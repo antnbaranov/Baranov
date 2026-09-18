@@ -2,20 +2,16 @@
 //  ContentView.swift
 //  Baranov
 //
-//  Created by Anton Baranov on 11.09.26.
+//  App entry point — hands off immediately to the root screen (Journey,
+//  with Pasture reached by pushing from its toolbar; see `RootView`).
+//  Kept as its own tiny file so `BaranovApp.swift` doesn't need to change.
 //
 
 import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        RootView()
     }
 }
 

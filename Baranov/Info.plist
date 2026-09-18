@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSMotionUsageDescription</key>
+	<string>Baranov uses your steps to walk your carrier rams toward their destinations.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Baranov suggests people from your contacts when you address a letter to someone.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Baranov finds another shepherd standing next to you when you both shake your phones, so a ram can change hands without the internet.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_baranov-gate._tcp</string>
+		<string>_baranov-gate._udp</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Baranov uses your current location to set where a letter's journey starts.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Baranov uses the microphone so you can dictate text instead of typing it.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Baranov turns your speech into text when you use dictation.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.baranov.transit</string>
+			<key>UTTypeDescription</key>
+			<string>Baranov Ram Transit Package</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>ram</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Baranov Ram Transit Package</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.baranov.transit</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,18 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local secrets (the RevenueCat key in Config/RevenueCatConfiguration.swift is a *public* SDK key and is fine to commit)
+*.secrets.xcconfig
