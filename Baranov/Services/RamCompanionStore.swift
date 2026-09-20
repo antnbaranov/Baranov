@@ -19,6 +19,8 @@ final class RamCompanionStore {
     private(set) var companion: RamCompanion?
 
     private static let storageKey = "com.baranov.ramCompanion"
+    private static let defaults: UserDefaults =
+        UserDefaults(suiteName: "group.com.baranov") ?? .standard
 
     init() {
         load()
@@ -50,7 +52,7 @@ final class RamCompanionStore {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+        guard let data = Self.defaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode(RamCompanion.self, from: data)
         else { return }
         companion = decoded
@@ -58,7 +60,7 @@ final class RamCompanionStore {
 
     private func save() {
         guard let companion, let data = try? JSONEncoder().encode(companion) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        Self.defaults.set(data, forKey: Self.storageKey)
     }
 }
 

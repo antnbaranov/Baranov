@@ -1,0 +1,736 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A721CF8A30568ACE0052DF31 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8930568ACE0052DF31 /* ReceiptParser */; };
+		A721CF8C30568ACE0052DF31 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8B30568ACE0052DF31 /* RevenueCat */; };
+		A721CF8E30568ACE0052DF31 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8D30568ACE0052DF31 /* RevenueCatUI */; };
+		C4B00000D00000000000000D /* BaranovWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C4B00000C00000000000000C /* BaranovWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B4A1000300000000000000C3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A721CF543054D4230052DF31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A721CF5B3054D4230052DF31;
+			remoteInfo = Baranov;
+		};
+		C4B00000B00000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A721CF543054D4230052DF31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4B000001000000000000001;
+			remoteInfo = BaranovWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C4B00000E00000000000000E /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C4B00000D00000000000000D /* BaranovWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A721CF5C3054D4230052DF31 /* Baranov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Baranov.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4A1000100000000000000C1 /* BaranovTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BaranovTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4B00000C00000000000000C /* BaranovWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaranovWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A721D04930573FB90052DF31 /* Exceptions for "Baranov" folder in "Baranov" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A721CF5B3054D4230052DF31 /* Baranov */;
+		};
+		C4B000009000000000000009 /* Exceptions for "BaranovWidget" folder in "BaranovWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C4B000001000000000000001 /* BaranovWidget */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A721CF5E3054D4230052DF31 /* Baranov */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A721D04930573FB90052DF31 /* Exceptions for "Baranov" folder in "Baranov" target */,
+			);
+			path = Baranov;
+			sourceTree = "<group>";
+		};
+		B4A1000200000000000000C2 /* BaranovTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BaranovTests;
+			sourceTree = "<group>";
+		};
+		C4B000002000000000000002 /* BaranovWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C4B000009000000000000009 /* Exceptions for "BaranovWidget" folder in "BaranovWidget" target */,
+			);
+			path = BaranovWidget;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A721CF593054D4230052DF31 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A721CF8C30568ACE0052DF31 /* RevenueCat in Frameworks */,
+				A721CF8A30568ACE0052DF31 /* ReceiptParser in Frameworks */,
+				A721CF8E30568ACE0052DF31 /* RevenueCatUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4A1000600000000000000C6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4B000004000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A721CF533054D4230052DF31 = {
+			isa = PBXGroup;
+			children = (
+				A721CF5E3054D4230052DF31 /* Baranov */,
+				B4A1000200000000000000C2 /* BaranovTests */,
+				C4B000002000000000000002 /* BaranovWidget */,
+				A721CF5D3054D4230052DF31 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A721CF5D3054D4230052DF31 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A721CF5C3054D4230052DF31 /* Baranov.app */,
+				B4A1000100000000000000C1 /* BaranovTests.xctest */,
+				C4B00000C00000000000000C /* BaranovWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A721CF5B3054D4230052DF31 /* Baranov */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A721CF673054D4250052DF31 /* Build configuration list for PBXNativeTarget "Baranov" */;
+			buildPhases = (
+				A721CF583054D4230052DF31 /* Sources */,
+				A721CF593054D4230052DF31 /* Frameworks */,
+				A721CF5A3054D4230052DF31 /* Resources */,
+				C4B00000E00000000000000E /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C4B00000A00000000000000A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A721CF5E3054D4230052DF31 /* Baranov */,
+			);
+			name = Baranov;
+			packageProductDependencies = (
+				A721CF8930568ACE0052DF31 /* ReceiptParser */,
+				A721CF8B30568ACE0052DF31 /* RevenueCat */,
+				A721CF8D30568ACE0052DF31 /* RevenueCatUI */,
+			);
+			productName = Baranov;
+			productReference = A721CF5C3054D4230052DF31 /* Baranov.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B4A1000800000000000000C8 /* BaranovTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4A1000B00000000000000CB /* Build configuration list for PBXNativeTarget "BaranovTests" */;
+			buildPhases = (
+				B4A1000500000000000000C5 /* Sources */,
+				B4A1000600000000000000C6 /* Frameworks */,
+				B4A1000700000000000000C7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B4A1000400000000000000C4 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B4A1000200000000000000C2 /* BaranovTests */,
+			);
+			name = BaranovTests;
+			packageProductDependencies = (
+			);
+			productName = BaranovTests;
+			productReference = B4A1000100000000000000C1 /* BaranovTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C4B000001000000000000001 /* BaranovWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4B000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWidget" */;
+			buildPhases = (
+				C4B000003000000000000003 /* Sources */,
+				C4B000004000000000000004 /* Frameworks */,
+				C4B000005000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C4B000002000000000000002 /* BaranovWidget */,
+			);
+			name = BaranovWidget;
+			packageProductDependencies = (
+			);
+			productName = BaranovWidget;
+			productReference = C4B00000C00000000000000C /* BaranovWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A721CF543054D4230052DF31 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					A721CF5B3054D4230052DF31 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					B4A1000800000000000000C8 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = A721CF5B3054D4230052DF31;
+					};
+					C4B000001000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = A721CF573054D4230052DF31 /* Build configuration list for PBXProject "Baranov" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				"en-GB",
+				"en-AU",
+				"en-CA",
+				sq,
+				ar,
+				eu,
+				bs,
+				bg,
+				ca,
+				"zh-Hans",
+				"zh-Hant",
+				"zh-HK",
+				hr,
+				cs,
+				da,
+				nl,
+				et,
+				fi,
+				fr,
+				"fr-CA",
+				gl,
+				de,
+				el,
+				he,
+				hi,
+				hu,
+				is,
+				id,
+				ga,
+				it,
+				ja,
+				ko,
+				lv,
+				lt,
+				mk,
+				ms,
+				mt,
+				no,
+				pl,
+				"pt-BR",
+				"pt-PT",
+				ro,
+				ru,
+				sr,
+				sk,
+				sl,
+				es,
+				"es-419",
+				sv,
+				th,
+				tr,
+				uk,
+				vi,
+			);
+			mainGroup = A721CF533054D4230052DF31;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A721CF8830568ACE0052DF31 /* XCRemoteSwiftPackageReference "purchases-ios" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A721CF5D3054D4230052DF31 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A721CF5B3054D4230052DF31 /* Baranov */,
+				B4A1000800000000000000C8 /* BaranovTests */,
+				C4B000001000000000000001 /* BaranovWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A721CF5A3054D4230052DF31 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4A1000700000000000000C7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4B000005000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A721CF583054D4230052DF31 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4A1000500000000000000C5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4B000003000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B4A1000400000000000000C4 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A721CF5B3054D4230052DF31 /* Baranov */;
+			targetProxy = B4A1000300000000000000C3 /* PBXContainerItemProxy */;
+		};
+		C4B00000A00000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4B000001000000000000001 /* BaranovWidget */;
+			targetProxy = C4B00000B00000000000000B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		A721CF653054D4250052DF31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		A721CF663054D4250052DF31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A721CF683054D4250052DF31 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Baranov/Baranov.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Baranov/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Baranov;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A721CF693054D4250052DF31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Baranov/Baranov.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Baranov/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Baranov;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B4A1000900000000000000C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.BaranovTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Baranov.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Baranov";
+			};
+			name = Debug;
+		};
+		B4A1000A00000000000000CA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.BaranovTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Baranov.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Baranov";
+			};
+			name = Release;
+		};
+		C4B000007000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaranovWidget/BaranovWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C4B000008000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BaranovWidget/BaranovWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A721CF573054D4230052DF31 /* Build configuration list for PBXProject "Baranov" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A721CF653054D4250052DF31 /* Debug */,
+				A721CF663054D4250052DF31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A721CF673054D4250052DF31 /* Build configuration list for PBXNativeTarget "Baranov" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A721CF683054D4250052DF31 /* Debug */,
+				A721CF693054D4250052DF31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B4A1000B00000000000000CB /* Build configuration list for PBXNativeTarget "BaranovTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4A1000900000000000000C9 /* Debug */,
+				B4A1000A00000000000000CA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C4B000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4B000007000000000000007 /* Debug */,
+				C4B000008000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A721CF8830568ACE0052DF31 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.89.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A721CF8930568ACE0052DF31 /* ReceiptParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A721CF8830568ACE0052DF31 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = ReceiptParser;
+		};
+		A721CF8B30568ACE0052DF31 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A721CF8830568ACE0052DF31 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
+		};
+		A721CF8D30568ACE0052DF31 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A721CF8830568ACE0052DF31 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCatUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A721CF543054D4230052DF31 /* Project object */;
+}

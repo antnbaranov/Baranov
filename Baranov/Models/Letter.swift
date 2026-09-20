@@ -46,6 +46,15 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     let createdAt: Date
     /// The wax this letter was sealed with.
     var sealColor: SealColor
+    /// Optional photo (JPEG, possibly doodled on). Ciphertext for a
+    /// wax-sealed letter, plain for an open postcard — like the body.
+    private(set) var attachment: Data?
+    /// The photo's plain bytes, once this device may show it.
+    private(set) var revealedAttachment: Data?
+    /// The paper it travels on; purely visual.
+    var paper: EnvelopePaper = .cream
+    /// `#RRGGBB` picked on the colour wheel; overrides `paper` when set.
+    var paperCustomHex: String?
 
     // MARK: - Writing a letter
 
@@ -58,14 +67,16 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     static func writeOpen(
         senderName: String,
         recipientName: String,
-        messageBody: String
+        messageBody: String,
+        attachment: Data? = nil
     ) -> Letter {
         Letter(
             id: UUID(),
             senderName: senderName,
             recipientName: recipientName,
             openBody: messageBody,
-            createdAt: Date()
+            createdAt: Date(),
+            attachment: attachment
         )
     }
 
@@ -74,7 +85,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         senderName: String,
         recipientName: String,
         openBody: String,
-        createdAt: Date
+        createdAt: Date,
+        attachment: Data?
     ) {
         self.id = id
         self.senderName = senderName
@@ -84,6 +96,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         self.isSealed = true
         self.createdAt = createdAt
         self.sealColor = .crimson
+        self.attachment = attachment
+        self.revealedAttachment = attachment
     }
 
     /// Writes and seals a brand-new letter. The receiving code is minted
@@ -93,7 +107,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         senderName: String,
         recipientName: String,
         messageBody: String,
-        sealColor: SealColor = .crimson
+        sealColor: SealColor = .crimson,
+        attachment: Data? = nil
     ) -> (letter: Letter, receivingCode: String) {
         let code = generateReceivingCode()
         let letter = Letter(
@@ -101,7 +116,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
             recipientName: recipientName,
             messageBody: messageBody,
             receivingCode: code,
-            sealColor: sealColor
+            sealColor: sealColor,
+            attachment: attachment
         )
         SealKeyVault.store(code, for: letter.id)
         return (letter, code)
@@ -119,7 +135,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         isSealed: Bool = true,
         createdAt: Date = Date(),
         receivingCode: String,
-        sealColor: SealColor = .crimson
+        sealColor: SealColor = .crimson,
+        attachment: Data? = nil
     ) {
         self.id = id
         self.senderName = senderName
@@ -132,6 +149,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         // over; an empty body simply reads as an empty letter.
         self.sealedBody = (try? LetterCipher.seal(messageBody, receivingCode: receivingCode, letterID: id)) ?? Data()
         self.revealedBody = isSealed ? nil : messageBody
+        self.attachment = attachment.flatMap {
+            try? LetterCipher.sealData($0, receivingCode: receivingCode, letterID: id)
+        }
+        self.revealedAttachment = isSealed ? nil : attachment
     }
 
     // MARK: - Reading a letter
@@ -173,6 +194,9 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         }
         let body = try LetterCipher.open(sealedBody, receivingCode: code, letterID: id)
         revealedBody = body
+        if let attachment {
+            revealedAttachment = try? LetterCipher.openData(attachment, receivingCode: code, letterID: id)
+        }
         isSealed = false
         SealKeyVault.store(code, for: id)
     }
@@ -180,7 +204,7 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     // MARK: - Codable
 
     private enum CodingKeys: String, CodingKey {
-        case id, senderName, recipientName, sealedBody, revealedBody, isSealed, createdAt, sealColor
+        case id, senderName, recipientName, sealedBody, revealedBody, isSealed, createdAt, sealColor, attachment, revealedAttachment, paper, paperCustomHex
         // Legacy keys from builds before letters were actually encrypted.
         case messageBody, receivingCode
     }
@@ -198,6 +222,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         isSealed = try container.decode(Bool.self, forKey: .isSealed)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         sealColor = try container.decodeIfPresent(SealColor.self, forKey: .sealColor) ?? .crimson
+        attachment = try container.decodeIfPresent(Data.self, forKey: .attachment)
+        revealedAttachment = try container.decodeIfPresent(Data.self, forKey: .revealedAttachment)
+        paper = try container.decodeIfPresent(EnvelopePaper.self, forKey: .paper) ?? .cream
+        paperCustomHex = try container.decodeIfPresent(String.self, forKey: .paperCustomHex)
 
         if let sealed = try container.decodeIfPresent(Data.self, forKey: .sealedBody) {
             sealedBody = sealed
@@ -222,6 +250,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         try container.encode(isSealed, forKey: .isSealed)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(sealColor, forKey: .sealColor)
+        try container.encodeIfPresent(attachment, forKey: .attachment)
+        try container.encodeIfPresent(revealedAttachment, forKey: .revealedAttachment)
+        try container.encode(paper, forKey: .paper)
+        try container.encodeIfPresent(paperCustomHex, forKey: .paperCustomHex)
     }
 
     // MARK: - Receiving codes

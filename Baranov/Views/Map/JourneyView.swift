@@ -56,8 +56,22 @@ import SwiftUI
 struct JourneyView: View {
     let telemetryService: TelemetryService
     let carrierUserId: UUID
+    private let onManualHoofbeat: () -> Void
 
     @Environment(FlockViewModel.self) private var flockViewModel
+    @Environment(EntitlementService.self) private var entitlementService
+    @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
+    @AppStorage(AppAppearance.storageKey) private var appAppearanceRawValue = AppAppearance.system.rawValue
+
+    private var currentLocale: Locale {
+        Locale(identifier: selectedLanguageCode)
+    }
+
+    private var appAppearance: AppAppearance {
+        AppAppearance(rawValue: appAppearanceRawValue) ?? .system
+    }
+
     @State private var stepTracker = StepTrackerService()
     /// The map camera and its follow/flyover behaviour — see
     /// `JourneyCameraController`. The `Map` binds to `camera.position`.
@@ -108,10 +122,13 @@ struct JourneyView: View {
     /// points on the map. See `FlockPulseService` for why.
     @State private var flockPulse: FlockPulseService
 
-    init(telemetryService: TelemetryService, carrierUserId: UUID, isPasturePresented: Binding<Bool>) {
+    init(telemetryService: TelemetryService, carrierUserId: UUID, isPasturePresented: Binding<Bool>, isCouriersPresented: Binding<Bool> = .constant(false), letterRam: Binding<Ram?>, onManualHoofbeat: @escaping () -> Void = {}) {
         self.telemetryService = telemetryService
         self.carrierUserId = carrierUserId
         _isPasturePresented = isPasturePresented
+        _isCouriersPresented = isCouriersPresented
+        _letterRam = letterRam
+        self.onManualHoofbeat = onManualHoofbeat
         // Reads from the same ACIT3855 receiver this view already posts
         // ram hops to, so there is exactly one telemetry host to point at.
         _flockPulse = State(initialValue: FlockPulseService(baseURL: telemetryService.baseURL))
@@ -122,7 +139,20 @@ struct JourneyView: View {
     /// can hide this view's own docked panel while it's showing.
     @Binding var isPasturePresented: Bool
 
-    @State private var panelDetent: PresentationDetent = .height(88)
+    /// Whether the couriers sheet is up — owned by `RootView`, like Pasture.
+    @Binding var isCouriersPresented: Bool
+
+    /// The ram whose letter is being inspected or opened — owned by
+    /// `RootView`, which presents `LetterDetailView` for it (same
+    /// one-owner-per-modal rule as Pasture). Set from the courier dock
+    /// and by tapping the ram on the map.
+    @Binding var letterRam: Ram?
+
+    /// The person's own default ram, shown in the dock even when no
+    /// letter is out, so the courier is always on the main screen.
+    @State private var ramCompanionStore = RamCompanionStore()
+
+    @State private var panelDetent: PresentationDetent = .height(152)
 
     /// Whether the floating "You are here"/"Ram is away" pill is
     /// currently shown — auto-dismissed a few seconds after it appears
@@ -236,7 +266,8 @@ struct JourneyView: View {
     /// composing; while a ram is out, room for the compact dispatch card
     /// plus the page dots under it.
     private var collapsedPanelHeight: CGFloat {
-        trackedRam == nil ? 88 : 132
+        guard let ram = trackedRam else { return 152 }
+        return ram.status == .arrivedAtGate ? 188 : 132
     }
 
     private var isPanelCollapsed: Bool {
@@ -249,6 +280,12 @@ struct JourneyView: View {
     private var trackedRam: Ram? {
         flockViewModel.activeRams.first { $0.status == .walking }
             ?? flockViewModel.activeRams.first { $0.status == .grazing }
+            // A ram at the recipient's gate owns the dock next: the letter
+            // waiting to be opened is the payoff of the whole walk, and the
+            // dock is now the only way to reach it (the Satchel is gone).
+            // Ranked below walking/grazing because those need the
+            // pedometer, which follows `trackedRam`.
+            ?? flockViewModel.activeRams.first { $0.status == .arrivedAtGate }
             // Nothing is walking, but something may still be moving: a ram
             // aboard the packet crosses on the clock, and the map is the
             // one place that progress is legible. Ranked last so a ram
@@ -267,13 +304,32 @@ struct JourneyView: View {
     /// preview card, by contrast, never touches the sheet.
     private var isDockedPanelPresented: Binding<Bool> {
         Binding(
-            get: { !isPasturePresented && !lookAround.layout.isExpanded },
+            get: { !isPasturePresented && !isCouriersPresented && letterRam == nil && !lookAround.layout.isExpanded },
             set: { newValue in
-                if !lookAround.layout.isExpanded {
+                if !lookAround.layout.isExpanded, letterRam == nil {
                     isPasturePresented = !newValue
                 }
             }
         )
+    }
+
+    /// The Pasture button: a paw and, when rams are out, how many — so the
+    /// button says something instead of being a bare glyph.
+    private var pastureToolbarLabel: some View {
+        let outCount = flockViewModel.activeRams.filter { $0.status != .delivered }.count
+        return HStack(spacing: 5) {
+            Image(systemName: "pawprint.fill")
+            if outCount > 0 {
+                Text("\(outCount)")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            } else {
+                Text("Pasture")
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
+        .padding(.horizontal, 4)
     }
 
     var body: some View {
@@ -287,11 +343,23 @@ struct JourneyView: View {
                     // transaction as the panel's spring.
                     .toolbar(lookAround.layout.isExpanded ? .hidden : .visible, for: .navigationBar)
                     .toolbar {
+                        // Couriers: always reachable, whether or not a
+                        // ram is out. Same toolbar button as Pasture,
+                        // different glyph, on the opposite side of the title.
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                isCouriersPresented = true
+                            } label: {
+                                Image(systemName: "figure.walk.motion")
+                                    .padding(.horizontal, 4)
+                            }
+                            .accessibilityLabel("Couriers")
+                        }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 isPasturePresented = true
                             } label: {
-                                Image(systemName: "pawprint.fill")
+                                pastureToolbarLabel
                             }
                             .accessibilityLabel("Pasture")
                         }
@@ -309,7 +377,11 @@ struct JourneyView: View {
                     // explicitly re-added there), so `ComposeLetterView`
                     // gets the same explicit copy rather than trusting
                     // inheritance alone.
+                    .environment(flockViewModel)
+                    .environment(entitlementService)
                     .environment(locationService)
+                    .environment(\.locale, currentLocale)
+                    .preferredColorScheme(appAppearance.colorScheme)
                     .presentationDetents([.height(collapsedPanelHeight), .medium, .large], selection: $panelDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationDragIndicator(.visible)
@@ -396,6 +468,12 @@ struct JourneyView: View {
                 }
                 refreshLookAroundAvailability()
             }
+            .onChange(of: trackedRam?.status) { old, new in
+                // A ram reaching its gate grows the panel so the seal
+                // button is right there, not hidden behind a drag.
+                guard new == .arrivedAtGate, old != nil else { return }
+                withAnimation { panelDetent = .medium }
+            }
             .onChange(of: trackedRam?.id) { _, newValue in
                 withAnimation {
                     // A ram setting out lands the panel on its journey
@@ -413,6 +491,7 @@ struct JourneyView: View {
                 // "steps today" readout going regardless of whether a ram
                 // is currently being tracked. Idempotent, so it's safe if
                 // SwiftUI ever re-invokes it.
+                guard hasCompletedOnboarding else { return }
                 stepTracker.startTrackingToday()
             }
             .onAppear {
@@ -421,7 +500,14 @@ struct JourneyView: View {
                 // person walks and turns its heading indicator. Stopped
                 // below so the radio isn't left on behind a dismissed map;
                 // `resolveCurrentLocation()` still works independently.
+                guard hasCompletedOnboarding else { return }
                 locationService.startLiveTracking()
+            }
+            .onChange(of: hasCompletedOnboarding) { _, completed in
+                if completed {
+                    locationService.startLiveTracking()
+                    stepTracker.startTrackingToday()
+                }
             }
             .onDisappear {
                 stepTracker.stopTracking()
@@ -542,8 +628,16 @@ struct JourneyView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             } else {
-                composePage
-                    .transition(.opacity)
+                VStack(spacing: 0) {
+                    if isPanelCollapsed {
+                        IdleCourierCard(name: ramCompanionStore.companion?.name ?? "Your ram")
+                            .padding(.horizontal, 16)
+                            .padding(.top, 20)
+                            .padding(.bottom, 8)
+                    }
+                    composePage
+                }
+                .transition(.opacity)
             }
         }
         // Sending a letter flips `trackedRam` from nil to the freshly
@@ -564,8 +658,8 @@ struct JourneyView: View {
             if trackedRam != nil {
                 PanelPageControl(
                     items: [
-                        .init(page: .delivery, title: "Delivery"),
-                        .init(page: .compose, title: "New Letter"),
+                        .init(page: .delivery, title: String(localized: "Delivery")),
+                        .init(page: .compose, title: String(localized: "New Letter")),
                     ],
                     selection: $panelPage
                 )
@@ -603,12 +697,14 @@ struct JourneyView: View {
             DispatchStatusCard(
                 ram: ram,
                 headline: waitingHeadline(for: ram),
-                isMoving: ram.status == .walking && isPersonMoving
-            ) {
-                withAnimation {
-                    panelDetent = .medium
-                }
-            }
+                isMoving: ram.status == .walking && isPersonMoving,
+                onTap: {
+                    withAnimation {
+                        panelDetent = .medium
+                    }
+                },
+                onBreakSeal: { letterRam = ram }
+            )
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .frame(maxHeight: .infinity, alignment: .top)
@@ -625,18 +721,13 @@ struct JourneyView: View {
 
     // MARK: - Map
 
-    /// See `globeViewDistanceThresholdMeters` for why this isn't just a
-    /// fixed `.standard(elevation: .flat)`.
+    /// Switches between standard 3D realistic relief up close and hybrid globe view from orbit.
     private var currentMapStyle: MapStyle {
-        // `cameraPosition`'s own `.camera` reflects the live camera as the
-        // person pans/zooms (no separate tracked-camera state needed) —
-        // falls back to the default tracking distance for `.automatic`/
-        // `.region` positions, where there's no `MapCamera` to read yet.
         let distance = camera.currentDistance
         if distance > globeViewDistanceThresholdMeters {
-            return .hybrid(elevation: .flat, showsTraffic: false)
+            return .hybrid(elevation: .realistic, showsTraffic: false)
         }
-        return .standard(elevation: .flat)
+        return .standard(elevation: .realistic)
     }
 
     private var mapContent: some View {
@@ -690,6 +781,15 @@ struct JourneyView: View {
                             bearingDegrees: ram.currentBearingDegrees ?? ram.originBearingDegrees ?? 0,
                             motionState: motionState(for: ram)
                         )
+                        // Tap the ram to look at the letter it carries.
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            guard ram.letter != nil else { return }
+                            letterRam = ram
+                        }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityLabel(Text("\(ram.name), carrying a letter"))
+                        .accessibilityHint(Text("Opens the letter"))
                     }
                 }
             } else if let homeCoordinate = locationService.currentCoordinate {
@@ -996,14 +1096,19 @@ struct JourneyView: View {
             // No binoculars button here: the floating Look Around
             // preview card (above the docked sheet) is the one entry
             // point, so the same feature is never drawn twice.
-            if trackedRam != nil {
-                mapControlButton(
-                    systemImage: "scope",
-                    accessibilityLabel: "Find Ram",
-                    tint: camera.isFollowingRam ? .primary : .accentColor,
-                    action: returnToRam
-                )
-            }
+            mapControlButton(
+                systemImage: "scope",
+                accessibilityLabel: "Find Ram",
+                tint: trackedRam == nil ? .secondary : (camera.isFollowingRam ? .primary : .accentColor),
+                action: {
+                    if trackedRam != nil {
+                        returnToRam()
+                    } else {
+                        locationService.resolveCurrentLocation()
+                        camera.centerOnUser(locationService.currentCoordinate, animated: true)
+                    }
+                }
+            )
 
             mapControlButton(
                 systemImage: "location.fill",
@@ -1039,9 +1144,6 @@ struct JourneyView: View {
     ) -> some View {
         Button(action: action) {
             ZStack {
-                Circle()
-                    .fill(.regularMaterial)
-
                 if isLoading {
                     ProgressView()
                         .controlSize(.small)
@@ -1052,6 +1154,8 @@ struct JourneyView: View {
                 }
             }
             .frame(width: 44, height: 44)
+            .liquidGlass(in: Circle(), fallbackMaterial: .regularMaterial)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .disabled(isLoading)
@@ -1206,6 +1310,37 @@ struct JourneyView: View {
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
+            if ram.status == .arrivedAtGate {
+                BreakSealButton { letterRam = ram }
+                    .padding(.top, 4)
+            } else if ram.letter != nil {
+                Button {
+                    letterRam = ram
+                } label: {
+                    Label("View Letter", systemImage: "envelope")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.regular)
+                .padding(.top, 4)
+            }
+
+            // Another ram may be standing at a gate while this one is
+            // still on the road; the dock shows one ram at a time, so say
+            // so instead of leaving the letter unreachable.
+            if let waiting = flockViewModel.activeRams.first(where: { $0.status == .arrivedAtGate && $0.id != ram.id }) {
+                Button {
+                    letterRam = waiting
+                } label: {
+                    Label("\(waiting.name) is at the gate", systemImage: "door.left.hand.open")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.regular)
+            }
+
             if ram.status == .grazing || ram.status == .walking || ram.status == .waitingForHandoff {
                 // Withdrawing a letter is a full slide, never a tap: this
                 // sheet gets dragged between detents constantly, and a
@@ -1231,13 +1366,13 @@ struct JourneyView: View {
     private func waitingHeadline(for ram: Ram) -> String {
         if let recipient = ram.letter?.recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
            !recipient.isEmpty {
-            return "\(recipient) is waiting"
+            return String(format: String(localized: "%@ is waiting"), recipient)
         }
         if let passenger = ram.passengerLetters.first?.recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
            !passenger.isEmpty {
-            return "\(passenger) is waiting"
+            return String(format: String(localized: "%@ is waiting"), passenger)
         }
-        return "On the way to \(ram.targetCity)"
+        return String(format: String(localized: "On the way to %@"), ram.targetCity)
     }
 
     private func nextLandmarkRow(_ landmark: NextLandmarkService.Landmark, for ram: Ram) -> some View {
@@ -1606,7 +1741,8 @@ struct JourneyView: View {
     JourneyView(
         telemetryService: TelemetryService(),
         carrierUserId: UUID(),
-        isPasturePresented: $isPasturePresented
+        isPasturePresented: $isPasturePresented,
+        letterRam: .constant(nil)
     )
     .environment(FlockViewModel.preview)
     .environment(LocationService())

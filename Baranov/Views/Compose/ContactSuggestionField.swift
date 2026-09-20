@@ -26,7 +26,7 @@ import SwiftUI
 import UIKit
 
 struct ContactSuggestionField: View {
-    let placeholder: String
+    let placeholder: LocalizedStringKey
     @Binding var text: String
 
     /// Fires when the sender taps one of a selected contact's addresses —

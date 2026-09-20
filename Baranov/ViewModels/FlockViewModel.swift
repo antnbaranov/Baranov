@@ -15,6 +15,8 @@
 import CoreLocation
 import Foundation
 import Observation
+import ActivityKit
+import WidgetKit
 
 @Observable
 @MainActor
@@ -51,6 +53,15 @@ final class FlockViewModel {
             self.activeRams = snapshot.activeRams
             self.selectedRamId = snapshot.selectedRamId
         }
+        PhoneWatchSessionManager.shared.onStepsReceived = { [weak self] steps in
+            guard let self else { return }
+            if let active = self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
+                self.addStepProgress(ramId: active.id, steps: steps)
+            }
+        }
+        if let active = self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
+            self.startOrUpdateLiveActivity(for: active)
+        }
     }
 
     /// Coalesces bursts of mutations (a pedometer update lands every few
@@ -58,6 +69,71 @@ final class FlockViewModel {
     /// after the last change, rather than rewriting a flock with three
     /// legs of road polylines on every step.
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
+
+    // MARK: - Live Activity
+
+    @ObservationIgnored private var liveActivities: [UUID: Activity<RamActivityAttributes>] = [:]
+    @ObservationIgnored private var lastActivityUpdate: [UUID: Date] = [:]
+    private let activityUpdateInterval: TimeInterval = 60
+
+    func startOrUpdateLiveActivity(for ram: Ram) {
+        let state = contentState(for: ram)
+        if ActivityAuthorizationInfo().areActivitiesEnabled {
+            if let existing = liveActivities[ram.id] {
+                let now = Date()
+                if let last = lastActivityUpdate[ram.id], now.timeIntervalSince(last) < activityUpdateInterval {
+                    // Throttle ActivityKit updates to avoid system limits
+                } else {
+                    lastActivityUpdate[ram.id] = now
+                    Task { await existing.update(using: state) }
+                }
+            } else {
+                let attrs = RamActivityAttributes(ramName: ram.name, fromCity: ram.currentCity, toCity: ram.targetCity)
+                do {
+                    let activity = try Activity.request(
+                        attributes: attrs,
+                        content: .init(state: state, staleDate: Date().addingTimeInterval(30 * 60))
+                    )
+                    liveActivities[ram.id] = activity
+                    lastActivityUpdate[ram.id] = Date()
+                } catch { /* not supported or authorized */ }
+            }
+        }
+        PhoneWatchSessionManager.shared.syncRamState(
+            ramName: ram.name,
+            fromCity: ram.currentCity,
+            toCity: ram.targetCity,
+            progress: state.progress,
+            remainingSteps: state.remainingSteps,
+            remainingDistance: state.remainingDistance,
+            statusSymbol: state.statusSymbol,
+            statusLabel: state.statusLabel,
+            isAtSea: ram.status == .atSea,
+            seaVoyageTitle: ram.voyage.map { "\($0.departurePortName) → \($0.arrivalPortName)" }
+        )
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func endLiveActivity(for ramId: UUID) {
+        guard let activity = liveActivities[ramId] else { return }
+        Task { await activity.end(nil, dismissalPolicy: .after(Date().addingTimeInterval(5))) }
+        liveActivities.removeValue(forKey: ramId)
+        lastActivityUpdate.removeValue(forKey: ramId)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func contentState(for ram: Ram) -> RamActivityAttributes.ContentState {
+        let remaining = max(0, ram.totalStepsRequired - ram.stepsWalked)
+        let progress = ram.totalStepsRequired > 0 ? min(1.0, Double(ram.stepsWalked) / Double(ram.totalStepsRequired)) : 0
+        let distanceStr = remaining >= 1000 ? String(format: "%.1f km", Double(remaining) / 1000) : "\(remaining) m"
+        return RamActivityAttributes.ContentState(
+            progress: progress,
+            remainingSteps: remaining,
+            remainingDistance: distanceStr,
+            statusSymbol: ram.status.symbolName,
+            statusLabel: ram.status.displayName
+        )
+    }
 
     private func persist() {
         guard let store else { return }
@@ -152,6 +228,7 @@ final class FlockViewModel {
         }
 
         activeRams[index] = ram
+        startOrUpdateLiveActivity(for: ram)
     }
 
     /// Records a passport stamp for a real, named place this ram has just
@@ -314,6 +391,7 @@ final class FlockViewModel {
         }
 
         activeRams.remove(at: index)
+        endLiveActivity(for: ramId)
         if selectedRamId == ramId {
             selectedRamId = activeRams.first?.id
         }

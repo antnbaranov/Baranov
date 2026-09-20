@@ -104,9 +104,10 @@ struct PasturePaywallView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(.primary)
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .symbolRenderingMode(.hierarchical)
                     }
                     .accessibilityLabel("Close")
                 }
@@ -169,6 +170,8 @@ struct PasturePaywallView: View {
 
     // MARK: - Pasture scene
 
+    private static let previewRamNames = ["Juniper", "Basalt", "Thistle", "Clove", "Ember"]
+
     private var pastureScene: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
@@ -195,9 +198,7 @@ struct PasturePaywallView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
-    private static let previewRamNames = ["Juniper", "Basalt", "Thistle", "Clove", "Ember"]
-
-    private var sceneCaption: String {
+    private var sceneCaption: LocalizedStringKey {
         switch previewedSlots {
         case ...1: return "Right now: \(companionName), one letter at a time."
         case 2: return "With an adopted ram: two letters out at once, for good."
@@ -398,13 +399,13 @@ struct PasturePaywallView: View {
 
     // MARK: - Actions
 
-    private var ctaTitle: String {
+    private var ctaTitle: LocalizedStringKey {
         guard let option = viewModel.selectedOption else { return "Continue" }
         if option.isOneTime { return "Adopt a Ram" }
         return option.hasIntroductoryOffer ? "Start Free Week" : "Expand the Pasture"
     }
 
-    private var ctaSubtitle: String? {
+    private var ctaSubtitle: LocalizedStringKey? {
         guard let option = viewModel.selectedOption, option.hasIntroductoryOffer else { return nil }
         let priceLine = option.periodDescription.isEmpty
             ? option.priceString
@@ -504,7 +505,7 @@ private struct PlanRow: View {
     let isSelected: Bool
     let onTap: () -> Void
 
-    private var subtitle: String {
+    private var subtitle: LocalizedStringKey {
         if option.isOneTime {
             return "Pay once. A second ram, yours for good."
         }
@@ -514,8 +515,12 @@ private struct PlanRow: View {
         return "\(option.priceString) \(option.periodDescription). Cancel anytime."
     }
 
-    private var title: String {
-        option.isOneTime ? "Adopt a Ram" : "Expand the Pasture · \(option.title)"
+    private var title: LocalizedStringKey {
+        if option.isOneTime {
+            return "Adopt a Ram"
+        } else {
+            return "Expand the Pasture · \(option.title)"
+        }
     }
 
     var body: some View {
@@ -636,8 +641,8 @@ private struct PasturePenView: View {
 
 private struct FeatureRow: View {
     let symbol: String
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringKey
+    let subtitle: LocalizedStringKey
 
     @State private var bounce = 0
 
@@ -919,9 +924,10 @@ final class PasturePaywallViewModel {
     /// RevenueCat dashboard — for design review and demos without a key.
     private static var sampleOptions: [PaywallOption] {
         [
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: "Monthly", periodDescription: "per month", priceString: "$1.99", price: 1.99, approximateDays: 30),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: "Annual", periodDescription: "per year", priceString: "$12.99", price: 12.99, approximateDays: 365, hasIntroductoryOffer: true),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: "Adopt a Ram", periodDescription: "one-time purchase", priceString: "$3.99", price: 3.99, approximateDays: nil),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: "Monthly", periodDescription: "per month", priceString: "$2.99", price: 2.99, approximateDays: 30),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureQuarterly, title: "Every 3 Months", periodDescription: "every 3 months", priceString: "$5.99", price: 5.99, approximateDays: 90),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: "Annual", periodDescription: "per year", priceString: "$19.99", price: 19.99, approximateDays: 365, hasIntroductoryOffer: true),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: "Adopt a Ram", periodDescription: "one-time purchase", priceString: "$2.99", price: 2.99, approximateDays: nil),
         ]
     }
 }

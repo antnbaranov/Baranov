@@ -25,6 +25,8 @@ struct DispatchStatusCard: View {
     /// what animates the state glyph.
     var isMoving: Bool = false
     let onTap: () -> Void
+    /// Shown as a prominent button once the ram is at the gate.
+    var onBreakSeal: (() -> Void)? = nil
 
     private var stateSymbol: String {
         switch ram.status {
@@ -38,7 +40,7 @@ struct DispatchStatusCard: View {
         }
     }
 
-    private var stateCaption: String {
+    private var stateCaption: LocalizedStringKey {
         switch ram.status {
         case .walking: return isMoving ? "Walking" : "Resting"
         case .grazing: return "Ready to set out"
@@ -48,7 +50,7 @@ struct DispatchStatusCard: View {
             }
             return "Sails \(voyage.departsAt.formatted(.relative(presentation: .named)))"
         case .atSea:
-            guard let voyage = ram.voyage else { return "At sea" }
+            guard let voyage = ram.voyage else { return "At Sea" }
             return "At sea — \(voyage.arrivalPortName) by \(voyage.arrivesAt.formatted(.relative(presentation: .named)))"
         case .handedOff: return "Carried by someone else"
         case .arrivedAtGate: return "At the gate"
@@ -57,6 +59,15 @@ struct DispatchStatusCard: View {
     }
 
     var body: some View {
+        VStack(spacing: 8) {
+            cardButton
+            if ram.status == .arrivedAtGate, let onBreakSeal {
+                BreakSealButton(action: onBreakSeal)
+            }
+        }
+    }
+
+    private var cardButton: some View {
         Button(action: onTap) {
             VStack(spacing: 8) {
                 HStack(spacing: 12) {
@@ -71,6 +82,7 @@ struct DispatchStatusCard: View {
 
                         HStack(spacing: 4) {
                             Text(ram.name)
+                                .contentTransition(.opacity)
                             Text("·")
                             Text(stateCaption)
                                 .contentTransition(.opacity)
@@ -78,19 +90,22 @@ struct DispatchStatusCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .animation(.easeInOut(duration: 0.2), value: ram.status)
                     }
 
                     Spacer(minLength: 8)
 
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(ram.remainingSteps.formatted(.number.grouping(.automatic)))
-                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText(value: Double(ram.remainingSteps)))
-                            .foregroundStyle(.primary)
-                        Text("steps to go")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                    if ram.status != .delivered && ram.status != .arrivedAtGate {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(ram.remainingSteps.formatted(.number.grouping(.automatic)))
+                                .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                                .monospacedDigit()
+                                .contentTransition(.numericText(value: Double(ram.remainingSteps)))
+                                .foregroundStyle(.primary)
+                            Text("steps to go")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
 
                     Image(systemName: stateSymbol)
@@ -103,7 +118,6 @@ struct DispatchStatusCard: View {
 
                 ProgressView(value: ram.progress)
                     .progressViewStyle(.linear)
-                    .tint(.accentColor)
                     .controlSize(.mini)
             }
             .padding(.horizontal, 14)
@@ -115,7 +129,14 @@ struct DispatchStatusCard: View {
         .animation(.snappy, value: ram.remainingSteps)
         .animation(.easeInOut(duration: 0.2), value: isMoving)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(headline). \(ram.name), \(stateCaption.lowercased()), \(ram.remainingSteps) steps to go.")
+        .accessibilityLabel(
+            Text(headline)
+            + Text(". ")
+            + Text(ram.name)
+            + Text(", ")
+            + Text(stateCaption)
+            + Text(", \(ram.remainingSteps) steps to go.")
+        )
         .accessibilityHint("Opens the journey")
     }
 }

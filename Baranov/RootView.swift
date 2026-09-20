@@ -49,6 +49,15 @@ struct RootView: View {
     /// doc) and handed down to `JourneyView` only so its docked panel
     /// knows to hide itself while Pasture is showing.
     @State private var isPasturePresented = false
+    @State private var isCouriersPresented = false
+    /// A receiving code found nearby, handed to the letter sheet that opens next.
+    @State private var proximityCode: String?
+
+    /// The ram whose wax seal is being broken from the main screen's
+    /// courier dock or by tapping the ram on the map. Owned here so
+    /// `LetterDetailView` is the only modal competing with Pasture for
+    /// the presentation slot.
+    @State private var letterRam: Ram?
 
     /// Coming back to the foreground is the moment to reconcile the packet
     /// schedule: a crossing runs on the wall clock, so a ship that sailed
@@ -74,10 +83,16 @@ struct RootView: View {
     /// reused from then on — read here only to decide whether onboarding
     /// still needs to run; `ComposeLetterView` reads the same key itself
     /// to auto-fill "Your Name".
+    @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("com.baranov.carrierDisplayName") private var carrierDisplayName = ""
+    @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
+
+    private var currentLocale: Locale {
+        Locale(identifier: selectedLanguageCode)
+    }
 
     private var needsOnboarding: Bool {
-        carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !hasCompletedOnboarding || carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     init() {
@@ -99,13 +114,21 @@ struct RootView: View {
         JourneyView(
             telemetryService: telemetryService,
             carrierUserId: carrierUserId,
-            isPasturePresented: $isPasturePresented
+            isPasturePresented: $isPasturePresented,
+            isCouriersPresented: $isCouriersPresented,
+            letterRam: $letterRam,
+            onManualHoofbeat: { triggerManualHoofbeat() }
         )
             .environment(flockViewModel)
             .environment(entitlementService)
             .environment(locationService)
             .overlay(alignment: .top) {
-                HoofbeatOverlay(phase: hoofbeatRelay.phase, successTick: hoofbeatRelay.successTick)
+                HoofbeatOverlay(
+                    phase: hoofbeatRelay.phase,
+                    successTick: hoofbeatRelay.successTick,
+                    onDismiss: { hoofbeatRelay.reset() },
+                    onRetry: { triggerManualHoofbeat() }
+                )
             }
             .task {
                 await entitlementService.refresh()
@@ -147,12 +170,14 @@ struct RootView: View {
                 syncCarrierAttributes()
             }
             .onOpenURL { url in
+                guard url.scheme?.caseInsensitiveCompare("baranov") != .orderedSame else { return }
                 Task { await receiveTransitFile(at: url) }
             }
             .sheet(isPresented: $isCapacityPaywallPresented) {
                 PasturePaywallView()
                     .environment(flockViewModel)
                     .environment(entitlementService)
+                    .environment(\.locale, currentLocale)
                     .preferredColorScheme(appAppearance.colorScheme)
             }
             .sheet(isPresented: $isPasturePresented) {
@@ -163,15 +188,32 @@ struct RootView: View {
                 .environment(flockViewModel)
                 .environment(entitlementService)
                 .environment(locationService)
+                .environment(\.locale, currentLocale)
                 .preferredColorScheme(appAppearance.colorScheme)
             }
-            .fullScreenCover(isPresented: Binding(
-                get: { needsOnboarding },
-                set: { _ in }
-            )) {
-                OnboardingView(onFinished: {})
+            .sheet(isPresented: $isCouriersPresented) {
+                CouriersView(onOpenLetter: { ram, code in
+                    proximityCode = code
+                    isCouriersPresented = false
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(450))
+                        letterRam = ram
+                    }
+                })
+                    .presentationDragIndicator(.visible)
                     .environment(flockViewModel)
                     .environment(entitlementService)
+                    .environment(locationService)
+                    .environment(\.locale, currentLocale)
+                    .preferredColorScheme(appAppearance.colorScheme)
+            }
+            .sheet(item: $letterRam, onDismiss: { proximityCode = nil }) { ram in
+                LetterDetailView(ram: ram, prefilledCode: proximityCode)
+                    .presentationDragIndicator(.visible)
+                    .environment(flockViewModel)
+                    .environment(entitlementService)
+                    .environment(locationService)
+                    .environment(\.locale, currentLocale)
                     .preferredColorScheme(appAppearance.colorScheme)
             }
             .alert(
@@ -185,6 +227,7 @@ struct RootView: View {
             } message: {
                 Text(incomingImportErrorMessage ?? "")
             }
+            .environment(\.locale, currentLocale)
             .preferredColorScheme(appAppearance.colorScheme)
     }
 
@@ -234,6 +277,14 @@ struct RootView: View {
             hoofbeatRelay.begin(shakenAt: shakenAt, offering: handoffCandidate())
         }
         shakeDetector.start()
+    }
+
+    /// Toolbar-button alternative to the physical shake: arms the relay
+    /// with `Date()` as the shake instant and offers the same candidate a
+    /// real shake would.  The wider `matchWindow` (3.5 s) gives both people
+    /// enough room to tap within a few seconds of each other.
+    private func triggerManualHoofbeat() {
+        hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate())
     }
 
     /// The ram a shake should offer: one already waiting at a border first,

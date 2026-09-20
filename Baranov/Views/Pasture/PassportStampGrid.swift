@@ -117,12 +117,35 @@ struct PassportStampGrid: View {
             .padding(.vertical, 4)
         } else {
             LazyVGrid(columns: columns, alignment: .leading, spacing: 20) {
-                ForEach(stamps) { stamp in
+                ForEach(Array(stamps.enumerated()), id: \.element.id) { index, stamp in
                     PassportStampView(stamp: stamp, ramName: ramName)
+                        .modifier(StampEntranceModifier(index: index))
                 }
             }
             .padding(.vertical, 8)
         }
+    }
+}
+
+/// Staggers each stamp's appearance: fades + scales in from 0.82,
+/// with a 50 ms delay per index so a full page of stamps fans in
+/// rather than popping in all at once.
+private struct StampEntranceModifier: ViewModifier {
+    let index: Int
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(appeared ? 1 : 0)
+            .scaleEffect(appeared ? 1 : 0.82)
+            .onAppear {
+                withAnimation(
+                    .spring(response: 0.45, dampingFraction: 0.72)
+                    .delay(Double(index) * 0.05)
+                ) {
+                    appeared = true
+                }
+            }
     }
 }
 

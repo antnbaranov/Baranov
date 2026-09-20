@@ -103,16 +103,11 @@ struct RamSelectorSlider: View {
             .frame(height: 190)
             .clipped()
             .contentShape(Rectangle())
-            // `.simultaneousGesture`, not `.gesture` — the portrait and
-            // name inside the card have their own tap targets (petting,
-            // renaming), and a plain `.gesture` here would compete with
-            // them for the touch and could swallow it before either one
-            // gets a chance to recognize anything, including the swipe
-            // itself.
             .simultaneousGesture(swipeGesture)
 
             slotIndicator
         }
+        .sensoryFeedback(.selection, trigger: displayedSlotIndex)
         .onAppear {
             guard !hasSyncedInitialSlot else { return }
             hasSyncedInitialSlot = true

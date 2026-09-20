@@ -33,6 +33,8 @@ struct RamSelectorCard: View {
     /// it exists, so there's never a moment with nothing to show at all.
     let companion: RamCompanion?
     let onRenameCompanion: (String) -> Void
+    /// Opens the selected ram's passport, right under the ram itself.
+    var onPassportTapped: ((Ram) -> Void)? = nil
 
     @State private var isRenamePresented = false
     @State private var renameDraft = ""
@@ -89,6 +91,19 @@ struct RamSelectorCard: View {
                     .transition(.opacity.combined(with: .move(edge: .leading)))
 
                     Spacer(minLength: 8)
+
+                    if let onPassportTapped {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onPassportTapped(ram)
+                        } label: {
+                            Label("Passport", systemImage: "book.closed")
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                        .controlSize(.small)
+                        .accessibilityHint("Shows \(ram.name)'s passport and stamped visas")
+                    }
                 }
                 .animation(.easeInOut(duration: 0.25), value: ram.id)
             } else if let companion {
@@ -125,7 +140,7 @@ struct RamSelectorCard: View {
             }
         }
         .padding(14)
-        .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .alert("Rename Ram", isPresented: $isRenamePresented) {
             TextField("Ram's Name", text: $renameDraft)
             Button("Cancel", role: .cancel) {}
@@ -157,7 +172,8 @@ struct RamSelectorCard: View {
         onRename: { _, _ in },
         ledgerEntry: { ram in RamLedger.preview.entry(forName: ram.name) },
         companion: RamCompanionStore.preview.companion,
-        onRenameCompanion: { _ in }
+        onRenameCompanion: { _ in },
+        onPassportTapped: { _ in }
     )
     .padding()
 }

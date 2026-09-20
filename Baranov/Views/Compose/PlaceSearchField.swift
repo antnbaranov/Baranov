@@ -17,7 +17,7 @@ import MapKit
 import SwiftUI
 
 struct PlaceSearchField: View {
-    let placeholder: String
+    let placeholder: LocalizedStringKey
     @Binding var text: String
     let onSelect: (String, CLLocationCoordinate2D) -> Void
 

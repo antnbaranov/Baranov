@@ -15,6 +15,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 enum ShepherdAchievement: String, CaseIterable, Identifiable, Sendable {
     case firstLetter = "com.baranov.achievement.firstLetter"
@@ -46,6 +47,14 @@ enum ShepherdAchievement: String, CaseIterable, Identifiable, Sendable {
         case .oceanCrossing: return "Hand a ram to someone at a coast or border."
         case .fullPasture: return "Every pen full — five rams out walking at once."
         }
+    }
+
+    var localizedTitle: LocalizedStringKey {
+        LocalizedStringKey(title)
+    }
+
+    var localizedCaption: LocalizedStringKey {
+        LocalizedStringKey(caption)
     }
 
     var symbolName: String {

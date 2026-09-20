@@ -26,26 +26,9 @@ final class RamBleatPlayer {
 
     private init() {}
 
-    /// Plays the bleat: the bundled "ram_bleat" recording if one exists,
-    /// otherwise a brief system fallback sound. Never throws outward and
-    /// never crashes on a missing or corrupt asset — worst case, nothing
-    /// audible happens, which is no worse than not calling this at all.
+    /// Plays the bleat through SoundEffectPlayer.
     func play() {
-        configureSessionIfNeeded()
-
-        if let url = Self.bundledBleatURL {
-            do {
-                let player = try AVAudioPlayer(contentsOf: url)
-                player.prepareToPlay()
-                player.play()
-                self.player = player
-                return
-            } catch {
-                // Falls through to the system sound below.
-            }
-        }
-
-        AudioServicesPlaySystemSound(1104)
+        SoundEffectPlayer.shared.play(.ramBleat)
     }
 
     private static var bundledBleatURL: URL? {

@@ -55,3 +55,40 @@ private struct MaterialFieldBackground: ViewModifier {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
+
+// MARK: - Compact glass buttons
+
+extension View {
+    /// Small capsule button: Liquid Glass on iOS 26+, the system
+    /// bordered style on iOS 18–25.
+    @ViewBuilder
+    func compactGlassButton() -> some View {
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .tint(.secondary)
+        } else {
+            self.buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+                .controlSize(.small)
+                .tint(.secondary)
+        }
+    }
+
+    /// Icon-only round glass button (Liquid Glass on iOS 26+, a bordered
+    /// circle on iOS 18–25).
+    @ViewBuilder
+    func glassIconButton() -> some View {
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
+        } else {
+            self.buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
+                .tint(.secondary)
+        }
+    }
+}

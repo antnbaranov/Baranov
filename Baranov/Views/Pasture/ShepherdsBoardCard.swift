@@ -25,7 +25,6 @@ struct ShepherdsBoardCard: View {
     let localEntry: LeaderboardRow?
     let totalPlayers: Int
     let onSignInTapped: () -> Void
-    let onOpenGameCenterTapped: () -> Void
 
     @State private var earnedTick = 0
 
@@ -42,7 +41,7 @@ struct ShepherdsBoardCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onChange(of: earned.count) { old, new in
             if new > old { earnedTick += 1 }
         }
@@ -57,16 +56,6 @@ struct ShepherdsBoardCard: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             Spacer()
-            if isAuthenticated {
-                Button(action: onOpenGameCenterTapped) {
-                    Label("Game Center", systemImage: "gamecontroller.fill")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.thinMaterial, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 
@@ -74,11 +63,28 @@ struct ShepherdsBoardCard: View {
 
     private var scoreRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("\(experiencePoints)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.snappy, value: experiencePoints)
+            KeyframeAnimator(
+                initialValue: XPAnimationValues(),
+                trigger: experiencePoints
+            ) { values in
+                Text("\(experiencePoints)")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: false))
+                    .scaleEffect(values.scale, anchor: .bottom)
+                    .offset(y: values.verticalOffset)
+            } keyframes: { _ in
+                KeyframeTrack(\.verticalOffset) {
+                    SpringKeyframe(0, duration: 0.1)
+                    SpringKeyframe(-8, duration: 0.15)
+                    SpringKeyframe(0, spring: .bouncy(duration: 0.35))
+                }
+                KeyframeTrack(\.scale) {
+                    SpringKeyframe(1, duration: 0.1)
+                    SpringKeyframe(1.14, duration: 0.15)
+                    SpringKeyframe(1, spring: .bouncy(duration: 0.35))
+                }
+            }
             Text("XP")
                 .font(.headline)
                 .foregroundStyle(.secondary)
@@ -87,6 +93,8 @@ struct ShepherdsBoardCard: View {
                 if let localEntry {
                     Text("#\(localEntry.rank)")
                         .font(.title3.weight(.bold).monospacedDigit())
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: localEntry.rank)
                     Text(totalPlayers > 0 ? "of \(totalPlayers) shepherds" : "on the board")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -97,6 +105,11 @@ struct ShepherdsBoardCard: View {
                 }
             }
         }
+    }
+
+    private struct XPAnimationValues {
+        var verticalOffset: Double = 0
+        var scale: Double = 1
     }
 
     // MARK: - Leaderboard
@@ -138,12 +151,22 @@ struct ShepherdsBoardCard: View {
             }
         } else {
             VStack(spacing: 6) {
-                ForEach(topEntries) { row in
+                ForEach(Array(topEntries.enumerated()), id: \.element.id) { index, row in
                     boardRow(row)
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .trailing)
+                                    .combined(with: .opacity)
+                                    .animation(.spring(response: 0.45, dampingFraction: 0.8)
+                                        .delay(Double(index) * 0.05)),
+                                removal: .opacity
+                            )
+                        )
                 }
                 if let localEntry, !topEntries.contains(where: { $0.isLocalPlayer }) {
                     Divider().padding(.vertical, 2)
                     boardRow(localEntry)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
         }
@@ -239,7 +262,7 @@ private struct AchievementBadge: View {
                 }
                 .frame(width: 58, height: 58)
 
-                Text(showsCaption ? achievement.caption : achievement.title)
+                Text(showsCaption ? achievement.localizedCaption : achievement.localizedTitle)
                     .font(.caption2.weight(isEarned ? .semibold : .regular))
                     .foregroundStyle(isEarned ? .primary : .secondary)
                     .multilineTextAlignment(.center)
@@ -268,8 +291,7 @@ private struct AchievementBadge: View {
         ],
         localEntry: LeaderboardRow(id: "me", rank: 7, displayName: "Anton", score: 1_240, isLocalPlayer: true),
         totalPlayers: 42,
-        onSignInTapped: {},
-        onOpenGameCenterTapped: {}
+        onSignInTapped: {}
     )
     .padding()
 }
@@ -283,8 +305,7 @@ private struct AchievementBadge: View {
         topEntries: [],
         localEntry: nil,
         totalPlayers: 0,
-        onSignInTapped: {},
-        onOpenGameCenterTapped: {}
+        onSignInTapped: {}
     )
     .padding()
 }

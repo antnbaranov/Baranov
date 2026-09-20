@@ -21,10 +21,31 @@ import SwiftUI
 struct HoofbeatOverlay: View {
     let phase: HoofbeatPhase
     let successTick: Int
+    /// Cancels the current exchange and resets to idle.
+    var onDismiss: (() -> Void)? = nil
+    /// Re-triggers the hoofbeat after a failure.
+    var onRetry: (() -> Void)? = nil
 
     private var hasSpriteArt: Bool {
         guard let first = RamSpriteFrameSets.gallopWithEnvelope.first else { return false }
         return RamSpriteFrameSets.assetExists(first)
+    }
+
+    /// Phases where the dismiss button is useful — everywhere except idle
+    /// (nothing to dismiss) and exchanging (data is in flight, cancelling
+    /// mid-stream would corrupt the handoff).
+    private var showDismiss: Bool {
+        switch phase {
+        case .searching, .connecting, .failed, .finished:
+            return true
+        case .idle, .exchanging:
+            return false
+        }
+    }
+
+    private var showRetry: Bool {
+        if case .failed = phase { return true }
+        return false
     }
 
     var body: some View {
@@ -38,6 +59,29 @@ struct HoofbeatOverlay: View {
                         .font(.subheadline)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
+
+                    if showRetry, let onRetry {
+                        Button {
+                            onRetry()
+                        } label: {
+                            Text("Retry")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+
+                    if showDismiss, let onDismiss {
+                        Button {
+                            onDismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Dismiss")
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -48,7 +92,6 @@ struct HoofbeatOverlay: View {
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: phase)
         .sensoryFeedback(.success, trigger: successTick)
-        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -103,19 +146,25 @@ struct HoofbeatOverlay: View {
 }
 
 #Preview("Searching") {
-    HoofbeatOverlay(phase: .searching, successTick: 0)
+    HoofbeatOverlay(phase: .searching, successTick: 0, onDismiss: {}, onRetry: {})
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(.systemGroupedBackground))
 }
 
 #Preview("Exchanging") {
-    HoofbeatOverlay(phase: .exchanging(peerName: "Anton"), successTick: 0)
+    HoofbeatOverlay(phase: .exchanging(peerName: "Anton"), successTick: 0, onDismiss: {})
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color(.systemGroupedBackground))
+}
+
+#Preview("Failed") {
+    HoofbeatOverlay(phase: .failed(reason: "No one shook back nearby."), successTick: 0, onDismiss: {}, onRetry: {})
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(.systemGroupedBackground))
 }
 
 #Preview("Finished") {
-    HoofbeatOverlay(phase: .finished(summary: "Klaus went with Anton."), successTick: 1)
+    HoofbeatOverlay(phase: .finished(summary: "Klaus went with Anton."), successTick: 1, onDismiss: {})
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(.systemGroupedBackground))
 }

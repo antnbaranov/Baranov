@@ -51,13 +51,13 @@ struct SlideToActionControl: View {
         }
     }
 
-    let title: String
+    let title: LocalizedStringKey
     var role: Role = .dispatch
     var systemImage: String? = nil
     /// While true, the knob stays parked at the end and a spinner replaces
     /// its symbol; `busyTitle` replaces the track's label.
     var isBusy: Bool = false
-    var busyTitle: String? = nil
+    var busyTitle: LocalizedStringKey? = nil
     /// The control still slides and still calls `onComplete` when this is
     /// false — the parent decides what "not ready" means (this app
     /// explains what's missing rather than greying out). It only dims.

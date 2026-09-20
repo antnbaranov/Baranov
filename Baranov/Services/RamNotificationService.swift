@@ -48,6 +48,13 @@ final class RamNotificationService: NSObject {
     private var lastStepChange: [UUID: (steps: Int, at: Date)] = [:]
     private var hasPrimed = false
 
+    /// Pending transitions, keyed by ram ID — only the latest transition
+    /// per ram survives the debounce window, so a cascade through
+    /// `.atSea` → `.waitingForHandoff` → `.grazing` delivers one
+    /// notification for the final state, not three.
+    private var pendingTransitions: [UUID: (ram: Ram, from: RamStatus?)] = [:]
+    private var debounceTask: Task<Void, Never>?
+
     override init() {
         super.init()
         center.delegate = self
@@ -59,9 +66,11 @@ final class RamNotificationService: NSObject {
 
     // MARK: - Sync
 
-    /// Call on every flock change (and once at launch). Immediate
-    /// notifications for transitions that just happened; pending timers
-    /// re-planned for everything else.
+    /// Call on every flock change (and once at launch). Transitions are
+    /// buffered and delivered after a short debounce window, so a cascade
+    /// of mutations (e.g. a voyage landing followed by a leg resolution)
+    /// produces one notification for the final state, not one per
+    /// intermediate step.
     func sync(rams: [Ram]) {
         // First call after launch only primes the memory — a relaunch must
         // never re-announce every ram already sitting at a gate.
@@ -78,7 +87,15 @@ final class RamNotificationService: NSObject {
         for ram in rams {
             let previous = lastKnownStatus[ram.id]
             if previous != ram.status {
-                announceTransition(of: ram, from: previous)
+                // Buffer: keep the *original* `from` status for this ram
+                // if it's already pending — that's the real transition the
+                // person should know about. Only the ram snapshot (with its
+                // latest state) is replaced.
+                if pendingTransitions[ram.id] == nil {
+                    pendingTransitions[ram.id] = (ram, previous)
+                } else {
+                    pendingTransitions[ram.id]?.ram = ram
+                }
             }
             lastKnownStatus[ram.id] = ram.status
 
@@ -89,9 +106,26 @@ final class RamNotificationService: NSObject {
         for gone in Set(lastKnownStatus.keys).subtracting(rams.map(\.id)) {
             lastKnownStatus[gone] = nil
             lastStepChange[gone] = nil
+            pendingTransitions[gone] = nil
+        }
+
+        debounceTask?.cancel()
+        debounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled else { return }
+            flushPendingTransitions()
         }
 
         Task { await replan(rams: rams) }
+    }
+
+    /// Delivers every buffered transition and clears the buffer.
+    private func flushPendingTransitions() {
+        let transitions = pendingTransitions
+        pendingTransitions.removeAll()
+        for (_, entry) in transitions {
+            announceTransition(of: entry.ram, from: entry.from)
+        }
     }
 
     // MARK: - Immediate
@@ -107,9 +141,12 @@ final class RamNotificationService: NSObject {
                 title: "\(ram.name) is at the gate",
                 body: letter.map { "A letter from \($0.senderName) for \($0.recipientName) is waiting. Hold the seal to open it." }
                     ?? "A letter is waiting. Hold the seal to open it.",
-                ramID: ram.id
+                ramID: ram.id,
+                interruptionLevel: .timeSensitive
             )
-        case (_, .waitingForHandoff):
+        case (.walking, .waitingForHandoff), (.grazing, .waitingForHandoff):
+            // Only when the ram walked to a port — not when it's an
+            // intermediate step after a voyage landing or a fresh import.
             deliver(
                 id: "handoff-\(ram.id.uuidString)",
                 title: "\(ram.name) reached \(ram.legDestinationCity)",
@@ -149,13 +186,20 @@ final class RamNotificationService: NSObject {
         }
     }
 
-    private func deliver(id: String, title: String, body: String, ramID: UUID) {
+    private func deliver(
+        id: String,
+        title: String,
+        body: String,
+        ramID: UUID,
+        interruptionLevel: UNNotificationInterruptionLevel = .active
+    ) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         content.threadIdentifier = ramID.uuidString
         content.userInfo = ["ramID": ramID.uuidString]
+        content.interruptionLevel = interruptionLevel
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         center.add(request)
     }

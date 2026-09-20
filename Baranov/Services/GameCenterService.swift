@@ -33,7 +33,14 @@ final class GameCenterService {
     /// for real with no other code changes.
     static let lettersDeliveredLeaderboardID = "com.baranov.lettersDelivered"
 
-    private(set) var isAuthenticated = false
+    /// One shared instance for the whole app. Each screen used to create its
+    /// own `GameCenterService()`, so a second screen started life with
+    /// `isAuthenticated == false` (showing "Sign in" although the player was
+    /// already signed in) and re-installed `authenticateHandler`, which makes
+    /// GameKit ask again.
+    static let shared = GameCenterService()
+
+    private(set) var isAuthenticated = GKLocalPlayer.local.isAuthenticated
     private var didAttemptAuthentication = false
 
     /// The top of the leaderboard and where this player sits on it, as
@@ -65,6 +72,7 @@ final class GameCenterService {
     /// the access point never appeared. That's `presentAuthenticationViewController`
     /// below.
     func authenticateIfNeeded() {
+        if GKLocalPlayer.local.isAuthenticated { isAuthenticated = true }
         guard !didAttemptAuthentication else { return }
         didAttemptAuthentication = true
 
@@ -73,6 +81,7 @@ final class GameCenterService {
                 guard let self else { return }
 
                 if let viewController {
+                    self.didPresentAuthUI = true
                     self.presentAuthenticationViewController(viewController)
                     return
                 }
@@ -80,13 +89,38 @@ final class GameCenterService {
                 self.isAuthenticated = (error == nil) && GKLocalPlayer.local.isAuthenticated
                 guard self.isAuthenticated else { return }
 
-                // GKAccessPoint draws its own small overlay badge and
-                // handles sign-in/profile/leaderboard UI natively — no
-                // UIViewControllerRepresentable bridging needed.
-                GKAccessPoint.shared.location = .topTrailing
-                GKAccessPoint.shared.showHighlights = true
-                GKAccessPoint.shared.isActive = true
+                // The floating Game Center badge (the "rocket" in the
+                // top-right corner) is deliberately off: it sat on top of
+                // the app's own toolbar. The leaderboard is still one tap
+                // away from Pasture via `presentLeaderboard()`.
+                GKAccessPoint.shared.isActive = false
             }
+        }
+    }
+
+    private var didPresentAuthUI = false
+
+    /// The "Sign in to Game Center" button. `authenticateIfNeeded()` is
+    /// once-per-launch, so after a dismissed or declined prompt (or a
+    /// sign-in done in Settings since launch) tapping the button did
+    /// nothing at all. This one always does something: picks up an
+    /// existing system sign-in, otherwise re-runs authentication so
+    /// GameKit shows its sheet again, and if GameKit won't show one any
+    /// more (it stops after repeated dismissals) opens this app's page in
+    /// Settings, where Game Center can be switched on.
+    func signIn() {
+        if GKLocalPlayer.local.isAuthenticated {
+            isAuthenticated = true
+            return
+        }
+        didPresentAuthUI = false
+        didAttemptAuthentication = false
+        authenticateIfNeeded()
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !isAuthenticated, !didPresentAuthUI,
+                  let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            await UIApplication.shared.open(url)
         }
     }
 

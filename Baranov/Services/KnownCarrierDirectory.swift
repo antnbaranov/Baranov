@@ -30,6 +30,7 @@ final class KnownCarrierDirectory {
     /// final destination counts as "going the same way" for matching
     /// purposes — per the brief, 800 km.
     static let matchRadiusMeters: CLLocationDistance = 800_000
+    static var matchRadiusKm: Int { Int(matchRadiusMeters / 1000) }
 
     private static let storageKey = "com.baranov.knownCarriers"
 

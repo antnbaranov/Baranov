@@ -26,42 +26,110 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
     @State private var page = 0
     @State private var name = ""
+    @State private var ramName = ""
     @State private var pageTick = 0
     @FocusState private var isNameFocused: Bool
+    @FocusState private var isRamNameFocused: Bool
 
     let onFinished: () -> Void
 
-    private let pageCount = 5
+    private let pageCount = 6
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var trimmedRamName: String {
+        ramName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canAdvance: Bool {
+        switch page {
+        case 4:
+            return !trimmedName.isEmpty
+        case 5:
+            return !trimmedRamName.isEmpty
+        default:
+            return true
+        }
+    }
+
     private var isLastPage: Bool { page == pageCount - 1 }
+
+    @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
+    @State private var isLanguagePickerPresented = false
+
+    private var currentLanguageDisplayName: String {
+        let targetLocale = Locale(identifier: selectedLanguageCode)
+        return targetLocale.localizedString(forIdentifier: selectedLanguageCode)?.capitalized(with: targetLocale)
+            ?? targetLocale.localizedString(forLanguageCode: selectedLanguageCode)?.capitalized(with: targetLocale)
+            ?? selectedLanguageCode
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button {
+                    isLanguagePickerPresented = true
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "globe")
+                        Text(currentLanguageDisplayName)
+                            .font(.footnote.weight(.medium))
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 12)
+                .padding(.trailing, 20)
+            }
+
             TabView(selection: $page) {
                 PainPage().tag(0)
                 RamPage().tag(1)
                 OceanPage().tag(2)
                 SealPage().tag(3)
                 namePage.tag(4)
+                ramCompanionPage.tag(5)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .onChange(of: page) { _, _ in
+            .onChange(of: page) { _, newPage in
+                if newPage == 5 && trimmedName.isEmpty {
+                    page = 4
+                    return
+                }
                 pageTick += 1
-                if isLastPage {
+                if newPage == 4 {
                     isNameFocused = true
+                    isRamNameFocused = false
+                } else if newPage == 5 {
+                    isNameFocused = false
+                    isRamNameFocused = true
+                } else {
+                    isNameFocused = false
+                    isRamNameFocused = false
                 }
             }
             .sensoryFeedback(.selection, trigger: pageTick)
 
             footer
         }
+        .sheet(isPresented: $isLanguagePickerPresented) {
+            NavigationStack {
+                AppLanguagePickerView()
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .environment(\.locale, Locale(identifier: selectedLanguageCode))
         .background(Color(.systemGroupedBackground))
     }
 
@@ -80,14 +148,24 @@ struct OnboardingView: View {
             .accessibilityLabel("Page \(page + 1) of \(pageCount)")
 
             Button(action: advance) {
-                Text(isLastPage ? "Open the Gate" : (page == 0 ? "There's another way" : "Continue"))
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                Group {
+                    if isLastPage {
+                        Text("Open the Gate")
+                    } else if page == 0 {
+                        Text("There's another way")
+                    } else {
+                        Text("Continue")
+                    }
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .buttonBorderShape(.roundedRectangle(radius: 16))
+            .disabled(!canAdvance)
+            .animation(.easeInOut(duration: 0.2), value: canAdvance)
             .padding(.horizontal, 32)
         }
         .padding(.top, 8)
@@ -95,6 +173,7 @@ struct OnboardingView: View {
     }
 
     private func advance() {
+        guard canAdvance else { return }
         if isLastPage {
             finish()
         } else {
@@ -105,7 +184,11 @@ struct OnboardingView: View {
     }
 
     private func finish() {
-        storedDisplayName = trimmedName.isEmpty ? "A Shepherd" : trimmedName
+        guard !trimmedName.isEmpty, !trimmedRamName.isEmpty else { return }
+        storedDisplayName = trimmedName
+        let store = RamCompanionStore()
+        store.createIfNeeded(name: trimmedRamName)
+        hasCompletedOnboarding = true
         onFinished()
     }
 
@@ -113,9 +196,9 @@ struct OnboardingView: View {
 
     private var namePage: some View {
         OnboardingPageLayout(
-            eyebrow: "One last thing",
+            eyebrow: "Almost there",
             title: "Who's writing?",
-            text: "Every letter introduces you by name to whoever breaks the seal. That's the whole account system — there isn't one."
+            text: "Your name appears on every letter you send. That's the whole account system."
         ) {
             VStack(spacing: 14) {
                 Image(systemName: "signature")
@@ -130,25 +213,137 @@ struct OnboardingView: View {
                     .focused($isNameFocused)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
-                    .submitLabel(.done)
-                    .onSubmit(finish)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        if !trimmedName.isEmpty {
+                            withAnimation(.easeInOut(duration: 0.35)) {
+                                page = 5
+                            }
+                        }
+                    }
                     .pillFieldBackground()
                     .padding(.horizontal, 24)
             }
+        }
+    }
+
+    // MARK: - Page 6: Welcome your ram companion
+
+    private var ramCompanionPage: some View {
+        OnboardingPageLayout(
+            eyebrow: "One last thing",
+            title: "Name your ram.",
+            text: "It'll carry your letters for as long as you keep Baranov."
+        ) {
+            OnboardingRamCompanionCard(
+                name: $ramName,
+                isFocused: $isRamNameFocused,
+                onDone: {
+                    if !trimmedRamName.isEmpty {
+                        finish()
+                    }
+                }
+            )
+        }
+    }
+}
+
+// MARK: - Onboarding Ram Companion Card
+
+private struct OnboardingRamCompanionCard: View {
+    @Binding var name: String
+    @FocusState.Binding var isFocused: Bool
+    let onDone: () -> Void
+
+    @State private var bleatTrigger = 0
+
+    private var displayName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            VStack(spacing: 6) {
+                portrait
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        bleatTrigger += 1
+                        RamBleatPlayer.shared.play()
+                    }
+                    .sensoryFeedback(.impact(weight: .light), trigger: bleatTrigger)
+                    .accessibilityLabel(displayName.isEmpty ? "Pet your ram" : "Pet \(displayName)")
+
+                VStack(spacing: 2) {
+                    if displayName.isEmpty {
+                        Text("Your Ram")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(displayName)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(.primary)
+                    }
+
+                    Text("Resting in the pasture")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            TextField("Ram's Name", text: $name)
+                .textFieldStyle(.plain)
+                .multilineTextAlignment(.center)
+                .font(.body.weight(.medium))
+                .focused($isFocused)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.done)
+                .onSubmit {
+                    if !displayName.isEmpty {
+                        onDone()
+                    }
+                }
+                .pillFieldBackground()
+                .padding(.horizontal, 24)
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var portrait: some View {
+        if !displayName.isEmpty, UIImage(named: "Ram-\(displayName)") != nil {
+            Image("Ram-\(displayName)")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 140)
+        } else if let first = RamSpriteFrameSets.walkCycle.first, RamSpriteFrameSets.assetExists(first) {
+            RamSpriteLoopView(frameNames: RamSpriteFrameSets.walkCycle, frameDuration: .milliseconds(80))
+                .frame(height: 140)
+        } else if UIImage(named: "RamPortraitPlaceholder") != nil {
+            Image("RamPortraitPlaceholder")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 140)
+        } else {
+            Image(systemName: "pawprint.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 80, height: 80)
+                .foregroundStyle(.secondary)
+                .symbolRenderingMode(.hierarchical)
         }
     }
 }
 
 // MARK: - Shared page layout
 
-/// The one shape every onboarding page has: a demonstration up top, an
-/// eyebrow, a big title, a short body. Keeps the pages from drifting
-/// apart visually as each one does its own thing in the demo slot.
 private struct OnboardingPageLayout<Demo: View>: View {
-    let eyebrow: String
-    let title: String
-    let text: String
+    let eyebrow: LocalizedStringKey
+    let title: LocalizedStringKey
+    let text: LocalizedStringKey
     @ViewBuilder let demo: () -> Demo
+
+    @State private var textAppeared = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -165,17 +360,30 @@ private struct OnboardingPageLayout<Demo: View>: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+                    .opacity(textAppeared ? 1 : 0)
+                    .offset(y: textAppeared ? 0 : 16)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.05), value: textAppeared)
+
                 Text(title)
                     .font(.largeTitle.weight(.bold))
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                    .opacity(textAppeared ? 1 : 0)
+                    .offset(y: textAppeared ? 0 : 16)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.13), value: textAppeared)
+
                 Text(text)
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                    .opacity(textAppeared ? 1 : 0)
+                    .offset(y: textAppeared ? 0 : 16)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.22), value: textAppeared)
             }
             .padding(.horizontal, 28)
+            .onAppear { textAppeared = true }
+            .onDisappear { textAppeared = false }
 
             Spacer(minLength: 24)
         }
@@ -191,7 +399,7 @@ private struct PainPage: View {
     @State private var shown = 0
     @State private var dimmed = false
 
-    private let messages: [(String, String)] = [
+    private let messages: [(LocalizedStringKey, LocalizedStringKey)] = [
         ("hey", "now"),
         ("u up?", "now"),
         ("k", "now"),
@@ -203,7 +411,7 @@ private struct PainPage: View {
         OnboardingPageLayout(
             eyebrow: "The problem",
             title: "Everything arrives instantly.",
-            text: "So nothing arrives mattering. A message costs nothing to send — and it shows. Read in a queue, gone before the coffee."
+            text: "So nothing feels like it matters. Read, skipped, gone."
         ) {
             VStack(spacing: 10) {
                 ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
@@ -225,6 +433,8 @@ private struct PainPage: View {
                 }
             }
             .padding(.horizontal, 40)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("A stream of instant messages arriving one after another, then fading into irrelevance")
             .task {
                 shown = 0
                 dimmed = false
@@ -247,8 +457,8 @@ private struct RamPage: View {
     var body: some View {
         OnboardingPageLayout(
             eyebrow: "Another way",
-            title: "Send a letter that has to be carried.",
-            text: "Write it, seal it, and your ram walks it to their city. It only moves when you do: one of your real steps is one metre of its road."
+            title: "A letter that has to be carried.",
+            text: "Your ram walks it to them. One of your real steps moves it one metre closer."
         ) {
             VStack(spacing: 14) {
                 RamSpriteLoopView(frameNames: RamSpriteFrameSets.walkCycle, frameDuration: .milliseconds(80))
@@ -265,9 +475,7 @@ private struct RamPage: View {
                 .padding(.vertical, 8)
                 .background(.thinMaterial, in: Capsule())
 
-                // Why rams, and why "Baranov": the name is the maker's
-                // surname, and it means exactly this.
-                Text("Baranov is the creator's surname, which directly translates to \u{201C}rams\u{201D} — the faithful messengers delivering your encrypted letters.")
+                Text("\"Baranov\" is the maker's surname — it means rams.")
                     .font(.system(.caption, design: .serif).italic())
                     .foregroundStyle(.tertiary)
                     .multilineTextAlignment(.center)
@@ -299,52 +507,66 @@ private struct OceanPage: View {
     var body: some View {
         OnboardingPageLayout(
             eyebrow: "Borders and oceans",
-            title: "Water waits for a boat.",
-            text: "No road crosses an ocean. Your ram walks to a port and boards the next packet — it gets there on its own, slowly. Hand it to someone crossing sooner, phone to phone, and it skips the wait. No server ever sees your letter."
+            title: "No road crosses an ocean.",
+            text: "Your ram walks to a port and boards a packet — it crosses on its own. Shake phones with someone crossing sooner and it hops to their phone instead."
         ) {
-            ZStack {
-                HStack {
-                    phone(label: "You")
-                    Spacer()
-                    phone(label: "Someone crossing sooner")
-                }
-                .padding(.horizontal, 44)
-
+            VStack(spacing: 8) {
                 ZStack {
-                    Image(systemName: "water.waves")
-                        .font(.title3)
-                        .foregroundStyle(.tertiary)
-                        .symbolEffect(.variableColor.iterative, options: .repeating)
+                    HStack {
+                        phone(label: "You", isShaking: !crossed)
+                        Spacer()
+                        phone(label: "Someone crossing sooner", isShaking: crossed)
+                    }
+                    .padding(.horizontal, 44)
 
-                    Image(systemName: "ferry.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .offset(x: crossed ? 46 : -46, y: -2)
-                        .animation(.easeInOut(duration: 3.2), value: crossed)
+                    ZStack {
+                        Image(systemName: "water.waves")
+                            .font(.title3)
+                            .foregroundStyle(.tertiary)
+                            .symbolEffect(.variableColor.iterative, options: .repeating)
+
+                        Image(systemName: "ferry.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .offset(x: crossed ? 46 : -46, y: -2)
+                            .animation(.easeInOut(duration: 3.2), value: crossed)
+                    }
+                    .offset(y: 44)
+
+                    RamSpriteLoopView(frameNames: RamSpriteFrameSets.gallopRunningStride, frameDuration: .milliseconds(60))
+                        .frame(height: 64)
+                        .offset(x: crossed ? 92 : -92, y: -6)
+                        .animation(.easeInOut(duration: 1.4), value: crossed)
                 }
-                .offset(y: 54)
 
-                RamSpriteLoopView(frameNames: RamSpriteFrameSets.gallopRunningStride, frameDuration: .milliseconds(60))
-                    .frame(height: 64)
-                    .offset(x: crossed ? 92 : -92, y: -6)
-                    .animation(.easeInOut(duration: 1.4), value: crossed)
+                HStack(spacing: 6) {
+                    Image(systemName: "iphone.radiowaves.left.and.right")
+                        .font(.caption2)
+                    Text("Shake phones or AirDrop to hand off")
+                        .font(.caption2.weight(.medium))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 5)
+                .background(.thinMaterial, in: Capsule())
             }
             .task {
                 crossed = false
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .milliseconds(900))
+                    try? await Task.sleep(for: .milliseconds(1400))
                     crossed.toggle()
                 }
             }
         }
     }
 
-    private func phone(label: String) -> some View {
+    private func phone(label: LocalizedStringKey, isShaking: Bool) -> some View {
         VStack(spacing: 6) {
             Image(systemName: "iphone")
                 .font(.system(size: 56, weight: .light))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isShaking ? Color.accentColor : Color.secondary)
+                .symbolEffect(.wiggle, value: crossed)
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -374,7 +596,7 @@ private struct SealPage: View {
         OnboardingPageLayout(
             eyebrow: "On arrival",
             title: "Sealed until it's home.",
-            text: "Sealed letters travel as ciphertext. Only the recipient's code breaks the wax — and only at their gate. Try it: hold the seal."
+            text: "Only the recipient's code breaks it. Hold the seal to try."
         ) {
             VStack(spacing: 16) {
                 ZStack(alignment: .top) {
@@ -412,15 +634,26 @@ private struct SealPage: View {
                     }
                     .accessibilityLabel("Wax seal")
                     .accessibilityHint("Touch and hold to break")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction(named: "Break Seal") {
+                        shatter()
+                    }
                 }
                 .frame(height: 150)
                 .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: crackTick)
                 .sensoryFeedback(.impact(weight: .heavy), trigger: breakTick)
 
-                Text(isOpen ? "Broken. That's the feeling." : "Hold the seal")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .contentTransition(.opacity)
+                if isOpen {
+                    Text("Broken. That's the feeling.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.opacity)
+                } else {
+                    Text("Hold the seal")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .contentTransition(.opacity)
+                }
             }
         }
         .onDisappear { crackTask?.cancel() }

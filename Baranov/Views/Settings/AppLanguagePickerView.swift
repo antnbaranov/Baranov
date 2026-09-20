@@ -16,53 +16,96 @@ import SwiftUI
 struct AppLanguagePickerView: View {
     static let storageKey = "com.baranov.appLanguageCode"
 
-    /// A broad, common set of ISO 639-1 codes — not exhaustive, but not a
-    /// token handful either, since the whole point of the search field is
-    /// picking one out of a real list. `Locale` supplies the actual
-    /// display name for each, localized to however the device itself is
-    /// currently set.
-    private static let languageCodes: [String] = [
-        "en", "es", "fr", "de", "it", "pt", "ru", "uk", "pl", "nl", "sv", "no", "da", "fi",
-        "is", "cs", "sk", "hu", "ro", "bg", "el", "tr", "ar", "he", "hi", "bn", "ur", "fa",
-        "ja", "ko", "zh", "vi", "th", "id", "ms", "tl", "sw",
+    /// Full set of App Store Connect supported languages and all European languages
+    static let languageCodes: [String] = [
+        "en", "en-GB", "en-AU", "en-CA",
+        "sq", "ar", "eu", "bs", "bg", "ca",
+        "zh-Hans", "zh-Hant", "zh-HK", "hr", "cs",
+        "da", "nl", "et", "fi", "fr", "fr-CA",
+        "gl", "de", "el", "he", "hi", "hu",
+        "is", "id", "ga", "it", "ja", "ko",
+        "lv", "lt", "mk", "ms", "mt", "no",
+        "pl", "pt-BR", "pt-PT", "ro", "ru", "sr",
+        "sk", "sl", "es", "es-419", "sv", "th",
+        "tr", "uk", "vi"
     ]
+
+    struct LanguageItem: Identifiable {
+        var id: String { code }
+        let code: String
+        let autonym: String
+        let localizedName: String
+
+        var title: String {
+            autonym
+        }
+
+        var subtitle: String? {
+            if autonym.caseInsensitiveCompare(localizedName) == .orderedSame {
+                return nil
+            }
+            return localizedName
+        }
+    }
 
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedCode: String = Locale.current.language.languageCode?.identifier ?? "en"
     @State private var searchText = ""
     @Environment(\.dismiss) private var dismiss
 
-    private var languages: [(code: String, name: String)] {
-        Self.languageCodes
-            .map { code in (code: code, name: Locale.current.localizedString(forLanguageCode: code)?.capitalized(with: Locale.current) ?? code) }
-            .sorted { $0.name < $1.name }
+    private var languages: [LanguageItem] {
+        Self.languageCodes.map { code in
+            let targetLocale = Locale(identifier: code)
+            let nativeName = targetLocale.localizedString(forIdentifier: code)?.capitalized(with: targetLocale)
+                ?? targetLocale.localizedString(forLanguageCode: code)?.capitalized(with: targetLocale)
+                ?? code
+
+            let localName = Locale.current.localizedString(forIdentifier: code)?.capitalized(with: Locale.current)
+                ?? Locale.current.localizedString(forLanguageCode: code)?.capitalized(with: Locale.current)
+                ?? code
+
+            return LanguageItem(
+                code: code,
+                autonym: nativeName,
+                localizedName: localName
+            )
+        }.sorted { $0.autonym.localizedCaseInsensitiveCompare($1.autonym) == .orderedAscending }
     }
 
-    private var filteredLanguages: [(code: String, name: String)] {
+    private var filteredLanguages: [LanguageItem] {
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return languages }
-        return languages.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        return languages.filter {
+            $0.autonym.localizedCaseInsensitiveContains(searchText) ||
+            $0.localizedName.localizedCaseInsensitiveContains(searchText) ||
+            $0.code.localizedCaseInsensitiveContains(searchText)
+        }
     }
 
     var body: some View {
         List {
             Section {
-                ForEach(filteredLanguages, id: \.code) { language in
+                ForEach(filteredLanguages) { language in
                     Button {
                         selectedCode = language.code
                         dismiss()
                     } label: {
                         HStack {
-                            Text(language.name)
-                                .foregroundStyle(.primary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(language.title)
+                                    .foregroundStyle(.primary)
+                                if let subtitle = language.subtitle {
+                                    Text(subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
-                            if language.code == selectedCode {
+                            if language.code == selectedCode || (selectedCode.starts(with: language.code) && language.code == "en" && selectedCode == "en-US") {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.tint)
                             }
                         }
                     }
                 }
-            } footer: {
-                Text("Baranov is only in English right now — this just saves your preference for when more languages ship.")
             }
         }
         .searchable(text: $searchText, prompt: "Search Languages")

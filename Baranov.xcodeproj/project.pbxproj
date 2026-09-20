@@ -10,6 +10,8 @@
 		A721CF8A30568ACE0052DF31 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8930568ACE0052DF31 /* ReceiptParser */; };
 		A721CF8C30568ACE0052DF31 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8B30568ACE0052DF31 /* RevenueCat */; };
 		A721CF8E30568ACE0052DF31 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8D30568ACE0052DF31 /* RevenueCatUI */; };
+		C4B00000D00000000000000D /* BaranovWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C4B00000C00000000000000C /* BaranovWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D5C00000D00000000000000D /* BaranovWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D5C00000C00000000000000C /* BaranovWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -20,11 +22,52 @@
 			remoteGlobalIDString = A721CF5B3054D4230052DF31;
 			remoteInfo = Baranov;
 		};
+		C4B00000B00000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A721CF543054D4230052DF31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C4B000001000000000000001;
+			remoteInfo = BaranovWidget;
+		};
+		D5C00000B00000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A721CF543054D4230052DF31 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D5C000001000000000000001;
+			remoteInfo = BaranovWatch;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C4B00000E00000000000000E /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C4B00000D00000000000000D /* BaranovWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D5C00000E00000000000000E /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				D5C00000D00000000000000D /* BaranovWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A721CF5C3054D4230052DF31 /* Baranov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Baranov.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B4A1000100000000000000C1 /* BaranovTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BaranovTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C4B00000C00000000000000C /* BaranovWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaranovWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D5C00000C00000000000000C /* BaranovWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BaranovWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -34,6 +77,20 @@
 				Info.plist,
 			);
 			target = A721CF5B3054D4230052DF31 /* Baranov */;
+		};
+		C4B000009000000000000009 /* Exceptions for "BaranovWidget" folder in "BaranovWidget" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C4B000001000000000000001 /* BaranovWidget */;
+		};
+		D5C000009000000000000009 /* Exceptions for "BaranovWatch" folder in "BaranovWatch" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D5C000001000000000000001 /* BaranovWatch */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -49,6 +106,22 @@
 		B4A1000200000000000000C2 /* BaranovTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = BaranovTests;
+			sourceTree = "<group>";
+		};
+		C4B000002000000000000002 /* BaranovWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C4B000009000000000000009 /* Exceptions for "BaranovWidget" folder in "BaranovWidget" target */,
+			);
+			path = BaranovWidget;
+			sourceTree = "<group>";
+		};
+		D5C000002000000000000002 /* BaranovWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D5C000009000000000000009 /* Exceptions for "BaranovWatch" folder in "BaranovWatch" target */,
+			);
+			path = BaranovWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -71,6 +144,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C4B000004000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D5C000004000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -79,6 +166,8 @@
 			children = (
 				A721CF5E3054D4230052DF31 /* Baranov */,
 				B4A1000200000000000000C2 /* BaranovTests */,
+				C4B000002000000000000002 /* BaranovWidget */,
+				D5C000002000000000000002 /* BaranovWatch */,
 				A721CF5D3054D4230052DF31 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +177,8 @@
 			children = (
 				A721CF5C3054D4230052DF31 /* Baranov.app */,
 				B4A1000100000000000000C1 /* BaranovTests.xctest */,
+				C4B00000C00000000000000C /* BaranovWidget.appex */,
+				D5C00000C00000000000000C /* BaranovWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -99,13 +190,17 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A721CF673054D4250052DF31 /* Build configuration list for PBXNativeTarget "Baranov" */;
 			buildPhases = (
+				D5C00000E00000000000000E /* Embed Watch Content */,
 				A721CF583054D4230052DF31 /* Sources */,
 				A721CF593054D4230052DF31 /* Frameworks */,
 				A721CF5A3054D4230052DF31 /* Resources */,
+				C4B00000E00000000000000E /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D5C00000A00000000000000A /* PBXTargetDependency */,
+				C4B00000A00000000000000A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A721CF5E3054D4230052DF31 /* Baranov */,
@@ -143,6 +238,48 @@
 			productReference = B4A1000100000000000000C1 /* BaranovTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C4B000001000000000000001 /* BaranovWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C4B000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWidget" */;
+			buildPhases = (
+				C4B000003000000000000003 /* Sources */,
+				C4B000004000000000000004 /* Frameworks */,
+				C4B000005000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				C4B000002000000000000002 /* BaranovWidget */,
+			);
+			name = BaranovWidget;
+			packageProductDependencies = (
+			);
+			productName = BaranovWidget;
+			productReference = C4B00000C00000000000000C /* BaranovWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D5C000001000000000000001 /* BaranovWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D5C000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWatch" */;
+			buildPhases = (
+				D5C000003000000000000003 /* Sources */,
+				D5C000004000000000000004 /* Frameworks */,
+				D5C000005000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D5C000002000000000000002 /* BaranovWatch */,
+			);
+			name = BaranovWatch;
+			productName = BaranovWatch;
+			productReference = D5C00000C00000000000000C /* BaranovWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -160,6 +297,9 @@
 						CreatedOnToolsVersion = 26.6;
 						TestTargetID = A721CF5B3054D4230052DF31;
 					};
+					C4B000001000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
+					};
 				};
 			};
 			buildConfigurationList = A721CF573054D4230052DF31 /* Build configuration list for PBXProject "Baranov" */;
@@ -168,6 +308,59 @@
 			knownRegions = (
 				en,
 				Base,
+				"en-GB",
+				"en-AU",
+				"en-CA",
+				sq,
+				ar,
+				eu,
+				bs,
+				bg,
+				ca,
+				"zh-Hans",
+				"zh-Hant",
+				"zh-HK",
+				hr,
+				cs,
+				da,
+				nl,
+				et,
+				fi,
+				fr,
+				"fr-CA",
+				gl,
+				de,
+				el,
+				he,
+				hi,
+				hu,
+				is,
+				id,
+				ga,
+				it,
+				ja,
+				ko,
+				lv,
+				lt,
+				mk,
+				ms,
+				mt,
+				no,
+				pl,
+				"pt-BR",
+				"pt-PT",
+				ro,
+				ru,
+				sr,
+				sk,
+				sl,
+				es,
+				"es-419",
+				sv,
+				th,
+				tr,
+				uk,
+				vi,
 			);
 			mainGroup = A721CF533054D4230052DF31;
 			minimizedProjectReferenceProxies = 1;
@@ -181,6 +374,8 @@
 			targets = (
 				A721CF5B3054D4230052DF31 /* Baranov */,
 				B4A1000800000000000000C8 /* BaranovTests */,
+				C4B000001000000000000001 /* BaranovWidget */,
+				D5C000001000000000000001 /* BaranovWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -194,6 +389,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B4A1000700000000000000C7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C4B000005000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D5C000005000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -217,6 +426,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C4B000003000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D5C000003000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -224,6 +447,16 @@
 			isa = PBXTargetDependency;
 			target = A721CF5B3054D4230052DF31 /* Baranov */;
 			targetProxy = B4A1000300000000000000C3 /* PBXContainerItemProxy */;
+		};
+		C4B00000A00000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C4B000001000000000000001 /* BaranovWidget */;
+			targetProxy = C4B00000B00000000000000B /* PBXContainerItemProxy */;
+		};
+		D5C00000A00000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D5C000001000000000000001 /* BaranovWatch */;
+			targetProxy = D5C00000B00000000000000B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -361,7 +594,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Baranov/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				INFOPLIST_KEY_CFBundleDisplayName = Baranov;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -391,7 +626,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Baranov/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				INFOPLIST_KEY_CFBundleDisplayName = Baranov;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.lifestyle";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -453,6 +690,119 @@
 			};
 			name = Release;
 		};
+		C4B000007000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BaranovWidget/BaranovWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C4B000008000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BaranovWidget/BaranovWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		D5C000007000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BaranovWatch/BaranovWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWatch/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		D5C000008000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = BaranovWatch/BaranovWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7H96U9338J;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BaranovWatch/Info.plist;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -479,6 +829,24 @@
 			buildConfigurations = (
 				B4A1000900000000000000C9 /* Debug */,
 				B4A1000A00000000000000CA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C4B000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C4B000007000000000000007 /* Debug */,
+				C4B000008000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D5C000006000000000000006 /* Build configuration list for PBXNativeTarget "BaranovWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D5C000007000000000000007 /* Debug */,
+				D5C000008000000000000008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

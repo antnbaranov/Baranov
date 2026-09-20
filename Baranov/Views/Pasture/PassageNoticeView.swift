@@ -22,51 +22,52 @@ struct PassageNoticeView: View {
 
     var body: some View {
         if let voyage {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: ram.status == .atSea ? "sailboat.fill" : "ferry.fill")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(headline(for: voyage))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Text(detail(for: voyage))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if ram.status == .atSea {
-                        ProgressView(value: voyage.progress())
-                            .padding(.top, 2)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            noticeCard(
+                icon: ram.status == .atSea ? "sailboat.fill" : "ferry.fill",
+                title: headline(for: voyage),
+                detail: detail(for: voyage),
+                showProgress: ram.status == .atSea,
+                progress: voyage.progress()
+            )
         } else {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "ferry")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("At the quay in \(ram.legDestinationCity)")
-                        .font(.subheadline.weight(.semibold))
-                    Text("No road goes further. Baranov is arranging the next packet — until it does, a carrier heading across can take \(ram.name) instead.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(12)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            noticeCard(
+                icon: "ferry.fill",
+                title: "At the quay in \(ram.legDestinationCity)",
+                detail: "No road goes further. Baranov is arranging the next packet — until it does, a carrier heading across can take \(ram.name) instead.",
+                showProgress: false,
+                progress: 0
+            )
         }
+    }
+
+    @ViewBuilder
+    private func noticeCard(icon: String, title: String, detail: String, showProgress: Bool, progress: Double) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if showProgress {
+                    ProgressView(value: progress)
+                        .tint(.blue)
+                        .padding(.top, 2)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func headline(for voyage: SeaVoyage) -> String {

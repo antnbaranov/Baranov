@@ -31,11 +31,13 @@
 	<key>NSContactsUsageDescription</key>
 	<string>Baranov suggests people from your contacts when you address a letter to someone.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Baranov finds another shepherd standing next to you when you both shake your phones, so a ram can change hands without the internet.</string>
+	<string>Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_baranov-gate._tcp</string>
 		<string>_baranov-gate._udp</string>
+		<string>_baranov-post._tcp</string>
+		<string>_baranov-post._udp</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Baranov uses your current location to set where a letter's journey starts.</string>
@@ -104,5 +106,22 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>baranov</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<false/>
 </dict>
 </plist>

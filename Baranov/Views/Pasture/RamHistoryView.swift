@@ -27,7 +27,11 @@ struct RamHistoryView: View {
                 Section {
                     PassportStampGrid(stamps: passportStamps, ramName: ram.name)
                 } header: {
-                    Text("Passport")
+                    if passportStamps.isEmpty {
+                        Text("Passport")
+                    } else {
+                        Text("Passport · \(passportStamps.count) stamp\(passportStamps.count == 1 ? "" : "s")")
+                    }
                 } footer: {
                     if !passportStamps.isEmpty {
                         Text(passportSummary)
@@ -59,13 +63,13 @@ struct RamHistoryView: View {
                 }
 
                 Section("Lifetime") {
-                    LabeledContent("Experience", value: "\(ledgerEntry.experiencePoints) XP")
-                    LabeledContent("Letters Delivered", value: "\(ledgerEntry.lettersDelivered)")
-                    LabeledContent("Total Steps Walked", value: "\(ledgerEntry.totalStepsWalked)")
-                    LabeledContent("Places Stamped", value: "\(ledgerEntry.distinctPlacesVisited)")
+                    LabeledContent("Experience", value: "\(ledgerEntry.experiencePoints.formatted(.number)) XP")
+                    LabeledContent("Letters Delivered", value: ledgerEntry.lettersDelivered.formatted(.number))
+                    LabeledContent("Total Steps Walked", value: ledgerEntry.totalStepsWalked.formatted(.number))
+                    LabeledContent("Places Stamped", value: ledgerEntry.distinctPlacesVisited.formatted(.number))
 
-                    if !ledgerEntry.waypoints.isEmpty {
-                        ForEach(ledgerEntry.waypoints.sorted(by: { $0.timestamp > $1.timestamp })) { node in
+                    if !sortedLifetimeWaypoints.isEmpty {
+                        ForEach(sortedLifetimeWaypoints) { node in
                             waypointRow(node)
                         }
                     }
@@ -74,6 +78,10 @@ struct RamHistoryView: View {
             .navigationTitle(ram.name)
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+
+    private var sortedLifetimeWaypoints: [RouteNode] {
+        ledgerEntry.waypoints.sorted { $0.timestamp > $1.timestamp }
     }
 
     /// The full passport: stamps already folded into this name's lifetime

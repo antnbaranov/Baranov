@@ -65,6 +65,7 @@ struct ComposeLetterView: View {
     /// The sender's own name, captured once in `OnboardingView`. There is
     /// no field for it in this form — it's used as-is when dispatching.
     @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
+    @AppStorage(SealStyle.storageKey) private var sealStyleRaw = SealStyle.wax.rawValue
 
     @Environment(LocationService.self) private var locationService
 
@@ -80,6 +81,14 @@ struct ComposeLetterView: View {
     /// The wax the letter will be sealed with — crimson for everyone,
     /// the rest with the pasture expansion (see `SealColor`).
     @State private var sealColor: SealColor = .crimson
+    @State private var paper: EnvelopePaper = .cream
+    /// `#RRGGBB` picked on the paper colour wheel; nil = use the preset.
+    @State private var customPaperHex: String?
+    private var paperStyle: PaperStyle { PaperStyle(paper: paper, customHex: customPaperHex) }
+    @Environment(\.colorScheme) private var colorScheme
+    /// In Dark, the default paper is drawn as the same frosted field the
+    /// compose form's other fields use, so the page reads as a field.
+    private var padUsesFieldLook: Bool { paper == .cream && customPaperHex == nil && colorScheme == .dark }
     @State private var messageDictationService = DictationService()
 
     /// How the letter is closed before it travels — the sender's one
@@ -117,7 +126,7 @@ struct ComposeLetterView: View {
     @State private var isPlanningHandoff = false
 
     @State private var isResolvingRoute = false
-    @State private var resolutionError: String?
+    @State private var resolutionError: LocalizedStringKey?
     @State private var isPasturePaywallPresented = false
 
     /// The unsent letter's home (see `LetterDraft`). Composing is never
@@ -214,7 +223,7 @@ struct ComposeLetterView: View {
     /// The sender's own name is deliberately *not* a requirement here —
     /// it's captured in onboarding, not in this form, so the sender could
     /// never fix it from here; `senderName` falls back instead.
-    private var missingRequirement: String? {
+    private var missingRequirementKey: String? {
         if targetCoordinate == nil { return "Pick a destination from the suggestions." }
         if ramName.trimmed.isEmpty { return "Choose a ram to carry it." }
         if recipientName.trimmed.isEmpty { return "Say who the letter is for." }
@@ -226,8 +235,12 @@ struct ComposeLetterView: View {
         return nil
     }
 
+    private var missingRequirement: LocalizedStringKey? {
+        missingRequirementKey.map { LocalizedStringKey($0) }
+    }
+
     private var canSend: Bool {
-        missingRequirement == nil
+        missingRequirementKey == nil
     }
 
     /// The name stamped on the letter as its sender. Onboarding captures
@@ -244,9 +257,26 @@ struct ComposeLetterView: View {
 
     /// What a Send tap found still missing (see `missingRequirement`) —
     /// shown under the button until the form changes.
-    @State private var requirementNotice: String?
+    @State private var requirementNotice: LocalizedStringKey?
 
     var body: some View {
+        NavigationStack {
+            composerBody
+                .navigationTitle("Letter")
+                .navigationBarTitleDisplayMode(.inline)
+                // The search-first collapsed sheet stays a bare search
+                // bar; the standard bar appears once the form opens.
+                .toolbar(isExpanded ? .visible : .hidden, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button { cancelComposing() } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel("Cancel")
+                    }
+                }
+        }
+    }
+
+    private var composerBody: some View {
         // Destination row (with its own capped, independently-scrollable
         // suggestion dropdown) and the rest of the expanded form now live
         // inside ONE shared scroll container, not a plain fixed `VStack`
@@ -275,8 +305,20 @@ struct ComposeLetterView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button {
+                    isMessageFocused = false
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                } label: {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                }
+                .accessibilityLabel("Hide keyboard")
+            }
+        }
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
-        .onChange(of: missingRequirement) { _, _ in
+        .onChange(of: missingRequirementKey) { _, _ in
             // A "you're still missing X" notice from a Send tap clears
             // itself the moment the form changes — it shouldn't linger
             // as a stale warning under a now-complete form.
@@ -418,8 +460,9 @@ struct ComposeLetterView: View {
             fieldSection("Choose Your Ram") {
                 ramPicker
             }
+            .padding(.top, 14)
 
-            fieldSection("The Letter") {
+            fieldSection(nil) {
                 VStack(spacing: 10) {
                     ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName) { addressText, coordinate in
                         // Only settles the destination from the
@@ -442,7 +485,7 @@ struct ComposeLetterView: View {
                 }
             }
 
-            fieldSection(closureSectionTitle) {
+            fieldSection(nil) {
                 closureSection
             }
 
@@ -521,29 +564,52 @@ struct ComposeLetterView: View {
     /// the ram is out, `JourneyView` shows this same slot as the live
     /// `TransitProgressStrip`.
     private var sendButton: some View {
-        SlideToActionControl(
-            title: needsHandoffCity && handoffPlan != nil && !showsManualHandoffField
-                ? "Slide to Dispatch via \(handoffCity.trimmed)"
-                : "Slide to Dispatch",
-            role: .dispatch,
-            isBusy: isResolvingRoute || isAwaitingLocation,
-            busyTitle: isAwaitingLocation ? "Finding Your Location…"
-                : isPlanningHandoff ? "Finding a Port…"
-                : "Finding a Route…",
-            isReady: canSend
-        ) {
-            Task { await send() }
+        Group {
+            if needsHandoffCity && handoffPlan != nil && !showsManualHandoffField {
+                SlideToActionControl(
+                    title: "Slide to Dispatch via \(handoffCity.trimmed)",
+                    role: .dispatch,
+                    isBusy: isResolvingRoute || isAwaitingLocation,
+                    busyTitle: busyTitle,
+                    isReady: canSend
+                ) {
+                    Task { await send() }
+                }
+            } else {
+                SlideToActionControl(
+                    title: "Slide to Dispatch",
+                    role: .dispatch,
+                    isBusy: isResolvingRoute || isAwaitingLocation,
+                    busyTitle: busyTitle,
+                    isReady: canSend
+                ) {
+                    Task { await send() }
+                }
+            }
         }
         .sensoryFeedback(.warning, trigger: sendAttemptWarningTick)
     }
 
+    private var busyTitle: LocalizedStringKey? {
+        if isAwaitingLocation {
+            return "Finding Your Location…"
+        } else if isPlanningHandoff {
+            return "Finding a Port…"
+        } else if isResolvingRoute {
+            return "Finding a Route…"
+        }
+        return nil
+    }
+
     @State private var sendAttemptWarningTick = 0
 
-    private func fieldSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func fieldSection<Content: View>(_ title: LocalizedStringKey?, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+            if let title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
             content()
         }
     }
@@ -561,84 +627,87 @@ struct ComposeLetterView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(recipientName.trimmed.isEmpty ? "Dear —," : "Dear \(recipientName.trimmed),")
                     .font(.system(.body, design: .serif).italic())
-                    .foregroundStyle(recipientName.trimmed.isEmpty ? .tertiary : .primary)
+                    .foregroundStyle(recipientName.trimmed.isEmpty ? paperStyle.ink.opacity(0.4) : paperStyle.ink)
                     .contentTransition(.opacity)
                     .animation(.easeInOut(duration: 0.2), value: recipientName)
                 Spacer()
                 Text(letterDateline)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(paperStyle.ink.opacity(0.5))
                     .lineLimit(1)
             }
 
-            ZStack(alignment: .topLeading) {
-                if messageBody.isEmpty {
-                    Text(museNudge ?? writingPrompts[promptIndex % writingPrompts.count])
-                        .font(.system(.body, design: .serif))
-                        .foregroundStyle(.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .allowsHitTesting(false)
-                        .id(promptIndex)
-                        .transition(.opacity)
-                }
+            // The idea stays visible while writing — the model's line when
+            // there is one, otherwise the next static prompt — so the
+            // "Idea" button always has something to visibly change.
+            nudgeBadge(museNudge ?? writingPrompts[promptIndex % writingPrompts.count])
+                .id(museNudge ?? "static-\(promptIndex)")
 
+            ZStack(alignment: .topLeading) {
                 TextField("", text: $messageBody, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(.body, design: .serif))
                     .lineSpacing(3)
                     .lineLimit(6...16)
+                    .foregroundStyle(paperStyle.ink)
                     .focused($isMessageFocused)
             }
             .animation(.easeInOut(duration: 0.25), value: promptIndex)
 
-            HStack(spacing: 14) {
-                Text(letterFooter)
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-                    .contentTransition(.numericText())
-                    .animation(.snappy, value: messageWordCount)
+            if let photo = attachedPhoto {
+                photoAttachment(photo)
+            }
 
-                Spacer()
+            Text(letterFooter)
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(paperStyle.ink.opacity(0.5))
+                .contentTransition(.numericText())
+                .animation(.snappy, value: messageWordCount)
 
-                if messageBody.isEmpty {
-                    Button {
-                        withAnimation { promptIndex += 1 }
-                        promptTick += 1
-                        Task { await refreshMuseNudge(force: true) }
-                    } label: {
-                        HStack(spacing: 4) {
-                            if muse.isThinking {
-                                ProgressView()
-                                    .controlSize(.mini)
-                            } else {
-                                Image(systemName: museNudge == nil ? "arrow.trianglehead.2.clockwise" : "sparkles")
-                            }
-                            Text("Another nudge")
-                        }
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show another writing prompt")
+            HStack(spacing: 8) {
+                Button { openDoodle() } label: {
+                    Label("Draw", systemImage: "pencil.tip")
+                        .frame(minHeight: 24)
                 }
+                .accessibilityLabel(attachedPhoto == nil ? "Draw a picture" : "Edit drawing")
 
                 Button {
-                    messageDictationService.toggleRecording(appendingTo: messageBody)
+                    withAnimation { promptIndex += 1 }
+                    promptTick += 1
+                    Task { await refreshMuseNudge(force: true) }
                 } label: {
-                    Image(systemName: messageDictationService.isRecording ? "mic.fill" : "mic")
-                        .font(.footnote)
-                        .foregroundStyle(messageDictationService.isRecording ? Color.red : Color.secondary)
+                    Group {
+                        if muse.isThinking {
+                            ProgressView()
+                        } else {
+                            Label("Idea", systemImage: "arrow.trianglehead.2.clockwise")
+                        }
+                    }
+                    .frame(minHeight: 24)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Dictate Message")
+                .accessibilityLabel("Show another writing idea")
+
+                Spacer(minLength: 0)
+
+                dictationButton
             }
+            .compactGlassButton()
+
+            // Paper colour lives on the sheet itself, right under
+            // Draw / Idea, so the colour is chosen where it is seen.
+            paperPicker
+                .frame(maxWidth: .infinity)
         }
         .padding(14)
         // No stroke/border here anymore — a hard-edged rectangle around
         // a page of handwriting read as a form field, not a letter. The
         // material's own edge plus a hair more elevation while focused
         // is enough to show it's active, without a harsh outline.
-        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            padUsesFieldLook ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(paperStyle.color),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .animation(.easeInOut(duration: 0.25), value: paperStyle)
         .shadow(color: .black.opacity(isMessageFocused ? 0.08 : 0), radius: 10, y: 4)
         .animation(.easeInOut(duration: 0.2), value: isMessageFocused)
         .contentShape(Rectangle())
@@ -651,6 +720,104 @@ struct ComposeLetterView: View {
             guard !newValue.isEmpty else { return }
             messageBody = newValue
         }
+        .fullScreenCover(isPresented: $showsDoodle) {
+            if let base = doodleBase {
+                DoodleEditorView(image: base, backdrop: paperStyle.color) { edited in
+                    // An untouched blank sheet is no drawing at all.
+                    if attachedPhoto != nil || edited !== base { attachedPhoto = edited }
+                    showsDoodle = false
+                } onCancel: {
+                    showsDoodle = false
+                }
+            }
+        }
+    }
+
+    /// The optional drawing that rides with the letter.
+    @State private var attachedPhoto: UIImage?
+    @State private var doodleBase: UIImage?
+    @State private var showsDoodle = false
+
+    private func openDoodle() {
+        doodleBase = attachedPhoto ?? UIImage.blankPaper()
+        showsDoodle = true
+    }
+
+    /// The one-line spark: a quiet quote with a shuffle button.
+    private func nudgeBadge(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "sparkles")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(.subheadline, design: .serif).italic())
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .transition(.opacity)
+    }
+
+    /// Icon only, a circular tertiary fill; tints and pulses while listening.
+    private var dictationButton: some View {
+        let isRecording = messageDictationService.isRecording
+        return Button {
+            messageDictationService.toggleRecording(appendingTo: messageBody)
+        } label: {
+            Image(systemName: "mic.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(isRecording ? Color.red : Color.secondary)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Color(uiColor: .tertiarySystemFill)))
+                .symbolEffect(.pulse, isActive: isRecording)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.2), value: isRecording)
+        .accessibilityLabel("Dictate Message")
+        .sensoryFeedback(isRecording ? .start : .stop, trigger: isRecording)
+    }
+
+    private func photoAttachment(_ photo: UIImage) -> some View {
+        Button { openDoodle() } label: {
+            Image(uiImage: photo)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            Button { openDoodle() } label: {
+                Image(systemName: "pencil.tip.crop.circle.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .accessibilityLabel("Draw on picture")
+        }
+        .overlay(alignment: .topLeading) {
+            Button {
+                withAnimation { attachedPhoto = nil }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 34, height: 34)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .accessibilityLabel("Remove picture")
+        }
+        .accessibilityLabel("Your drawing")
     }
 
     @FocusState private var isMessageFocused: Bool
@@ -710,11 +877,11 @@ struct ComposeLetterView: View {
         messageBody.split { $0.isWhitespace || $0.isNewline }.count
     }
 
-    private var letterFooter: String {
+    private var letterFooter: LocalizedStringKey {
         let words = messageWordCount
         if words == 0 { return "Sealed in \(sealColor.displayName.lowercased()) wax when it goes." }
-        let noun = words == 1 ? "word" : "words"
-        return "\(words) \(noun) · sealed in \(sealColor.displayName.lowercased()) wax"
+        if words == 1 { return "1 word · sealed in \(sealColor.displayName.lowercased()) wax" }
+        return "\(Int64(words)) words · sealed in \(sealColor.displayName.lowercased()) wax"
     }
 
     /// "Burnaby, 16 September" — where and when the letter is being
@@ -800,22 +967,14 @@ struct ComposeLetterView: View {
         }
     }
 
-    private var ramRowTitle: String {
+    private var ramRowTitle: LocalizedStringKey {
         if showsCustomRamName {
-            return ramName.trimmed.isEmpty ? "Custom Name" : ramName.trimmed
+            return ramName.trimmed.isEmpty ? "Custom Name" : LocalizedStringKey(ramName.trimmed)
         }
-        return ramName.trimmed.isEmpty ? "Choose a Ram" : ramName.trimmed
+        return ramName.trimmed.isEmpty ? "Choose a Ram" : LocalizedStringKey(ramName.trimmed)
     }
 
     // MARK: - Closing the letter (seal or postcard)
-
-    private var closureSectionTitle: String {
-        switch closure {
-        case .none: return "Close the Letter"
-        case .sealed: return "Sealed"
-        case .postcard: return "Open Postcard"
-        }
-    }
 
     /// The sender's own signet — the first letter of their name, pressed
     /// into the wax on both ends of the journey.
@@ -840,143 +999,302 @@ struct ComposeLetterView: View {
         }
     }
 
-    /// Pick a wax, hold the seal, watch the signet come down. Or don't,
-    /// and send it open.
+    /// The letter as a postcard on the chosen paper, a row of papers, a
+    /// row of waxes, and one instruction: hold the seal.
     private var sealingRitual: some View {
-        VStack(spacing: 16) {
-            waxPicker
+        VStack(spacing: 18) {
+            PostcardView(
+                paper: paper,
+                addressee: addressee,
+                excerpt: messageBody.trimmed,
+                wax: sealColor,
+                monogram: monogram,
+                customHex: customPaperHex
+            )
+            .padding(.top, 4)
+            .animation(.easeInOut(duration: 0.25), value: paperStyle)
 
-            WaxSealPressView(wax: sealColor, monogram: monogram) {
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                    closure = .sealed
+            // Two clearly separate panels. Seal: a gesture (wax colour,
+            // then hold). Open: an ordinary tappable row.
+            VStack(spacing: 12) {
+                waxPicker
+
+                VStack(spacing: 6) {
+                    if sealStyleRaw == SealStyle.prompt.rawValue {
+                        Button {
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                                closure = .sealed
+                            }
+                        } label: {
+                            WaxSealView(wax: sealColor, monogram: monogram, diameter: 72)
+                        }
+                        .buttonStyle(.plain)
+                        .sensoryFeedback(.impact(weight: .heavy), trigger: closure == .sealed)
+                        .accessibilityLabel("Seal the letter")
+                        Text("Tap the seal!")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        WaxSealPressView(wax: sealColor, monogram: monogram) {
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                                closure = .sealed
+                            }
+                        }
+                        Text("Hold to seal")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            .padding(.top, 4)
-
-            // One atmospheric line instead of a paragraph explaining
-            // encryption — the ritual itself (hold, watch the signet
-            // drop) already tells the sender this letter is sealed.
-            Text("Hold to seal & dispatch")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
             Button {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                     closure = .postcard
                 }
             } label: {
-                Label("Send it open, as a postcard", systemImage: "envelope.open")
-                    .font(.footnote.weight(.medium))
+                HStack(spacing: 10) {
+                    Image(systemName: "envelope.open")
+                        .font(.system(size: 17, weight: .medium))
+                    Text("Send open")
+                        .font(.body.weight(.medium))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.tint)
-            .padding(.top, 2)
+            .accessibilityLabel("Send it open, as a postcard")
+            .sensoryFeedback(.selection, trigger: closure == .postcard)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Which paper the letter travels on.
+    private var paperPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(EnvelopePaper.allCases) { option in
+                let isUnlocked = option.isIncludedFree || entitlementService.hasPastureExpansion
+                Button {
+                    if isUnlocked {
+                        withAnimation(.snappy) { paper = option; customPaperHex = nil }
+                        waxPickTick += 1
+                    } else {
+                        isPasturePaywallPresented = true
+                    }
+                } label: {
+                    ZStack {
+                        if paper == option && customPaperHex == nil {
+                            Circle().strokeBorder(.primary, lineWidth: 2).frame(width: 38, height: 38)
+                        }
+                        Circle()
+                            .fill(option.color)
+                            .overlay(Circle().strokeBorder(.primary.opacity(0.15), lineWidth: 0.5))
+                            .frame(width: 30, height: 30)
+                            .opacity(isUnlocked ? 1 : 0.45)
+                        if !isUnlocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .shadow(radius: 1)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(option.displayName))
+                .accessibilityHint(isUnlocked ? "" : "Comes with Expand the Pasture")
+                .accessibilityAddTraits(paper == option && customPaperHex == nil ? .isSelected : [])
+            }
+
+            // Any colour: the system colour wheel, after the stationery swatches.
+            ZStack {
+                if customPaperHex != nil {
+                    Circle().strokeBorder(.primary, lineWidth: 2).frame(width: 38, height: 38)
+                }
+                ColorPicker("Paper colour", selection: Binding(
+                    get: { paperStyle.color },
+                    set: { customPaperHex = $0.paperHex; waxPickTick += 1 }
+                ), supportsOpacity: false)
+                .labelsHidden()
+            }
+            .frame(width: 44, height: 44)
+        }
+        .sensoryFeedback(.selection, trigger: waxPickTick)
     }
 
     /// Which wax to press the signet into. Crimson comes with the app;
-    /// the other five come with "Expand the Pasture" — a lock on the chip
-    /// says so, tapping one opens the paywall, and nothing here ever
-    /// blocks sending.
+    /// the other five come with "Expand the Pasture" — a lock on the
+    /// swatch says so, tapping one opens the paywall, and nothing here
+    /// ever blocks sending.
     private var waxPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Wax")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(sealColor.displayName)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(sealColor.color)
-                    .contentTransition(.numericText())
-            }
-
-            HStack(spacing: 12) {
-                ForEach(SealColor.allCases) { wax in
-                    let isUnlocked = wax.isIncludedFree || entitlementService.hasPastureExpansion
-                    Button {
-                        if isUnlocked {
-                            withAnimation(.snappy) { sealColor = wax }
-                            waxPickTick += 1
-                        } else {
-                            isPasturePaywallPresented = true
-                        }
-                    } label: {
-                        ZStack {
-                            if sealColor == wax {
-                                Circle()
-                                    .strokeBorder(.primary, lineWidth: 2)
-                                    .frame(width: 36, height: 36)
-                            }
-                            WaxBlobShape()
-                                .fill(wax.color.gradient)
-                                .frame(width: 28, height: 28)
-                                .opacity(isUnlocked ? 1 : 0.45)
-                            if !isUnlocked {
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                        .frame(width: 36, height: 36)
+        HStack(spacing: 4) {
+            ForEach(SealColor.allCases) { wax in
+                let isUnlocked = wax.isIncludedFree || entitlementService.hasPastureExpansion
+                Button {
+                    if isUnlocked {
+                        withAnimation(.snappy) { sealColor = wax }
+                        waxPickTick += 1
+                    } else {
+                        isPasturePaywallPresented = true
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isUnlocked ? "\(wax.displayName) wax" : "\(wax.displayName) wax, with Expand the Pasture")
+                } label: {
+                    ZStack {
+                        if sealColor == wax {
+                            Circle()
+                                .strokeBorder(.primary, lineWidth: 2)
+                                .frame(width: 38, height: 38)
+                        }
+                        WaxBlobShape()
+                            .fill(wax.color.gradient)
+                            .frame(width: 28, height: 28)
+                            .opacity(isUnlocked ? 1 : 0.45)
+                        if !isUnlocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
-                Spacer()
-            }
-            .sensoryFeedback(.selection, trigger: waxPickTick)
-
-            if !entitlementService.hasPastureExpansion {
-                Text("Crimson is yours. The other waxes come with Expand the Pasture — the colour is the only thing that changes; every seal locks the letter the same way.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                .buttonStyle(.plain)
+                .accessibilityLabel(isUnlocked ? "\(wax.displayName) wax" : "\(wax.displayName) wax, with Expand the Pasture")
+                .accessibilityAddTraits(sealColor == wax ? .isSelected : [])
             }
         }
+        .sensoryFeedback(.selection, trigger: waxPickTick)
     }
 
     /// The letter has gone into its envelope. The message field above is
-    /// hidden while sealed — breaking the seal brings it back.
+    /// hidden while sealed. Breaking the seal is staged — cracks spread,
+    /// the wax shatters, the flap swings open — and only then does the
+    /// form come back for editing.
     private var sealedEnvelopeCard: some View {
-        VStack(spacing: 14) {
-            SealedEnvelopeView(wax: sealColor, monogram: monogram, addressee: addressee, width: 240)
-                .padding(.top, 4)
+        VStack(spacing: 16) {
+            ZStack(alignment: .top) {
+                SealedEnvelopeView(
+                    wax: sealColor,
+                    monogram: monogram,
+                    addressee: addressee,
+                    isOpen: breakShatter,
+                    width: 240,
+                    showsSeal: false,
+                    paper: paper,
+                    customPaperHex: customPaperHex
+                )
+                .shadow(color: .black.opacity(0.16), radius: 12, x: 0, y: 7)
 
-            VStack(spacing: 3) {
-                Label("Sealed in \(sealColor.displayName.lowercased()) wax", systemImage: "lock.fill")
-                    .font(.subheadline.weight(.semibold))
-                Text("Encrypted for the whole journey. \(addressee.capitalizedFirst) opens it at the gate with the receiving code.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                WaxSealBreakView(
+                    wax: sealColor,
+                    monogram: monogram,
+                    diameter: 52,
+                    crackProgress: breakCrack,
+                    isShattering: breakShatter
+                )
+                .offset(y: SealedEnvelopeView.sealCenterY(width: 240) - 26)
             }
+            .frame(width: 240, height: 240 * 0.62)
+            .padding(.top, 4)
 
-            Button {
-                sealBrokenTick += 1
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    closure = nil
+            Button { breakSeal() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "seal")
+                        .font(.system(size: 17, weight: .medium))
+                    Text("Break the seal to edit")
+                        .font(.body.weight(.medium))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
                 }
-            } label: {
-                Label("Break the seal to edit", systemImage: "seal")
-                    .font(.footnote.weight(.medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.tint)
-            .sensoryFeedback(.impact(flexibility: .rigid), trigger: sealBrokenTick)
+            .disabled(isBreakingSeal)
+            .opacity(isBreakingSeal ? 0.5 : 1)
+            .accessibilityHint("Cracks the wax so you can keep editing")
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    @State private var isBreakingSeal = false
+    @State private var breakCrack: Double = 0
+    @State private var breakShatter = false
+
+    private func breakSeal() {
+        guard !isBreakingSeal else { return }
+        isBreakingSeal = true
+        Task {
+            let rigid = UIImpactFeedbackGenerator(style: .rigid)
+            rigid.prepare()
+            withAnimation(.easeIn(duration: 0.7)) { breakCrack = 1 }
+            for step in 1...4 {
+                try? await Task.sleep(for: .milliseconds(160))
+                rigid.impactOccurred(intensity: 0.3 + 0.2 * Double(step))
+            }
+            withAnimation(.easeOut(duration: 0.3)) { breakShatter = true }
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            SoundEffectPlayer.shared.play(.waxCrack, volume: 0.6)
+            try? await Task.sleep(for: .milliseconds(750))
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { closure = nil }
+            breakCrack = 0
+            breakShatter = false
+            isBreakingSeal = false
+        }
     }
 
     /// No wax: the letter goes as it is.
     private var postcardCard: some View {
+        VStack(spacing: 12) {
+            postcardNote
+            sealWithWaxRow
+        }
+    }
+
+    /// Same row idiom as "Send open", but for the other choice: press the
+    /// letter shut with wax after all.
+    private var sealWithWaxRow: some View {
+        Button {
+            // Back to the sealing ritual (wax colour, then press): choosing
+            // wax must never seal and send in one tap.
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                closure = nil
+            }
+        } label: {
+            HStack(spacing: 10) {
+                WaxSealView(wax: sealColor, monogram: monogram, diameter: 30)
+                Text("Seal with wax")
+                    .font(.body.weight(.medium))
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Seal the letter with wax instead")
+    }
+
+    private var postcardNote: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "envelope.open.fill")
                 .font(.title2)
@@ -990,18 +1308,6 @@ struct ComposeLetterView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Button {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        closure = nil
-                    }
-                } label: {
-                    Label("Seal it instead", systemImage: "seal.fill")
-                        .font(.footnote.weight(.medium))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tint)
-                .padding(.top, 2)
             }
             Spacer(minLength: 0)
         }
@@ -1048,7 +1354,8 @@ struct ComposeLetterView: View {
                     .foregroundStyle(.tint)
                 }
 
-                Text("No road reaches \(targetCity.trimmed) from here — there's water or a closed border in between. \(ramName.trimmed.isEmpty ? "Your ram" : ramName.trimmed) will walk to \(handoffPlan.gateway.name), the nearest port on the way, and board the next packet across. If you find someone crossing sooner, hand the ram to them there and it skips the wait.")
+                let ramDisplayName = ramName.trimmed.isEmpty ? String(localized: "Your Ram") : ramName.trimmed
+                Text("No road reaches \(targetCity.trimmed) from here — there's water or a closed border in between. \(ramDisplayName) will walk to \(handoffPlan.gateway.name), the nearest port on the way, and board the next packet across. If you find someone crossing sooner, hand the ram to them there and it skips the wait.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
@@ -1220,7 +1527,9 @@ struct ComposeLetterView: View {
                 // The handoff city itself isn't reachable by road either —
                 // ask for a different one rather than dispatching a ram
                 // that can never move.
-                resolutionError = "\(handoffCity.trimmed.isEmpty ? "That city" : handoffCity.trimmed) isn't reachable by road from \(currentCity.trimmed) either. Try a different handoff city."
+                let city = handoffCity.trimmed.isEmpty ? String(localized: "That city") : handoffCity.trimmed
+                let origin = currentCity.trimmed
+                resolutionError = "\(city) isn't reachable by road from \(origin) either. Try a different handoff city."
             } else {
                 // No road to the destination: pick the port for the
                 // sender, then show the plan for them to confirm with a
@@ -1362,19 +1671,28 @@ struct ComposeLetterView: View {
     /// (`missingRequirement` catches that), so the fallback is the
     /// private one.
     private func makeLetter() -> Letter {
+        var letter = makeUnpapered()
+        letter.paper = paper
+        letter.paperCustomHex = customPaperHex
+        return letter
+    }
+
+    private func makeUnpapered() -> Letter {
         switch closure {
         case .postcard:
             return Letter.writeOpen(
                 senderName: senderName,
                 recipientName: recipientName.trimmed,
-                messageBody: messageBody.trimmed
+                messageBody: messageBody.trimmed,
+                attachment: attachedPhoto?.jpegData(compressionQuality: 0.6)
             )
         case .sealed, .none:
             return Letter.write(
                 senderName: senderName,
                 recipientName: recipientName.trimmed,
                 messageBody: messageBody.trimmed,
-                sealColor: sealColor
+                sealColor: sealColor,
+                attachment: attachedPhoto?.jpegData(compressionQuality: 0.6)
             ).letter
         }
     }
@@ -1386,6 +1704,7 @@ struct ComposeLetterView: View {
             setAsideForLackOfRam()
             return
         }
+        SoundEffectPlayer.shared.play(.dispatchWhoosh)
         // The letter is on the road: nothing left to restore, and the
         // form is cleared for the next one. `trackedRam` in `JourneyView`
         // becomes non-nil immediately and its panel shows the journey on
@@ -1469,6 +1788,9 @@ struct ComposeLetterView: View {
         showsCustomRamName = false
         recipientName = ""
         messageBody = ""
+        attachedPhoto = nil
+        paper = .cream
+        customPaperHex = nil
         sealColor = .crimson
         closure = nil
         resolutionError = nil

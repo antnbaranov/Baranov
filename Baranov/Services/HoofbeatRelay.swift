@@ -71,14 +71,14 @@ final class HoofbeatRelay: NSObject {
     /// How far apart two shakes may be and still count as "together".
     /// Wide enough to absorb device clock drift and human reaction time,
     /// narrow enough that a stranger idling nearby is never swept in.
-    static let matchWindow: TimeInterval = 2.5
+    static let matchWindow: TimeInterval = 3.5
 
     /// How long we keep looking before giving up on finding a partner.
-    static let searchTimeout: TimeInterval = 12
+    static let searchTimeout: TimeInterval = 8
 
     /// Grace period after connecting, so a package arriving from the other
     /// side still lands before the session is torn down.
-    static let settleDelay: TimeInterval = 2.0
+    static let settleDelay: TimeInterval = 1.0
 
     private(set) var phase: HoofbeatPhase = .idle
     /// Bumped on every successful exchange; views key `.sensoryFeedback` to it.

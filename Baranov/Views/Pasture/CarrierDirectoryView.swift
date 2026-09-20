@@ -25,8 +25,6 @@ import SwiftUI
 struct CarrierDirectoryView: View {
     let directory: KnownCarrierDirectory
     var gameCenterService: GameCenterService? = nil
-    /// A name to start the form with — a Game Center friend tapped in the
-    /// Pasture's carriers card lands here with their name already filled.
     var prefilledName: String? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -37,6 +35,11 @@ struct CarrierDirectoryView: View {
 
     @State private var gameCenterFriends: [GameCenterFriend] = []
     @State private var hasLoadedGameCenterFriends = false
+
+    @State private var addTick = 0
+    @State private var pendingDeleteOffsets: IndexSet?
+    @State private var showsDeleteConfirmation = false
+    @FocusState private var isFormFocused: Bool
 
     private var canAdd: Bool {
         !name.trimmed.isEmpty && destinationCoordinate != nil
@@ -62,7 +65,7 @@ struct CarrierDirectoryView: View {
                 } header: {
                     Text("Add a Carrier")
                 } footer: {
-                    Text("A letter waiting for a handoff can be AirDropped straight to anyone here whose destination matches, or is within 800 km of, where it's actually going.")
+                    Text("A letter waiting for a handoff can be AirDropped straight to anyone here whose destination matches, or is within \(KnownCarrierDirectory.matchRadiusKm) km of, where it's actually going.")
                 }
                 .listRowSeparator(.hidden)
 
@@ -94,7 +97,8 @@ struct CarrierDirectoryView: View {
                             }
                         }
                         .onDelete { offsets in
-                            directory.remove(at: offsets)
+                            pendingDeleteOffsets = offsets
+                            showsDeleteConfirmation = true
                         }
                     }
                 }
@@ -107,6 +111,15 @@ struct CarrierDirectoryView: View {
                         .fontWeight(.semibold)
                 }
             }
+            .confirmationDialog("Remove Carrier?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
+                Button("Remove", role: .destructive) {
+                    if let offsets = pendingDeleteOffsets {
+                        withAnimation { directory.remove(at: offsets) }
+                    }
+                    pendingDeleteOffsets = nil
+                }
+            }
+            .sensoryFeedback(.success, trigger: addTick)
             .task {
                 if name.isEmpty, let prefilledName {
                     name = prefilledName
@@ -125,9 +138,13 @@ struct CarrierDirectoryView: View {
             destinationCity: destinationCity.trimmed,
             destinationCoordinate: RamCoordinate(destinationCoordinate)
         )
-        name = ""
-        destinationCity = ""
-        self.destinationCoordinate = nil
+        withAnimation(.snappy) {
+            name = ""
+            destinationCity = ""
+            self.destinationCoordinate = nil
+        }
+        isFormFocused = false
+        addTick += 1
     }
 }
 

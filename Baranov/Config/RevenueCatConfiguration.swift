@@ -19,9 +19,10 @@
 //
 //    Entitlement            Unlocks                          Granted by
 //    ─────────────────────  ───────────────────────────────  ─────────────────────────────
-//    pasture_expansion      5 rams at once + every wax       baranov.pasture.monthly  ($1.99)
-//                           colour                           baranov.pasture.annual   ($12.99, 7-day trial)
-//    adopted_ram            a permanent 2nd ram slot         baranov.ram.adopt        ($3.99, one-time)
+//    pasture_expansion      5 rams at once + every wax       com.baranov.sub.monthly   ($2.99)
+//                           colour                           com.baranov.sub.quarterly ($5.99 / 3 months)
+//                                                            com.baranov.sub.annual    ($19.99, 7-day trial)
+//    adopted_ram            a permanent 2nd ram slot         com.baranov.iap.ram.merino ($2.99, one-time)
 //
 //  Pricing rationale (a starting point, not data — watch the numbers):
 //  the expansion is worth about a coffee a month to someone who writes to
@@ -36,10 +37,8 @@
 import Foundation
 
 enum RevenueCatConfiguration {
-    /// Public SDK key from Project Settings → API Keys. Left at the
-    /// placeholder, the SDK is never configured and the app runs on
-    /// `MockEntitlementStore` instead (see `EntitlementService`).
-    static let apiKey = "REVENUECAT_API_KEY_PLACEHOLDER"
+    /// Public SDK key from Project Settings → API Keys.
+    static let apiKey = "test_JZRPZKzpSBlSCvjemKwkupccdcJ"
 
     static var hasRealAPIKey: Bool {
         !apiKey.isEmpty && apiKey != "REVENUECAT_API_KEY_PLACEHOLDER"
@@ -53,9 +52,10 @@ enum RevenueCatConfiguration {
     }
 
     enum ProductID {
-        static let pastureMonthly = "baranov.pasture.monthly"
-        static let pastureAnnual = "baranov.pasture.annual"
-        static let adoptRam = "baranov.ram.adopt"
+        static let pastureMonthly = "com.baranov.sub.monthly"
+        static let pastureQuarterly = "com.baranov.sub.quarterly"
+        static let pastureAnnual = "com.baranov.sub.annual"
+        static let adoptRam = "com.baranov.iap.ram.merino"
     }
 
     /// Custom subscriber attributes synced to RevenueCat so the dashboard

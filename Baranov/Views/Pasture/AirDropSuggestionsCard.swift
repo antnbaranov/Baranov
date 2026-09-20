@@ -73,7 +73,7 @@ struct AirDropSuggestionsCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemGray6), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: - Header
@@ -91,6 +91,7 @@ struct AirDropSuggestionsCard: View {
                         .font(.caption2.weight(.semibold))
                 }
                 .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(.thinMaterial, in: Capsule())
@@ -153,11 +154,17 @@ struct AirDropSuggestionsCard: View {
                 Spacer(minLength: 0)
             }
         } else if ram == nil {
-            Text(companionName.map { "\($0) hasn't set out on a journey yet. Add the people you know who travel — their trips become shortcuts for your letters." } ?? "No ram selected.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        } else {
-            Text("\(ram!.name)'s whole route is on land — no carrier needed this time.")
+            if let companionName {
+                Text("\(companionName) hasn't set out on a journey yet. Add the people you know who travel — their trips become shortcuts for your letters.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No ram selected.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } else if let ram {
+            Text("\(ram.name)'s whole route is on land — no carrier needed this time.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -310,7 +317,6 @@ struct AirDropSuggestionsCard: View {
         let isAdded = addedSuggestionIDs.contains(suggestion.id)
 
         return Button {
-            guard !isAdded else { return }
             onAddTripAsCarrier(suggestion)
         } label: {
             HStack(spacing: 4) {

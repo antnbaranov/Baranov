@@ -63,6 +63,23 @@ enum LetterCipher {
         return box.combined
     }
 
+    /// Seals raw bytes (a letter's photo) under the same per-letter key.
+    static func sealData(_ data: Data, receivingCode: String, letterID: UUID) throws -> Data {
+        let key = key(fromReceivingCode: receivingCode, letterID: letterID)
+        return try ChaChaPoly.seal(data, using: key, authenticating: Data(letterID.uuidString.utf8)).combined
+    }
+
+    /// Opens bytes sealed with `sealData`.
+    static func openData(_ sealed: Data, receivingCode: String, letterID: UUID) throws -> Data {
+        guard let box = try? ChaChaPoly.SealedBox(combined: sealed) else { throw LetterCipherError.malformed }
+        let key = key(fromReceivingCode: receivingCode, letterID: letterID)
+        do {
+            return try ChaChaPoly.open(box, using: key, authenticating: Data(letterID.uuidString.utf8))
+        } catch {
+            throw LetterCipherError.wrongCode
+        }
+    }
+
     /// Opens a sealed body. Throws `.wrongCode` on any authentication
     /// failure — a wrong code and a tampered body are indistinguishable
     /// by design, and both mean "this seal does not break for you".

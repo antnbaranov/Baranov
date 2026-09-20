@@ -13,22 +13,26 @@ struct DeliveredLettersCarousel: View {
     let rams: [Ram]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Delivered Letters", systemImage: "checkmark.seal.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+        if rams.isEmpty { return AnyView(EmptyView()) }
+        return AnyView(
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Delivered Letters", systemImage: "checkmark.seal.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(rams) { ram in
-                        DeliveredLetterCard(ram: ram)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(rams) { ram in
+                            DeliveredLetterCard(ram: ram)
+                        }
                     }
+                    .padding(.vertical, 2)
+                    .scrollTargetLayout()
                 }
-                .padding(.vertical, 2)
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .contentMargins(.horizontal, 2, for: .scrollContent)
             }
-            .scrollTargetBehavior(.viewAligned)
-        }
+        )
     }
 }
 

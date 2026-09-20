@@ -23,9 +23,9 @@ enum RamAgeStage: String, Codable, Sendable {
 
     var displayName: String {
         switch self {
-        case .lamb: return "Lamb"
-        case .yearling: return "Yearling"
-        case .adult: return "Adult"
+        case .lamb: return String(localized: "Lamb")
+        case .yearling: return String(localized: "Yearling")
+        case .adult: return String(localized: "Adult")
         }
     }
 
@@ -71,13 +71,16 @@ struct RamCompanion: Codable, Sendable {
     var ageDescription: String {
         let days = ageInDays
         if days < 14 {
-            return days == 1 ? "1 day old" : "\(days) days old"
+            if days == 0 {
+                return String(localized: "0 days old")
+            }
+            return days == 1 ? String(localized: "1 day old") : String(localized: "\(days) days old")
         }
         let weeks = days / 7
         if weeks < 12 {
-            return weeks == 1 ? "1 week old" : "\(weeks) weeks old"
+            return weeks == 1 ? String(localized: "1 week old") : String(localized: "\(weeks) weeks old")
         }
         let months = days / 30
-        return months <= 1 ? "1 month old" : "\(months) months old"
+        return months <= 1 ? String(localized: "1 month old") : String(localized: "\(months) months old")
     }
 }

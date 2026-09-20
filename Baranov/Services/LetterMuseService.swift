@@ -68,19 +68,22 @@ final class LetterMuseService {
         let distance = DistanceFormatter.string(forMeters: context.distanceMeters)
         let month = Date().formatted(.dateTime.month(.wide))
         let session = LanguageModelSession(instructions: """
-            You help someone start a handwritten-style letter that will be carried slowly, on foot, by a virtual ram. \
-            Reply with exactly one sentence, under 22 words, in the second person, suggesting one concrete thing they could write about. \
-            Do not write the letter. Do not use quotation marks, emoji, exclamation marks, or the word "journey". \
-            Be warm, specific and plain.
+            You give a spark for a letter, never the letter. \
+            Reply with ONE short sentence of at most 15 words, in the second person, naming one thing to write about or ask. \
+            No greeting, no sign-off, no quotation marks, no emoji, no second sentence.
             """)
         let prompt = """
-            The letter is from \(context.senderName.isEmpty ? "the sender" : context.senderName) to \(context.recipientName.isEmpty ? "someone" : context.recipientName). \
-            It leaves \(context.originCity.isEmpty ? "here" : context.originCity) for \(context.destinationCity) — about \(distance) of walking\(context.needsHandoff ? ", then a hand-off across water" : ""). \
-            It is \(month). Suggest one thing to write about.
+            Letter to \(context.recipientName.isEmpty ? "someone" : context.recipientName) in \(context.destinationCity), \
+            about \(distance) away. Month: \(month). One-line idea only.
             """
         do {
-            let response = try await session.respond(to: prompt, options: GenerationOptions(temperature: 0.9))
-            return Self.cleaned(response.content)
+            // A hard token cap is what keeps this instant: the model
+            // physically cannot ramble into a draft of the letter.
+            let response = try await session.respond(
+                to: prompt,
+                options: GenerationOptions(temperature: 0.9, maximumResponseTokens: 36)
+            )
+            return Self.spark(response.content)
         } catch {
             return nil
         }
@@ -121,6 +124,21 @@ final class LetterMuseService {
         #else
         return nil
         #endif
+    }
+
+    /// One short line: first sentence only, at most 20 words.
+    private static func spark(_ text: String) -> String? {
+        guard let line = cleaned(text) else { return nil }
+        let firstLine = line.split(whereSeparator: \.isNewline).first.map(String.init) ?? line
+        var sentence = firstLine
+        if let end = firstLine.firstIndex(where: { ".!?".contains($0) }) {
+            sentence = String(firstLine[...end])
+        }
+        let words = sentence.split(separator: " ")
+        if words.count > 20 {
+            sentence = words.prefix(20).joined(separator: " ") + "…"
+        }
+        return cleaned(sentence)
     }
 
     /// Strips the quotation marks and stray whitespace models like to add.

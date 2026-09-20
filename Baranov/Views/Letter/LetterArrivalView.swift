@@ -27,11 +27,14 @@ import UIKit
 
 struct LetterArrivalView: View {
     let ram: Ram
+    /// A receiving code found nearby (see `ProximityCodeDiscovery`); fills the code field.
+    var prefilledCode: String? = nil
 
     @Environment(\.dismiss) private var dismiss
     @Environment(FlockViewModel.self) private var flockViewModel
 
     @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
+    @AppStorage(SealStyle.storageKey) private var sealStyleRaw = SealStyle.wax.rawValue
     @Environment(LocationService.self) private var locationService
 
     @State private var sealProgress: Double = 0
@@ -42,6 +45,7 @@ struct LetterArrivalView: View {
     @State private var sensoryTrigger = false
     @State private var crackTick = 0
     @State private var crackTask: Task<Void, Never>?
+    @State private var closeTick = 0
 
     /// The receiving code the recipient types in — the letter's actual
     /// decryption key (see `LetterCipher`). Pre-filled only if this very
@@ -124,11 +128,20 @@ struct LetterArrivalView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("Close") {
+                        closeTick += 1
+                        dismiss()
+                    }
                 }
             }
+            .sensoryFeedback(.impact(weight: .light), trigger: closeTick)
             .task {
-                locationService.resolveCurrentLocation()
+                if locationService.currentCoordinate == nil {
+                    locationService.resolveCurrentLocation()
+                }
+                if enteredCode.isEmpty, let found = prefilledCode {
+                    enteredCode = found
+                }
                 if enteredCode.isEmpty, let known = letter?.receivingCode {
                     enteredCode = known
                 }
@@ -157,7 +170,7 @@ struct LetterArrivalView: View {
                 .foregroundStyle(.secondary)
                 .symbolRenderingMode(.hierarchical)
 
-            Text("Not Your Letter to Open")
+            Text("This Letter Isn't for You")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -207,7 +220,7 @@ struct LetterArrivalView: View {
 
             Text(holdInstruction)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(canBreak ? .primary : .secondary)
+                .foregroundStyle(canBreak && !usesPrompt ? .primary : .secondary)
                 .contentTransition(.opacity)
                 .animation(.easeInOut(duration: 0.2), value: canBreak)
 
@@ -218,7 +231,9 @@ struct LetterArrivalView: View {
                     addressee: letter?.recipientName ?? "",
                     isOpen: isEnvelopeOpen,
                     width: 260,
-                    showsSeal: false
+                    showsSeal: usesPrompt && isEncrypted && !isBreaking,
+                    paper: letter?.paper,
+                    customPaperHex: letter?.paperCustomHex
                 )
 
                 holdTarget
@@ -246,7 +261,13 @@ struct LetterArrivalView: View {
         .onDisappear { crackTask?.cancel() }
     }
 
+    private var usesPrompt: Bool { sealStyleRaw == SealStyle.prompt.rawValue }
+
     private var holdInstruction: String {
+        if usesPrompt {
+            if !isEncrypted { return String(localized: "Tap to lift the postcard out") }
+            return hasCompleteCode ? String(localized: "Tap the seal!") : String(localized: "Enter your receiving code to unlock the seal")
+        }
         if !isEncrypted { return "Hold to lift the postcard out" }
         return hasCompleteCode ? "Hold the seal to break it" : "Enter your receiving code to unlock the seal"
     }
@@ -256,7 +277,23 @@ struct LetterArrivalView: View {
     /// What the recipient holds: the wax seal (cracking as they hold,
     /// shattering on success) or, for a postcard, the open-envelope
     /// glyph in the same spot.
+    @ViewBuilder
     private var holdTarget: some View {
+        if usesPrompt {
+            Circle()
+                .fill(Color.clear)
+                .frame(width: 84, height: 84)
+                .contentShape(Circle())
+                .onTapGesture { breakSeal() }
+                .accessibilityLabel(isEncrypted ? "Wax seal" : "Postcard")
+                .accessibilityHint(canBreak ? "Tap to open the letter" : "Enter the receiving code first")
+                .accessibilityAddTraits(.isButton)
+        } else {
+            waxHoldTarget
+        }
+    }
+
+    private var waxHoldTarget: some View {
         ZStack {
             Circle()
                 .trim(from: 0, to: sealProgress)
@@ -309,6 +346,11 @@ struct LetterArrivalView: View {
         .accessibilityLabel(isEncrypted ? "Wax seal" : "Postcard")
         .accessibilityHint(canBreak ? "Touch and hold to open the letter" : "Enter the receiving code first")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: isEncrypted ? "Break Seal" : "Open Letter") {
+            if canBreak {
+                breakSeal()
+            }
+        }
     }
 
     /// Soft ticks as the cracks spread — one per crack.
@@ -319,6 +361,7 @@ struct LetterArrivalView: View {
                 try? await Task.sleep(for: .milliseconds(260))
                 guard !Task.isCancelled else { return }
                 crackTick += 1
+                SoundEffectPlayer.shared.play(.waxCrack, volume: 0.35)
             }
         }
     }
@@ -353,9 +396,11 @@ struct LetterArrivalView: View {
             withAnimation { wrongCodeMessage = nil }
             isPressing = false
             isBreaking = true
+            SoundEffectPlayer.shared.play(.waxShatter)
             Task {
                 try? await Task.sleep(for: .milliseconds(isEncrypted ? 450 : 150))
                 isEnvelopeOpen = true
+                SoundEffectPlayer.shared.play(.paperRustle)
                 try? await Task.sleep(for: .milliseconds(650))
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
                     isRevealed = true
@@ -426,6 +471,14 @@ struct LetterArrivalView: View {
             Text(letter.messageBody)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let data = letter.revealedAttachment, let photo = UIImage(data: data) {
+                Image(uiImage: photo)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .accessibilityLabel("Drawing attached to the letter")
+            }
 
             Divider()
 

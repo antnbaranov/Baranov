@@ -30,6 +30,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Shapes
 
@@ -157,7 +158,7 @@ struct WaxSealPressView: View {
     var wax: SealColor
     var monogram: String
     var diameter: CGFloat = 84
-    var holdDuration: Double = 1.1
+    var holdDuration: Double = 1.5
     var onSealed: () -> Void
 
     @State private var holdProgress: Double = 0
@@ -189,7 +190,7 @@ struct WaxSealPressView: View {
                 .opacity(isStamping ? 0 : 1)
 
             waxAndStamp
-                .scaleEffect(poolScale)
+                .scaleEffect(poolScale * (1 + 0.06 * CGFloat(holdProgress)))
                 .opacity(isStamping ? 1 : min(1, holdProgress * 3))
 
             if !isStamping, holdProgress == 0 {
@@ -232,12 +233,12 @@ struct WaxSealPressView: View {
                     cancelHold()
                 }
         )
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: holdTick)
-        .sensoryFeedback(.impact(weight: .heavy), trigger: impactTrigger)
-        .sensoryFeedback(.success, trigger: settledTrigger)
         .accessibilityLabel("Wax seal")
         .accessibilityHint("Touch and hold to seal the letter")
         .accessibilityAddTraits(.isButton)
+        .accessibilityAction(named: "Seal Letter") {
+            stamp()
+        }
         .onDisappear {
             holdTask?.cancel()
             holdTimerTask?.cancel()
@@ -253,9 +254,10 @@ struct WaxSealPressView: View {
         holdTimerTask?.cancel()
         holdTask?.cancel()
         guard !isStamping else { return }
-        if holdProgress < 1 {
-            withAnimation(.easeOut(duration: 0.25)) { holdProgress = 0 }
-        }
+        // `holdProgress` is already 1 (the linear fill is only an
+        // animation towards it), so it must be pulled back explicitly —
+        // otherwise letting go left the ring finishing on its own.
+        withAnimation(.easeOut(duration: 0.25)) { holdProgress = 0 }
     }
 
     /// The actual "did they really hold it long enough" check — a `Task`
@@ -372,12 +374,26 @@ struct WaxSealPressView: View {
 
     private func startHoldTicks() {
         holdTask?.cancel()
-        let interval = Int(holdDuration * 1000) / 5
+        // Progressive haptics: rigid taps that grow stronger, then heavy
+        // ones as the wax is about to set.
+        let steps = 6
+        let interval = Int(holdDuration * 1000) / (steps + 1)
+        let rigid = UIImpactFeedbackGenerator(style: .rigid)
+        let heavy = UIImpactFeedbackGenerator(style: .heavy)
+        rigid.prepare()
+        heavy.prepare()
         holdTask = Task {
-            for _ in 0..<4 {
+            for step in 1...steps {
                 try? await Task.sleep(for: .milliseconds(interval))
                 guard !Task.isCancelled else { return }
+                let strength = 0.3 + 0.7 * Double(step) / Double(steps)
+                if step <= 4 {
+                    rigid.impactOccurred(intensity: strength)
+                } else {
+                    heavy.impactOccurred(intensity: strength)
+                }
                 holdTick += 1
+                if step % 2 == 0 { SoundEffectPlayer.shared.play(.waxCrack, volume: 0.25) }
             }
         }
     }
@@ -392,8 +408,11 @@ struct WaxSealPressView: View {
         Task {
             try? await Task.sleep(for: .milliseconds(220))
             impactTrigger += 1
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+            SoundEffectPlayer.shared.play(.waxStamp)
             try? await Task.sleep(for: .milliseconds(620))
             settledTrigger += 1
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSealed()
         }
     }
@@ -518,6 +537,12 @@ struct SealedEnvelopeView: View {
     /// `false` lets a caller draw its own seal (one that cracks and
     /// shatters, say) at `sealCenterY(width:)` instead.
     var showsSeal: Bool = true
+    /// The paper the envelope is made of; `nil` keeps the system-material look.
+    var paper: EnvelopePaper?
+    /// A colour the writer picked; overrides the preset paper.
+    var customPaperHex: String? = nil
+
+    private var style: PaperStyle? { paper.map { PaperStyle(paper: $0, customHex: customPaperHex) } }
 
     private var height: CGFloat { width * 0.62 }
 
@@ -530,19 +555,24 @@ struct SealedEnvelopeView: View {
     var body: some View {
         ZStack(alignment: .top) {
             // Pocket.
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.thickMaterial)
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.secondary.opacity(0.25), lineWidth: 1))
-                .frame(width: width, height: height)
+            Group {
+                if let style {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(style.color)
+                } else {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.thickMaterial)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.secondary.opacity(0.25), lineWidth: 1))
+            .frame(width: width, height: height)
 
             // Address line.
             VStack(spacing: 2) {
                 Text("To")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(style.map { $0.ink.opacity(0.6) } ?? Color(uiColor: .tertiaryLabel))
                 Text(addressee)
                     .font(.system(.body, design: .serif, weight: .semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(style?.ink ?? Color.primary)
                     .lineLimit(1)
             }
             .frame(width: width * 0.8)
@@ -550,9 +580,15 @@ struct SealedEnvelopeView: View {
 
             // Flap, hinged on the top edge, with the seal riding on it.
             ZStack(alignment: .bottom) {
-                FlapShape()
-                    .fill(.regularMaterial)
-                    .overlay(FlapShape().stroke(.secondary.opacity(0.3), lineWidth: 1))
+                Group {
+                    if let style {
+                        FlapShape().fill(style.color)
+                            .overlay(FlapShape().fill(.black.opacity(0.07)))
+                    } else {
+                        FlapShape().fill(.regularMaterial)
+                    }
+                }
+                .overlay(FlapShape().stroke(.secondary.opacity(0.3), lineWidth: 1))
                 if showsSeal {
                     WaxSealView(wax: wax, monogram: monogram, diameter: width * 0.2)
                         .offset(y: width * 0.08)

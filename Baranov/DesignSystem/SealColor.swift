@@ -37,7 +37,7 @@ enum SealColor: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var color: Color {
         switch self {
-        case .crimson: return .red
+        case .crimson: return .adaptive(light: (0.66, 0.11, 0.13), dark: (0.80, 0.25, 0.27))
         case .gold: return .orange
         case .forest: return .green
         case .navy: return .blue
@@ -48,5 +48,5 @@ enum SealColor: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Whether this wax comes free with the app or with the pasture
     /// expansion.
-    var isIncludedFree: Bool { self == .crimson }
+    var isIncludedFree: Bool { true }
 }

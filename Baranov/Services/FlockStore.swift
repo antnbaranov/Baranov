@@ -81,6 +81,12 @@ struct FlockStore: Sendable {
     }
 
     private static func defaultFileURL() -> URL {
+        if let groupBase = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: "group.com.baranov") {
+            return groupBase
+                .appendingPathComponent("Baranov", isDirectory: true)
+                .appendingPathComponent("flock.json")
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("Baranov", isDirectory: true).appendingPathComponent("flock.json")
