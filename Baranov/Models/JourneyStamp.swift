@@ -73,6 +73,11 @@ struct JourneyStamp: Identifiable, Codable, Hashable, Sendable {
     /// stretch is a different carrier entirely.
     let carrierName: String
     let timestamp: Date
+    /// The weather where and when this stamp was earned, if the device was
+    /// online at that moment. Optional and never back-filled: a stamp from
+    /// before this existed, or earned offline, simply has none — Codable
+    /// decodes the missing key as nil, so old passports still load.
+    var weather: StampWeather?
 
     init(
         id: UUID = UUID(),
@@ -82,7 +87,8 @@ struct JourneyStamp: Identifiable, Codable, Hashable, Sendable {
         longitude: Double,
         stepsAtStamp: Int,
         carrierName: String,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        weather: StampWeather? = nil
     ) {
         self.id = id
         self.placeName = placeName
@@ -92,5 +98,18 @@ struct JourneyStamp: Identifiable, Codable, Hashable, Sendable {
         self.stepsAtStamp = stepsAtStamp
         self.carrierName = carrierName
         self.timestamp = timestamp
+        self.weather = weather
     }
+}
+
+/// A frozen reading of the sky, saved on the stamp. Stored as plain values
+/// (not WeatherKit types) so it is `Sendable`, tiny, and readable offline.
+struct StampWeather: Codable, Hashable, Sendable {
+    /// Localized condition name, e.g. "Light Rain".
+    let condition: String
+    /// An SF Symbol name.
+    let symbolName: String
+    let temperatureCelsius: Double
+    /// Whether it was actually wet — drives the "Rain Walker" patch.
+    let isWet: Bool
 }

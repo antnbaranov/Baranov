@@ -40,6 +40,20 @@ final class RamNotificationService: NSObject {
     private let center = UNUserNotificationCenter.current()
     private let enabledKey = "com.baranov.notificationsEnabled"
 
+    /// The morning note is its own switch and its own time, both chosen in
+    /// Settings (minutes after midnight; 9:00 by default — a fixed 8:30
+    /// was an arbitrary hour for everyone).
+    nonisolated static let morningEnabledKey = "com.baranov.morningNoteEnabled"
+    nonisolated static let morningMinutesKey = "com.baranov.morningNoteMinutes"
+    nonisolated static let defaultMorningMinutes = 9 * 60
+    /// Posted by Settings so a changed time or switch re-plans at once.
+    nonisolated static let preferencesChanged = Notification.Name("com.baranov.notificationPreferencesChanged")
+
+    private var lastRams: [Ram] = []
+    /// When each ram's step count last *really* moved (not the launch
+    /// priming) — lets the morning note skip a day already being walked.
+    private var stepsMovedAt: [UUID: Date] = [:]
+
     /// Last status seen per ram, so status *changes* can be detected
     /// across `sync` calls without diffing whole arrays.
     private var lastKnownStatus: [UUID: RamStatus] = [:]
@@ -58,6 +72,15 @@ final class RamNotificationService: NSObject {
     override init() {
         super.init()
         center.delegate = self
+        NotificationCenter.default.addObserver(
+            forName: Self.preferencesChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let rams = self.lastRams
+                Task { await self.replan(rams: rams) }
+            }
+        }
     }
 
     private var isEnabled: Bool {
@@ -72,6 +95,7 @@ final class RamNotificationService: NSObject {
     /// produces one notification for the final state, not one per
     /// intermediate step.
     func sync(rams: [Ram]) {
+        lastRams = rams
         // First call after launch only primes the memory — a relaunch must
         // never re-announce every ram already sitting at a gate.
         if !hasPrimed {
@@ -101,6 +125,7 @@ final class RamNotificationService: NSObject {
 
             if lastStepChange[ram.id]?.steps != ram.stepsWalked {
                 lastStepChange[ram.id] = (ram.stepsWalked, Date())
+                stepsMovedAt[ram.id] = Date()
             }
         }
         for gone in Set(lastKnownStatus.keys).subtracting(rams.map(\.id)) {
@@ -130,11 +155,29 @@ final class RamNotificationService: NSObject {
 
     // MARK: - Immediate
 
+    /// Whether this device's owner wrote the letter (by the display name
+    /// they carry, the same identity the mailbag's Outgoing tab uses).
+    private func isSender(of letter: Letter?) -> Bool {
+        guard let sender = letter?.senderName else { return false }
+        let mine = UserDefaults.standard.string(forKey: "com.baranov.carrierDisplayName") ?? ""
+        return !mine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && sender.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(mine.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame
+    }
+
     private func announceTransition(of ram: Ram, from previous: RamStatus?) {
         guard isEnabled else { return }
         let letter = ram.letter
 
         switch (previous, ram.status) {
+        case (_, .arrivedAtGate) where isSender(of: letter):
+            // Your own letter: the ram has set it down and is free again.
+            deliver(
+                id: "gate-\(ram.id.uuidString)",
+                title: "\(ram.name) left your letter at the gate",
+                body: "\(letter?.recipientName ?? "The recipient") can collect it by walking to \(ram.targetCity). \(ram.name) is free for the next letter.",
+                ramID: ram.id
+            )
         case (_, .arrivedAtGate):
             deliver(
                 id: "gate-\(ram.id.uuidString)",
@@ -186,6 +229,18 @@ final class RamNotificationService: NSObject {
         }
     }
 
+    /// The sender's letter was claimed by its recipient. Local, and only
+    /// while the app is in the foreground checking the relay — the relay
+    /// never learns or shares where the recipient chose to receive it.
+    func announceLetterClaimed(recipientName: String, code: String) {
+        guard isEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "\(recipientName) claimed your letter"
+        content.body = "A ram is on its way to them now."
+        content.sound = .default
+        center.add(UNNotificationRequest(identifier: "claimed-\(code)", content: content, trigger: nil))
+    }
+
     private func deliver(
         id: String,
         title: String,
@@ -223,7 +278,8 @@ final class RamNotificationService: NSObject {
         for ram in walking {
             scheduleIdleNudges(for: ram)
         }
-        if let furthest = walking.max(by: { $0.remainingSteps < $1.remainingSteps }) {
+        let morningOn = UserDefaults.standard.object(forKey: Self.morningEnabledKey) as? Bool ?? true
+        if morningOn, let furthest = walking.max(by: { $0.remainingSteps < $1.remainingSteps }) {
             scheduleMorningForecast(for: furthest, others: walking.count - 1)
         }
     }
@@ -278,10 +334,20 @@ final class RamNotificationService: NSObject {
         content.userInfo = ["ramID": ram.id.uuidString]
         content.interruptionLevel = .passive
 
-        var components = DateComponents()
-        components.hour = 8
-        components.minute = 30
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
+        // One-shot for the *next* chosen time, re-planned on every sync —
+        // never a blind daily repeat. If the ram has already moved today,
+        // today's note is skipped (nothing to encourage), so it can't fire
+        // at someone who is already out walking.
+        let minutes = UserDefaults.standard.object(forKey: Self.morningMinutesKey) as? Int ?? Self.defaultMorningMinutes
+        let calendar = Calendar.current
+        let time = DateComponents(hour: minutes / 60, minute: minutes % 60)
+        guard var fire = calendar.nextDate(after: Date(), matching: time, matchingPolicy: .nextTime) else { return }
+        if calendar.isDateInToday(fire), calendar.isDateInToday(stepsMovedAt[ram.id] ?? .distantPast),
+           let tomorrow = calendar.date(byAdding: .day, value: 1, to: fire) {
+            fire = tomorrow
+        }
+        let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         center.add(UNNotificationRequest(identifier: "morning", content: content, trigger: trigger))
     }
 }

@@ -31,14 +31,14 @@ import SwiftUI
 
 struct SlideToActionControl: View {
     enum Role {
-        /// Sending a letter out: tinted knob, `paperplane.fill`.
+        /// Sending a letter out: wax-coloured knob, `paperplane.fill`.
         case dispatch
         /// Withdrawing a ram mid-journey: red knob, `arrow.uturn.backward`.
         case recall
 
         fileprivate var knobColor: Color {
             switch self {
-            case .dispatch: return .accentColor
+            case .dispatch: return .wax
             case .recall: return .red
             }
         }

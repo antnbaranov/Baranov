@@ -99,6 +99,7 @@ struct ContactSuggestionField: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear recipient")
             } else {
                 Button {
                     isContactPickerPresented = true

@@ -2,8 +2,9 @@
 //  CourierCodeStore.swift
 //  Baranov
 //
-//  A courier's own permanent, universal code — the one identifier used
-//  for receiving mail and transfers. Generated once on this device and
+//  A courier's own permanent address — the profile code a friend types into
+//  "Send by code" to put a letter straight into this person's mailbag (see
+//  `LetterInbox`). Generated once on this device and
 //  kept; 10 characters from a 31-symbol alphabet (no 0/O, 1/I/L), so
 //  there are ~8 × 10^14 possibilities and two couriers never collide in
 //  practice. Formatted XXXXX-XXXXX for reading aloud and typing.
@@ -19,6 +20,35 @@ final class CourierCodeStore {
     private static let alphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
 
     private(set) var code: String
+
+    /// The code as the relay knows it: 10 characters, no dash.
+    var address: String { Self.address(from: code) }
+
+    static let addressLength = 10
+
+    static func address(from raw: String) -> String {
+        String(raw.uppercased().filter { $0.isLetter || $0.isNumber }.prefix(addressLength))
+    }
+
+    /// Whether typed or scanned text is a whole profile address.
+    static func isAddress(_ raw: String) -> Bool {
+        let cleaned = raw.uppercased().filter { $0.isLetter || $0.isNumber }
+        return cleaned.count == addressLength && cleaned.allSatisfy(alphabet.contains)
+    }
+
+    /// `ABCDEFGHJK` → `ABCDE-FGHJK`, as far as the text goes.
+    static func formatted(_ raw: String) -> String {
+        let cleaned = address(from: raw)
+        return cleaned.count > 5 ? "\(cleaned.prefix(5))-\(cleaned.dropFirst(5))" : cleaned
+    }
+
+    /// Replaces the address with a fresh one. Only used when the relay says
+    /// this one already belongs to somebody else's keys.
+    func regenerate(defaults: UserDefaults = .standard) {
+        let fresh = Self.generate()
+        defaults.set(fresh, forKey: Self.key)
+        code = fresh
+    }
 
     init(defaults: UserDefaults = .standard) {
         if let stored = defaults.string(forKey: Self.key), Self.isValid(stored) {

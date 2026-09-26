@@ -9,22 +9,29 @@
 //  AirDrop: there is no system share sheet, no picker, no Accept dialog.
 //  The pairing proof is the shake itself — two devices that registered a
 //  shake within `matchWindow` of each other are, by construction, two
-//  people standing together who both meant to do this. That consent is
-//  what lets both sides auto-accept.
+//  people standing together who both meant to do this.
 //
-//  Wire protocol, deliberately minimal:
-//    1. Both sides advertise AND browse on `serviceType`, publishing their
-//       shake instant in `discoveryInfo["s"]`.
-//    2. A browser that finds a peer whose shake is inside the window
-//       invites it — but only the lexicographically lower `displayName`
-//       invites, so the two devices can't race into two half-open sessions.
-//    3. The other side accepts any invitation while it is still armed.
-//    4. On connect, each side sends its own JSON-encoded `RamTransitPackage`
-//       (if it has one to give) and imports whatever arrives.
-//    5. After a short settle window the session is torn down.
+//  Discovery: both sides advertise AND browse on `serviceType`, publishing
+//  their shake instant in `discoveryInfo["s"]`. Only the lexicographically
+//  lower `displayName` invites, so the two devices can't race into two
+//  half-open sessions.
 //
-//  Both sides can hand off simultaneously — the exchange is symmetric, so
-//  two carriers can genuinely trade rams in one shake.
+//  Transfer: a typed, deterministic packet flow (see `TransferPacket`) —
+//  no timers decide who sent what, so nothing can deadlock or fork a letter:
+//
+//    sender   -> .handshake(name, hasLetterToSend: true)
+//    receiver -> .acceptTransfer(name)          (its own shake is the consent)
+//    sender   -> .letterData(package)
+//    receiver -> ingests, then .transferConfirmed   (or .transferDeclined)
+//    both     -> heavy haptic, HUD summary
+//
+//  Every device sends a handshake on connect, with `hasLetterToSend` saying
+//  whether it has a ram to give, and answers a peer's handshake with an
+//  accept when the peer has one. The two directions are independent, so two
+//  carriers can still trade rams in one shake. A ram is only marked handed
+//  off after the receiver CONFIRMS it was ingested — never merely because
+//  bytes left this phone — so a lost link can't leave the letter on neither
+//  device, or on both.
 //
 //  Requires in Info.plist: `NSLocalNetworkUsageDescription` and
 //  `NSBonjourServices` entries for `_baranov-gate._tcp` / `._udp`. Without
@@ -37,6 +44,18 @@
 import Foundation
 import MultipeerConnectivity
 import Observation
+import UIKit
+
+/// The wire protocol of a nearby transfer.
+enum TransferPacket: Codable, Sendable {
+    case handshake(senderName: String, hasLetterToSend: Bool)
+    case acceptTransfer(receiverName: String)
+    case letterData(RamTransitPackage)
+    case transferConfirmed
+    /// The receiver could not take the ram (a full pasture, say). The sender
+    /// keeps it.
+    case transferDeclined(reason: String)
+}
 
 /// Where a hoofbeat exchange currently stands. Drives the on-screen HUD.
 enum HoofbeatPhase: Equatable, Sendable {
@@ -68,48 +87,66 @@ final class HoofbeatRelay: NSObject {
     /// rule, not a style choice.
     static let serviceType = "baranov-gate"
 
-    /// How far apart two shakes may be and still count as "together".
-    /// Wide enough to absorb device clock drift and human reaction time,
-    /// narrow enough that a stranger idling nearby is never swept in.
-    static let matchWindow: TimeInterval = 3.5
+    /// How far apart two shakes may be and still count as "together". The
+    /// first person to shake keeps advertising while they wait, so the
+    /// second can shake a few seconds later — in either order.
+    static let matchWindow: TimeInterval = 4
 
     /// How long we keep looking before giving up on finding a partner.
     static let searchTimeout: TimeInterval = 8
 
-    /// Grace period after connecting, so a package arriving from the other
-    /// side still lands before the session is torn down.
+    /// How long a connected exchange may take before it is abandoned.
+    static let transferTimeout: TimeInterval = 20
+
+    /// Grace period after finishing, so the last packet (the confirmation)
+    /// is delivered before the session is torn down.
     static let settleDelay: TimeInterval = 1.0
 
     private(set) var phase: HoofbeatPhase = .idle
     /// Bumped on every successful exchange; views key `.sensoryFeedback` to it.
     private(set) var successTick = 0
+    /// Set when the exchange was started by tapping a specific nearby courier, so the HUD can say who
+    /// we're waiting for. The pairing itself is still the mutual shake.
+    private(set) var partnerName: String?
 
     /// Invoked on the main actor with each package received from a peer.
     /// Returns the name to show in the HUD, or `nil` if it was refused
     /// (a full pasture, a package that doesn't decode).
     var onReceive: ((RamTransitPackage) async -> String?)?
 
-    /// Invoked on the main actor once a ram has actually gone out over the
-    /// wire, with its id and the name of the carrier who took it. This is
-    /// what lets the flock mark the ram `.handedOff` — a handoff that left
-    /// the ram walking here too would advance the same letter on two
-    /// phones at once.
+    /// Invoked on the main actor once the receiver has CONFIRMED a ram, with
+    /// its id and the name of the carrier who took it. This is what lets the
+    /// flock mark the ram `.handedOff` — a handoff that left the ram walking
+    /// here too would advance the same letter on two phones at once.
     var onHandedOff: ((UUID, String) -> Void)?
 
     private let localPeerID: MCPeerID
+    private let localCarrierName: String
     private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
 
     private var myShakeAt: Date = .distantPast
-    private var outgoingPayload: Data?
-    private var outgoingRamName: String?
-    private var outgoingRamId: UUID?
+    private var outgoingPackage: RamTransitPackage?
     private var invitedPeers: Set<String> = []
-    private var didSend = false
+    private var activePeer: MCPeerID?
+    private var peerName = ""
+
+    // Transfer state — one flag per fact, so each packet is idempotent.
+    private var peerHandshakeSeen = false
+    private var peerHasLetter = false
+    private var outgoingSent = false
+    private var outgoingConfirmed = false
+    private var outgoingDeclined = false
+    private var incomingStarted = false
+    private var incomingDone = false
     private var receivedRamName: String?
+    private var didConclude = false
+
     private var timeoutTask: Task<Void, Never>?
+    private var stallTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
+    private var closeTask: Task<Void, Never>?
 
     /// - Parameters:
     ///   - carrierName: the person's own name, shown to the other side.
@@ -119,6 +156,7 @@ final class HoofbeatRelay: NSObject {
         let trimmed = carrierName.trimmingCharacters(in: .whitespacesAndNewlines)
         let base = trimmed.isEmpty ? "Shepherd" : String(trimmed.prefix(32))
         let suffix = String(installID.uuidString.prefix(4))
+        localCarrierName = base
         localPeerID = MCPeerID(displayName: "\(base)#\(suffix)")
         super.init()
     }
@@ -134,16 +172,14 @@ final class HoofbeatRelay: NSObject {
     /// - Parameters:
     ///   - shakenAt: the instant the local shake was registered.
     ///   - package: the ram to offer, or `nil` to only receive.
-    func begin(shakenAt: Date, offering package: RamTransitPackage?) {
+    func begin(shakenAt: Date, offering package: RamTransitPackage?, partnerName: String? = nil) {
         guard !phase.isActive else { return }
+        self.partnerName = partnerName
 
         myShakeAt = shakenAt
-        outgoingPayload = package.flatMap { try? JSONEncoder().encode($0) }
-        outgoingRamName = package?.ram.name
-        outgoingRamId = package?.ram.id
+        outgoingPackage = package
         invitedPeers = []
-        didSend = false
-        receivedRamName = nil
+        resetTransferState()
 
         let session = MCSession(
             peer: localPeerID,
@@ -173,7 +209,7 @@ final class HoofbeatRelay: NSObject {
         timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(HoofbeatRelay.searchTimeout))
             guard !Task.isCancelled else { return }
-            await self?.timeOut()
+            self?.timeOut()
         }
     }
 
@@ -181,10 +217,29 @@ final class HoofbeatRelay: NSObject {
     func reset() {
         timeoutTask?.cancel()
         timeoutTask = nil
+        stallTask?.cancel()
+        stallTask = nil
         settleTask?.cancel()
         settleTask = nil
+        closeTask?.cancel()
+        closeTask = nil
         teardownTransport()
+        partnerName = nil
         phase = .idle
+    }
+
+    private func resetTransferState() {
+        activePeer = nil
+        peerName = ""
+        peerHandshakeSeen = false
+        peerHasLetter = false
+        outgoingSent = false
+        outgoingConfirmed = false
+        outgoingDeclined = false
+        incomingStarted = false
+        incomingDone = false
+        receivedRamName = nil
+        didConclude = false
     }
 
     private func teardownTransport() {
@@ -200,10 +255,9 @@ final class HoofbeatRelay: NSObject {
         session?.delegate = nil
         session = nil
 
-        outgoingPayload = nil
-        outgoingRamName = nil
-        outgoingRamId = nil
+        outgoingPackage = nil
         invitedPeers = []
+        activePeer = nil
     }
 
     private func timeOut() {
@@ -222,10 +276,19 @@ final class HoofbeatRelay: NSObject {
         }
     }
 
+    private func fail(_ reason: String) {
+        guard phase.isActive, !didConclude else { return }
+        timeoutTask?.cancel()
+        stallTask?.cancel()
+        teardownTransport()
+        phase = .failed(reason: reason)
+        autoDismiss(after: 3.0)
+    }
+
     // MARK: - Pairing
 
     private func consider(peerID: MCPeerID, info: [String: String]?) {
-        guard phase.isActive, let session, let browser else { return }
+        guard case .searching = phase, activePeer == nil, let session, let browser else { return }
         guard peerID.displayName != localPeerID.displayName else { return }
         guard !invitedPeers.contains(peerID.displayName) else { return }
 
@@ -242,69 +305,149 @@ final class HoofbeatRelay: NSObject {
         browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
     }
 
+    // MARK: - Transfer state machine
+
     private func handleConnected(peerID: MCPeerID) {
+        guard activePeer == nil, phase.isActive, !didConclude else { return }
+        activePeer = peerID
+        peerName = Self.friendlyName(peerID.displayName)
+
         timeoutTask?.cancel()
         timeoutTask = nil
+        phase = .exchanging(peerName: peerName)
 
-        let name = Self.friendlyName(peerID.displayName)
-        phase = .exchanging(peerName: name)
+        // If the exchange stalls, give up cleanly. Nothing was marked handed
+        // off yet, so the sender simply keeps its ram.
+        stallTask?.cancel()
+        stallTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(HoofbeatRelay.transferTimeout))
+            guard !Task.isCancelled else { return }
+            self?.fail("The handoff was interrupted — nothing changed.")
+        }
 
-        if let session, let payload = outgoingPayload {
-            do {
-                try session.send(payload, toPeers: [peerID], with: .reliable)
-                didSend = true
-            } catch {
-                didSend = false
+        send(.handshake(senderName: localCarrierName, hasLetterToSend: outgoingPackage != nil))
+    }
+
+    private func handle(_ packet: TransferPacket) {
+        guard activePeer != nil, !didConclude else { return }
+
+        switch packet {
+        case let .handshake(_, hasLetter):
+            peerHandshakeSeen = true
+            peerHasLetter = hasLetter
+            // Being armed (we shook) is the consent: accept at once.
+            if hasLetter {
+                send(.acceptTransfer(receiverName: localCarrierName))
+            }
+            checkComplete()
+
+        case .acceptTransfer:
+            guard let package = outgoingPackage, !outgoingSent else { return }
+            outgoingSent = true
+            send(.letterData(package))
+
+        case let .letterData(package):
+            guard peerHasLetter, !incomingStarted else { return }
+            incomingStarted = true
+            Task { [weak self] in
+                guard let self else { return }
+                let name = await self.onReceive?(package)
+                guard !self.didConclude else { return }
+                self.incomingDone = true
+                if let name {
+                    self.receivedRamName = name
+                    self.send(.transferConfirmed)
+                } else {
+                    self.send(.transferDeclined(reason: "Pasture full"))
+                }
+                self.checkComplete()
+            }
+
+        case .transferConfirmed:
+            guard outgoingSent else { return }
+            outgoingConfirmed = true
+            checkComplete()
+
+        case .transferDeclined:
+            guard outgoingSent else { return }
+            outgoingDeclined = true
+            checkComplete()
+        }
+    }
+
+    /// Finishes once both directions are settled: our ram was confirmed (or
+    /// declined) if we had one, and the peer's ram was ingested if it had one.
+    private func checkComplete() {
+        guard activePeer != nil, peerHandshakeSeen, !didConclude else { return }
+        let outgoingResolved = outgoingPackage == nil || outgoingConfirmed || outgoingDeclined
+        let incomingResolved = !peerHasLetter || incomingDone
+        guard outgoingResolved, incomingResolved else { return }
+        conclude()
+    }
+
+    private func conclude() {
+        didConclude = true
+        stallTask?.cancel()
+        stallTask = nil
+
+        let handed = outgoingConfirmed ? outgoingPackage?.ram : nil
+        let peer = peerName
+        let declined = outgoingDeclined ? outgoingPackage?.ram.name : nil
+
+        let summary: String
+        switch (handed?.name, receivedRamName) {
+        case let (given?, taken?):
+            summary = "Traded \(given) for \(taken) with \(peer)."
+        case let (given?, nil):
+            summary = "\(given) went with \(peer)."
+        case let (nil, taken?):
+            summary = "\(peer) handed you \(taken)."
+        case (nil, nil):
+            if let declined {
+                summary = "\(peer)'s pasture is full — \(declined) stays with you."
+            } else {
+                summary = "Met \(peer) — neither of you had a ram to pass."
             }
         }
 
-        settleTask?.cancel()
-        settleTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(HoofbeatRelay.settleDelay))
-            guard !Task.isCancelled else { return }
-            self?.conclude(peerName: name)
-        }
-    }
-
-    private func conclude(peerName: String) {
-        guard phase.isActive else { return }
-
-        // Read what was sent BEFORE tearing the transport down — teardown
-        // clears these, and reading them afterwards made every successful
-        // handoff report itself as "neither of you had a ram to pass".
-        let handed = didSend ? outgoingRamName : nil
-        let handedId = didSend ? outgoingRamId : nil
-
-        teardownTransport()
-        let summary: String
-        switch (handed, receivedRamName) {
-        case let (given?, taken?):
-            summary = "Traded \(given) for \(taken) with \(peerName)."
-        case let (given?, nil):
-            summary = "\(given) went with \(peerName)."
-        case let (nil, taken?):
-            summary = "\(peerName) handed you \(taken)."
-        case (nil, nil):
-            summary = "Met \(peerName) — neither of you had a ram to pass."
-        }
-
         if handed != nil || receivedRamName != nil {
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
             successTick += 1
         }
-        if let handedId {
-            onHandedOff?(handedId, peerName)
+        if let handed {
+            onHandedOff?(handed.id, peer)
         }
         phase = .finished(summary: summary)
+
+        // Keep the link up briefly so our last packet reaches the peer.
+        closeTask?.cancel()
+        closeTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(HoofbeatRelay.settleDelay))
+            guard !Task.isCancelled else { return }
+            self?.teardownTransport()
+        }
         autoDismiss(after: 3.0)
     }
 
-    private func ingest(_ data: Data) {
-        guard let package = try? JSONDecoder().decode(RamTransitPackage.self, from: data) else { return }
-        Task { [weak self] in
-            guard let self else { return }
-            let name = await self.onReceive?(package)
-            self.receivedRamName = name ?? nil
+    private func send(_ packet: TransferPacket) {
+        guard let session, let peer = activePeer,
+              let data = try? JSONEncoder().encode(packet) else { return }
+        do {
+            try session.send(data, toPeers: [peer], with: .reliable)
+        } catch {
+            fail("Couldn't send — the link dropped.")
         }
+    }
+
+    private func handleDisconnected(peerID: MCPeerID) {
+        guard peerID == activePeer, !didConclude else { return }
+        fail("The link dropped — nothing changed.")
+    }
+
+    private func handleData(_ data: Data, from peerID: MCPeerID) {
+        guard peerID == activePeer,
+              let packet = try? JSONDecoder().decode(TransferPacket.self, from: data) else { return }
+        handle(packet)
     }
 }
 
@@ -332,10 +475,7 @@ extension HoofbeatRelay: MCNearbyServiceBrowserDelegate {
         didNotStartBrowsingForPeers error: any Error
     ) {
         Task { @MainActor [weak self] in
-            guard let self, self.phase.isActive else { return }
-            self.teardownTransport()
-            self.phase = .failed(reason: "Local network access is off for Baranov.")
-            self.autoDismiss(after: 3.0)
+            self?.fail("Local network access is off for Baranov.")
         }
     }
 }
@@ -354,12 +494,17 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
         Task { @MainActor [weak self] in
             // The inviter already verified the shake windows match, and we
             // only advertise while armed — so being armed IS the consent.
-            guard let self, self.phase.isActive, let session = self.session else {
+            guard let self, self.activePeer == nil, let session = self.session else {
                 boxedHandler.value(false, nil)
                 return
             }
-            self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxedPeer.value.displayName))
-            boxedHandler.value(true, session)
+            switch self.phase {
+            case .searching, .connecting:
+                self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxedPeer.value.displayName))
+                boxedHandler.value(true, session)
+            default:
+                boxedHandler.value(false, nil)
+            }
         }
     }
 
@@ -368,10 +513,7 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
         didNotStartAdvertisingPeer error: any Error
     ) {
         Task { @MainActor [weak self] in
-            guard let self, self.phase.isActive else { return }
-            self.teardownTransport()
-            self.phase = .failed(reason: "Local network access is off for Baranov.")
-            self.autoDismiss(after: 3.0)
+            self?.fail("Local network access is off for Baranov.")
         }
     }
 }
@@ -391,9 +533,14 @@ extension HoofbeatRelay: MCSessionDelegate {
             case .connected:
                 self.handleConnected(peerID: boxed.value)
             case .connecting:
-                self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxed.value.displayName))
+                switch self.phase {
+                case .searching, .connecting:
+                    self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxed.value.displayName))
+                default:
+                    break
+                }
             case .notConnected:
-                break
+                self.handleDisconnected(peerID: boxed.value)
             @unknown default:
                 break
             }
@@ -401,8 +548,9 @@ extension HoofbeatRelay: MCSessionDelegate {
     }
 
     nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
+        let boxed = UnsafeTransfer(value: peerID)
         Task { @MainActor [weak self] in
-            self?.ingest(data)
+            self?.handleData(data, from: boxed.value)
         }
     }
 

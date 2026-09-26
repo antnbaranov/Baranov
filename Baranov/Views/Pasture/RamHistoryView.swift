@@ -2,17 +2,18 @@
 //  RamHistoryView.swift
 //  Baranov
 //
-//  One named ram's full story, opened from the "Passport" button on its
-//  selector card: the passport page itself (every place it has actually
-//  walked past, as pressed stamps), this journey's route log from the
-//  live `Ram`, and lifetime stats from `RamLedger` — letters delivered
-//  and every waypoint logged across every journey walked under this name,
-//  not just the current one.
+//  A ram's field passport, opened from the "Passport" button on its
+//  selector card: an analog travel journal rather than a settings table.
+//  ID page, the stamp collection, the ram's own notes on the road, and
+//  the equipment it has earned — laid on the linen tabletop the letters
+//  use, so the two objects belong to the same desk.
 //
 //  Stamps are read from two places and merged (see `passportStamps`):
 //  the ledger holds everything from journeys already delivered, while the
 //  `Ram` itself still carries the stamps of a journey in flight — which is
 //  also what lets them travel through an AirDrop handoff.
+//
+//  Pushed inside Pasture's navigation stack, so it owns no close button.
 //
 
 import SwiftUI
@@ -21,75 +22,67 @@ struct RamHistoryView: View {
     let ram: Ram
     let ledgerEntry: RamLedgerEntry
 
+    @State private var isReelPresented = false
+    private var job: ReelJobStore { .shared }
+
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    PassportStampGrid(stamps: passportStamps, ramName: ram.name)
-                } header: {
-                    if passportStamps.isEmpty {
-                        Text("Passport")
-                    } else {
-                        Text("Passport · \(passportStamps.count) stamp\(passportStamps.count == 1 ? "" : "s")")
-                    }
-                } footer: {
-                    if !passportStamps.isEmpty {
-                        Text(passportSummary)
-                    }
-                }
-                .listRowSeparator(.hidden)
+        ScrollView {
+            VStack(spacing: 18) {
+                PassportStampsSection(stamps: passportStamps, ramName: ram.name)
 
-                Section("This Journey") {
-                    LabeledContent("Route", value: "\(ram.currentCity) → \(ram.targetCity)")
-                    LabeledContent("Status", value: ram.status.displayName)
+                fieldMap
 
-                    if let letter = ram.letter {
-                        if letter.isEncrypted {
-                            receivingCodeRow(for: letter)
-                        } else {
-                            LabeledContent("Letter", value: "Open postcard — no code needed")
-                        }
-                    }
+                // Full-bleed: the carousel scrolls edge to edge past the page margins.
+                PassportNotesSection(ramName: ram.name, stamps: passportStamps)
+                    .padding(.horizontal, -16)
 
-                    if ram.routeHistory.isEmpty {
-                        Text("No waypoints logged yet on this journey.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    } else {
-                        ForEach(ram.routeHistory) { node in
-                            waypointRow(node)
-                        }
-                    }
-                }
-
-                Section("Lifetime") {
-                    LabeledContent("Experience", value: "\(ledgerEntry.experiencePoints.formatted(.number)) XP")
-                    LabeledContent("Letters Delivered", value: ledgerEntry.lettersDelivered.formatted(.number))
-                    LabeledContent("Total Steps Walked", value: ledgerEntry.totalStepsWalked.formatted(.number))
-                    LabeledContent("Places Stamped", value: ledgerEntry.distinctPlacesVisited.formatted(.number))
-
-                    if !sortedLifetimeWaypoints.isEmpty {
-                        ForEach(sortedLifetimeWaypoints) { node in
-                            waypointRow(node)
-                        }
-                    }
-                }
+                PassportEquipmentSection(
+                    ramID: ram.id,
+                    ramName: ram.name,
+                    totalMeters: lifetimeMeters,
+                    lettersDelivered: ledgerEntry.lettersDelivered,
+                    stamps: passportStamps
+                )
             }
-            .navigationTitle(ram.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .symbolVariant(.fill)
+        }
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+        .onAppear { job.suppressesOverlay = true }
+        .onDisappear { if job.ramName == ram.name { job.suppressesOverlay = false } }
+        .navigationTitle(ram.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { isReelPresented = true } label: {
+                    Image(systemName: "play.rectangle.on.rectangle.fill")
+                }
+                .accessibilityLabel("Make a reel")
+            }
+        }
+        .sheet(isPresented: $isReelPresented) {
+            RamReelSheet(base: RamReelData.make(
+                ramName: ram.name,
+                totalMeters: lifetimeMeters,
+                lettersDelivered: ledgerEntry.lettersDelivered,
+                stamps: passportStamps
+            ))
         }
     }
 
-    private var sortedLifetimeWaypoints: [RouteNode] {
-        ledgerEntry.waypoints.sorted { $0.timestamp > $1.timestamp }
+    // MARK: - Data
+
+    /// Delivered journeys (ledger) plus the one in flight.
+    private var lifetimeMeters: Int {
+        ledgerEntry.totalStepsWalked + (ram.status == .delivered ? 0 : ram.journeyStepsSoFar)
     }
 
     /// The full passport: stamps already folded into this name's lifetime
-    /// ledger (delivered journeys) plus the ones the ram is still carrying
-    /// on the journey in flight. Merged by id rather than concatenated —
-    /// a delivered ram that is still in `activeRams` appears in both — and
-    /// shown newest first, the way a real passport's latest page is the
-    /// one you open to.
+    /// ledger plus the ones the ram is still carrying. Merged by id — a
+    /// delivered ram that is still in `activeRams` appears in both — and
+    /// newest first, the way a real passport's latest page is the one you
+    /// open to.
     private var passportStamps: [JourneyStamp] {
         var seen = Set<UUID>()
         return (ram.stamps + ledgerEntry.stamps)
@@ -97,56 +90,29 @@ struct RamHistoryView: View {
             .sorted { $0.timestamp > $1.timestamp }
     }
 
-    /// Plain-string rather than inflected markup: the count is built at
-    /// runtime from live data, so the singular/plural is decided here
-    /// once instead of relying on grammar-agreement markup resolving
-    /// correctly for every language this app ships in.
-    private var passportSummary: String {
-        let count = Set(passportStamps.map { $0.placeName.lowercased() }).count
-        let noun = count == 1 ? "place" : "places"
-        return "\(count) \(noun) stamped across every journey walked as \(ram.name)."
-    }
+    // MARK: - Field map
 
-    /// Surfaces the letter's receiving code here too — not just at the
-    /// moment it was written — so a sender who skipped sharing it right
-    /// away (or wants to send it again) can always find it again by
-    /// opening this ram's own history.
-    private func receivingCodeRow(for letter: Letter) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Receiving Code")
-                    .font(.subheadline)
-                Text(letter.receivingCode ?? "Kept on the sender's phone")
-                    .font(.subheadline.weight(.semibold).monospaced())
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if let shareMessage = letter.shareMessage(carrierName: ram.name) {
-                ShareLink(item: shareMessage) {
-                    Image(systemName: "message.fill")
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("Share Receiving Code")
-            }
+    private var fieldMap: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            JournalHeading(title: "Journeys", symbol: "map.fill")
+            RamJourneysMap(
+                ramName: ram.name,
+                stamps: passportStamps,
+                plannedRoute: ram.status == .delivered ? [] : ram.routeCoordinates.map(\.clLocationCoordinate),
+                totalMeters: lifetimeMeters
+            )
         }
-    }
-
-    private func waypointRow(_ node: RouteNode) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(node.cityName)
-                .font(.subheadline.weight(.medium))
-            Text("\(node.stepsContributed) steps • \(node.timestamp.formatted(date: .abbreviated, time: .shortened))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .paperCard()
     }
 }
 
 #Preview {
-    RamHistoryView(
-        ram: FlockViewModel.preview.activeRams[0],
-        ledgerEntry: RamLedger.preview.entry(forName: "Klaus")
-    )
+    NavigationStack {
+        RamHistoryView(
+            ram: FlockViewModel.preview.activeRams[0],
+            ledgerEntry: RamLedger.preview.entry(forName: "Klaus")
+        )
+    }
 }

@@ -57,8 +57,19 @@ struct JourneyView: View {
     let telemetryService: TelemetryService
     let carrierUserId: UUID
     private let onManualHoofbeat: () -> Void
+    private let onNearbySender: () -> Void
+    private let onHandOverToNearby: ((NearbyCourier) -> Void)?
+    private let onSendLetterToNearby: ((NearbyCourier) -> Void)?
 
     @Environment(FlockViewModel.self) private var flockViewModel
+    @Environment(CarrierPresenceService.self) private var presence
+    @Environment(RelayOutbox.self) private var relayOutbox
+    @Environment(LetterInbox.self) private var letterInbox
+    @Environment(ProximityCodeDiscovery.self) private var proximity
+    @Environment(NearbyCourierService.self) private var nearbyCouriers
+    @Environment(SavedCourierStore.self) private var savedCouriers
+    /// The courier whose card is open on the map (see `NearbyCourierCard`).
+    @State private var selectedNearbyCourier: NearbyCourier?
     @Environment(EntitlementService.self) private var entitlementService
     @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
@@ -122,13 +133,23 @@ struct JourneyView: View {
     /// points on the map. See `FlockPulseService` for why.
     @State private var flockPulse: FlockPulseService
 
-    init(telemetryService: TelemetryService, carrierUserId: UUID, isPasturePresented: Binding<Bool>, isCouriersPresented: Binding<Bool> = .constant(false), letterRam: Binding<Ram?>, onManualHoofbeat: @escaping () -> Void = {}) {
+    init(telemetryService: TelemetryService, carrierUserId: UUID, isPasturePresented: Binding<Bool>, isProfilePresented: Binding<Bool> = .constant(false), isEnterCodePresented: Binding<Bool> = .constant(false), sendToShepherdID: Binding<String?> = .constant(nil), isDestinationPickerPresented: Binding<Bool> = .constant(false), pickedDestination: Binding<DroppedDestination?> = .constant(nil), letterRam: Binding<Ram?>, bagRam: Binding<Ram?> = .constant(nil), relay: LetterRelayService? = nil, onOpenByCode: @escaping (Ram, String) -> Void = { _, _ in }, onManualHoofbeat: @escaping () -> Void = {}, onNearbySender: @escaping () -> Void = {}, onHandOverToNearby: ((NearbyCourier) -> Void)? = nil, onSendLetterToNearby: ((NearbyCourier) -> Void)? = nil) {
+        self.relay = relay
+        self.onHandOverToNearby = onHandOverToNearby
+        self.onSendLetterToNearby = onSendLetterToNearby
+        self.onOpenByCode = onOpenByCode
         self.telemetryService = telemetryService
         self.carrierUserId = carrierUserId
         _isPasturePresented = isPasturePresented
-        _isCouriersPresented = isCouriersPresented
+        _isProfilePresented = isProfilePresented
+        _isEnterCodePresented = isEnterCodePresented
+        _sendToShepherdID = sendToShepherdID
+        _isDestinationPickerPresented = isDestinationPickerPresented
+        _pickedDestination = pickedDestination
         _letterRam = letterRam
+        _bagRam = bagRam
         self.onManualHoofbeat = onManualHoofbeat
+        self.onNearbySender = onNearbySender
         // Reads from the same ACIT3855 receiver this view already posts
         // ram hops to, so there is exactly one telemetry host to point at.
         _flockPulse = State(initialValue: FlockPulseService(baseURL: telemetryService.baseURL))
@@ -138,21 +159,42 @@ struct JourneyView: View {
     /// header doc), passed down purely so `isDockedPanelPresented` below
     /// can hide this view's own docked panel while it's showing.
     @Binding var isPasturePresented: Bool
+    /// A destination marked by pressing and holding on the map; read by Compose.
+    @State private var droppedDestination: DroppedDestination?
 
-    /// Whether the couriers sheet is up — owned by `RootView`, like Pasture.
-    @Binding var isCouriersPresented: Bool
+    /// Whether the profile sheet is up — owned by `RootView`, like Pasture.
+    @Binding var isProfilePresented: Bool
+    /// Whether the "Enter Code" sheet is up — also owned by `RootView`;
+    /// like the others it hides the docked panel while showing.
+    @Binding var isEnterCodePresented: Bool
+    /// A Shepherd ID picked up from a phone nearby: handed to the compose page,
+    /// which sends by code right there — there is no separate screen for it.
+    @Binding var sendToShepherdID: String?
+    /// The "Choose on Map" destination picker (owned by `RootView`) and the
+    /// spot it returns, which is forwarded to Compose as a dropped pin.
+    @Binding var isDestinationPickerPresented: Bool
+    @Binding var pickedDestination: DroppedDestination?
+    /// The letter relay and what to do with a receiving code that opens a
+    /// letter — the Enter Code page inside the docked panel needs both.
+    private let relay: LetterRelayService?
+    private let onOpenByCode: (Ram, String) -> Void
 
     /// The ram whose letter is being inspected or opened — owned by
     /// `RootView`, which presents `LetterDetailView` for it (same
     /// one-owner-per-modal rule as Pasture). Set from the courier dock
     /// and by tapping the ram on the map.
     @Binding var letterRam: Ram?
+    /// The ram whose bag is open (owned by `RootView`, like `letterRam`).
+    @Binding var bagRam: Ram?
 
     /// The person's own default ram, shown in the dock even when no
     /// letter is out, so the courier is always on the main screen.
     @State private var ramCompanionStore = RamCompanionStore()
 
-    @State private var panelDetent: PresentationDetent = .height(152)
+    // Starts on the shortest of the sheet's real detents (the tiny peek
+    // size, with the page title above one row) — a stale 152 matched none of them, which
+    // made the sheet look short while the code treated it as open.
+    @State private var panelDetent: PresentationDetent = .height(JourneyView.tinyPanelHeight)
 
     /// Whether the floating "You are here"/"Ram is away" pill is
     /// currently shown — auto-dismissed a few seconds after it appears
@@ -161,19 +203,23 @@ struct JourneyView: View {
     @State private var isReturnToMePillVisible = true
     @State private var returnToMePillDismissTask: Task<Void, Never>?
 
-    /// Which of the docked panel's pages is showing while a ram is out.
-    /// With nothing on the road there is only the compose page and the
-    /// dots don't appear; the moment a ram sets out the panel gains a
-    /// second page for the journey and lands on it. Composing therefore
-    /// stays reachable during a walk (a letter can be written and even
-    /// slid to dispatch with the one free ram already out — that's what
-    /// sends it to Drafts and opens "Expand the Pasture").
+    /// The docked panel has exactly two pages: writing a letter (always the
+    /// first, and where the app opens) and the mailbag of everything in
+    /// transit. Codes are typed in the small field along the bottom of both.
     private enum PanelPage: Hashable {
-        case delivery
         case compose
+        case mailbag
     }
 
     @State private var panelPage: PanelPage = .compose
+    @State private var codeDraft = ""
+    @State private var mailbagSection: MailbagSection = .incoming
+    /// What is pushed inside the mailbag page (a ram's bag, a letter). Held
+    /// here rather than in the page so it survives the page being recycled
+    /// by the horizontal pager.
+    @State private var mailbagPath: [MailbagRoute] = []
+    @State private var archiveQuery = ""
+    @State private var codeFocusTick = 0
 
     // Following / programmatic-vs-manual camera bookkeeping moved into
     // `JourneyCameraController` (`camera.isFollowingRam`,
@@ -262,16 +308,49 @@ struct JourneyView: View {
     /// small country," well below the globe-style switch above.
     private let regionOverviewDistanceThresholdMeters: CLLocationDistance = 120_000
 
-    /// The docked panel's collapsed height: just the search field while
-    /// composing; while a ram is out, room for the compact dispatch card
-    /// plus the page dots under it.
-    private var collapsedPanelHeight: CGFloat {
-        guard let ram = trackedRam else { return 152 }
-        return ram.status == .arrivedAtGate ? 188 : 132
+    /// The docked panel's collapsed height. One height for BOTH pages, so
+    /// swiping between New Letter and Mailbag never resizes the sheet — the
+    /// only exception is a letter waiting at the gate, whose "Break the
+    /// Seal" button needs the extra room — on both pages alike.
+    private func collapsedHeight(for page: PanelPage) -> CGFloat {
+        trackedRam?.status == .arrivedAtGate ? 340 : 310
     }
 
+    private var collapsedPanelHeight: CGFloat { collapsedHeight(for: panelPage) }
+
+    /// The shortest sheet, on the New Letter page only: destination, the
+    /// current ram's progress and the page dots.
+    private static let compactComposeHeight: CGFloat = 240
+
+    /// Smaller still: on New Letter only "Where is this letter going?", on
+    /// the Mailbag one slim courier row; "Expand" and the dots below.
+    private static let tinyPanelHeight: CGFloat = 148
+
+
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
+    private var isPanelTiny: Bool {
+        panelDetent == .height(Self.tinyPanelHeight)
+    }
+
+    private var isPanelCompact: Bool {
+        panelDetent == .height(Self.compactComposeHeight)
+    }
+
+    /// Open only at the two tall detents; every height detent — including a
+    /// stale one left over from a page or status change — is a short sheet.
     private var isPanelCollapsed: Bool {
-        panelDetent == .height(collapsedPanelHeight)
+        panelDetent != .dockMedium && panelDetent != .large
+    }
+
+    private var panelDetents: [PresentationDetent] {
+        // Three sizes on both pages: the sheet stays exactly where the
+        // person left it when they swipe to the other page. Neither the
+        // old 240pt stop nor the old collapsedPanelHeight stop are
+        // offered anymore — both sat between tiny and dockMedium showing
+        // a couple of fields with a big empty gap under them and nothing
+        // else, which read as a broken, near-empty sheet.
+        [.height(Self.tinyPanelHeight), .dockMedium, .large]
     }
 
     /// The ram this tab is currently tracking real-world steps for: the one
@@ -302,9 +381,23 @@ struct JourneyView: View {
     /// the screen: the bottom half is then a clean map with the marker
     /// and its heading cone, not a map with a sheet over it. The floating
     /// preview card, by contrast, never touches the sheet.
+    /// Whether one of the app's other modal sheets (owned by `RootView`)
+    /// is up over the map.
+    private var isAnotherSheetUp: Bool {
+        isPasturePresented || isProfilePresented
+            || isDestinationPickerPresented || letterRam != nil || bagRam != nil
+    }
+
+    /// Held `false` for a beat after another sheet closes. The docked
+    /// panel used to come back in the same frame the closing sheet was
+    /// still sliding down, so two sheets animated over each other — the
+    /// "weird" close. Waiting out the dismissal (about 0.45 s) lets the
+    /// sheet finish leaving before the panel rises again.
+    @State private var isDockedPanelAllowed = true
+
     private var isDockedPanelPresented: Binding<Bool> {
         Binding(
-            get: { !isPasturePresented && !isCouriersPresented && letterRam == nil && !lookAround.layout.isExpanded },
+            get: { isDockedPanelAllowed && !isAnotherSheetUp && !lookAround.layout.isExpanded },
             set: { newValue in
                 if !lookAround.layout.isExpanded, letterRam == nil {
                     isPasturePresented = !newValue
@@ -313,27 +406,28 @@ struct JourneyView: View {
         )
     }
 
-    /// The Pasture button: a paw and, when rams are out, how many — so the
-    /// button says something instead of being a bare glyph.
-    private var pastureToolbarLabel: some View {
-        let outCount = flockViewModel.activeRams.filter { $0.status != .delivered }.count
-        return HStack(spacing: 5) {
-            Image(systemName: "pawprint.fill")
-            if outCount > 0 {
-                Text("\(outCount)")
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-            } else {
-                Text("Pasture")
-                    .font(.subheadline.weight(.semibold))
-            }
-        }
-        .padding(.horizontal, 4)
-    }
-
     var body: some View {
         ZStack {
+            journeyStack
+        }
+        // Deliberately NOT a `.fullScreenCover` or `.sheet`: this view
+        // already has an always-on `.sheet` for the docked panel above,
+        // and a second real modal presentation competing for that same
+        // slot is what once caused "Look Around does nothing" and the
+        // docked sheet vanishing afterward. The panel is plain view
+        // composition in an overlay — it morphs between its card, split
+        // and full-screen frames in place and is never presented.
+        .overlay {
+            lookAroundOverlay
+        }
+    }
+
+
+    // MARK: - Body parts
+    // One long modifier chain made the type-checker time out; each part
+    // below is type-checked on its own.
+
+    private var journeyBase: some View {
             NavigationStack {
                 mapContent
                     .navigationTitle("Journey")
@@ -343,25 +437,25 @@ struct JourneyView: View {
                     // transaction as the panel's spring.
                     .toolbar(lookAround.layout.isExpanded ? .hidden : .visible, for: .navigationBar)
                     .toolbar {
-                        // Couriers: always reachable, whether or not a
-                        // ram is out. Same toolbar button as Pasture,
-                        // different glyph, on the opposite side of the title.
+                        // Profile on the left, Pasture (the shepherd's screen and
+                        // settings) on the right. Codes are typed in the panel.
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
-                                isCouriersPresented = true
+                                isProfilePresented = true
                             } label: {
-                                Image(systemName: "figure.walk.motion")
-                                    .padding(.horizontal, 4)
+                                Image(systemName: "person.crop.circle")
                             }
-                            .accessibilityLabel("Couriers")
+                            .accessibilityLabel("Profile")
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 isPasturePresented = true
                             } label: {
-                                pastureToolbarLabel
+                                Label("Pasture", systemImage: "pawprint.fill")
+                                    .labelStyle(.titleAndIcon)
+                                    .font(.subheadline.weight(.semibold))
                             }
-                            .accessibilityLabel("Pasture")
+                            .accessibilityLabel("Pasture and Settings")
                         }
                     }
             }
@@ -378,15 +472,51 @@ struct JourneyView: View {
                     // gets the same explicit copy rather than trusting
                     // inheritance alone.
                     .environment(flockViewModel)
+                    .environment(relayOutbox)
+                    .environment(letterInbox)
                     .environment(entitlementService)
                     .environment(locationService)
                     .environment(\.locale, currentLocale)
                     .preferredColorScheme(appAppearance.colorScheme)
-                    .presentationDetents([.height(collapsedPanelHeight), .medium, .large], selection: $panelDetent)
-                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .presentationDetents(Set(panelDetents), selection: $panelDetent)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .dockMedium))
+                    // No explicit `.presentationBackground` here on purpose:
+                    // iOS 26 gives a `.sheet` its Liquid Glass chrome for
+                    // free, and any explicit background (a color, or a plain
+                    // `.regularMaterial`) opts the sheet OUT of that and back
+                    // into a flat classic-Material fill instead — which is
+                    // exactly the "painted, not glass" look this panel kept
+                    // getting when one was set. Leave this alone even if the
+                    // panel looks momentarily flat in Xcode's canvas/preview;
+                    // it renders as real Liquid Glass on-device on iOS 26.
+                    // A phone-shaped card on iPad too: the form width, and
+                    // the medium detent capped (see `dockMedium`).
+                    .presentationSizing(.form)
                     .presentationDragIndicator(.visible)
                     .interactiveDismissDisabled()
             }
+            .onChange(of: isEnterCodePresented) { _, requested in
+                // Other parts of the app still ask for "Enter Code" through
+                // this flag (the nearby-sender marker); it now means "show
+                // the Code page", never a separate sheet.
+                guard requested else { return }
+                isEnterCodePresented = false
+                showCodePage()
+            }
+            .onChange(of: isAnotherSheetUp) { _, isUp in
+                if isUp {
+                    isDockedPanelAllowed = false
+                } else {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        if !isAnotherSheetUp { isDockedPanelAllowed = true }
+                    }
+                }
+            }
+    }
+
+    private var journeyTracking: some View {
+        journeyBase
             .task(id: trackedRam?.id) {
                 beginTrackingIfNeeded()
                 if let ram = trackedRam {
@@ -448,8 +578,27 @@ struct JourneyView: View {
                 // while one is already out.
                 guard newCount > oldCount, trackedRam != nil else { return }
                 withAnimation {
-                    panelPage = .delivery
-                    panelDetent = .medium
+                    panelPage = .mailbag
+                    panelDetent = .dockMedium
+                }
+            }
+            .onChange(of: sendToShepherdID) { _, id in
+                // A nearby Shepherd ID: open the compose page, in code mode.
+                guard id != nil else { return }
+                withAnimation {
+                    panelPage = .compose
+                    panelDetent = .dockMedium
+                }
+            }
+            .onChange(of: pickedDestination) { _, pin in
+                // A spot marked in the map picker: hand it to Compose the
+                // same way a long-press drop does.
+                guard let pin else { return }
+                droppedDestination = pin
+                pickedDestination = nil
+                withAnimation {
+                    panelPage = .compose
+                    panelDetent = .dockMedium
                 }
             }
             .onChange(of: stepTracker.liveStepCount) { _, newValue in
@@ -468,21 +617,40 @@ struct JourneyView: View {
                 }
                 refreshLookAroundAvailability()
             }
+    }
+
+    private var journeyStack: some View {
+        journeyTracking
+            .onChange(of: panelDetent) { _, detent in
+                // A ram's bag or letter is pushed inside the mailbag page;
+                // once the sheet is dragged back down to a short size there
+                // is no room for it, so it folds away to the list.
+                if detent != .dockMedium && detent != .large, !mailbagPath.isEmpty {
+                    mailbagPath.removeAll()
+                }
+            }
+            .onChange(of: collapsedPanelHeight) { old, new in
+                // The short height depends on the tracked ram (a letter at
+                // the gate needs more room). Keep a resting sheet glued to it.
+                guard panelDetent == .height(old) else { return }
+                withAnimation(.snappy) { panelDetent = .height(new) }
+            }
             .onChange(of: trackedRam?.status) { old, new in
                 // A ram reaching its gate grows the panel so the seal
                 // button is right there, not hidden behind a drag.
                 guard new == .arrivedAtGate, old != nil else { return }
-                withAnimation { panelDetent = .medium }
+                withAnimation { panelDetent = .dockMedium }
             }
             .onChange(of: trackedRam?.id) { _, newValue in
                 withAnimation {
-                    // A ram setting out lands the panel on its journey
-                    // page; the last ram arriving folds it back to the
-                    // search field. `collapsedPanelHeight` has already
-                    // changed with `trackedRam`, so the height read here
-                    // is the right one for the new state.
-                    panelPage = newValue != nil ? .delivery : .compose
-                    panelDetent = newValue != nil ? .medium : .height(collapsedPanelHeight)
+                    // A ram setting out lands the panel on the mailbag,
+                    // where its card now is (the journey page is one swipe
+                    // away); the last ram arriving folds it back to the
+                    // shortest peek — collapsedPanelHeight is no longer a
+                    // real stop, so there's nothing taller-but-short to
+                    // rest on instead.
+                    panelPage = newValue != nil ? .mailbag : .compose
+                    panelDetent = newValue != nil ? .dockMedium : .height(Self.tinyPanelHeight)
                 }
             }
             .task {
@@ -521,19 +689,7 @@ struct JourneyView: View {
             } action: { frame in
                 windowFrameGlobal = frame
             }
-        }
-        // Deliberately NOT a `.fullScreenCover` or `.sheet`: this view
-        // already has an always-on `.sheet` for the docked panel above,
-        // and a second real modal presentation competing for that same
-        // slot is what once caused "Look Around does nothing" and the
-        // docked sheet vanishing afterward. The panel is plain view
-        // composition in an overlay — it morphs between its card, split
-        // and full-screen frames in place and is never presented.
-        .overlay {
-            lookAroundOverlay
-        }
     }
-
     // MARK: - Look Around host
 
     /// The coordinate space every Look Around frame is expressed in: a
@@ -556,18 +712,38 @@ struct JourneyView: View {
     /// own layout.
     private var lookAroundOverlay: some View {
         GeometryReader { proxy in
+            // The host spans the whole window (it ignores the safe area,
+            // below), so `hostFrame.minY` is the window's top and the
+            // status-bar / Dynamic-Island / home-indicator heights come
+            // from the window's own safe-area insets — a fixed number
+            // read straight from UIKit, not a difference of two live
+            // SwiftUI frames that can be momentarily stale or zero (which
+            // is how the chrome used to slip under the status bar).
             let hostFrame = proxy.frame(in: .global)
+            let insets = WindowSafeArea.insets
+            let safeSize = CGSize(
+                width: max(0, proxy.size.width - insets.left - insets.right),
+                height: max(0, proxy.size.height - insets.top - insets.bottom)
+            )
             let metrics = LookAroundLayoutMetrics(
-                safeSize: proxy.size,
-                topInset: max(0, hostFrame.minY - windowFrameGlobal.minY),
-                bottomInset: max(0, windowFrameGlobal.maxY - hostFrame.maxY),
-                dockTopY: mapDockTopGlobalY - hostFrame.minY
+                safeSize: safeSize,
+                topInset: insets.top,
+                bottomInset: insets.bottom,
+                dockTopY: mapDockTopGlobalY - padOverlayLift - hostFrame.minY - insets.top
             )
             // With the sheet dragged to `.large` there is no map left
             // above it to preview; the card simply isn't shown then.
             let previewFits = metrics.frame(for: .preview).minY > 44
 
             if lookAround.layout.isVisible, lookAround.layout.isExpanded || previewFits {
+                // `LookAroundLayoutMetrics` frames are in *safe-region*
+                // space (origin just below the status bar). The panel
+                // fills this window-sized host, so shifting it by the
+                // safe insets puts that origin in the right place: the
+                // split / full-screen frames' negative `-topInset` then
+                // lands exactly on the physical top edge, and the header
+                // and close button — padded by the same `topInset` —
+                // land just below the Dynamic Island, never in it.
                 LookAroundPanel(
                     session: lookAround,
                     metrics: metrics,
@@ -577,15 +753,22 @@ struct JourneyView: View {
                     onCollapse: collapseLookAround,
                     onToggleFullscreen: toggleLookAroundFullscreen
                 )
+                .offset(x: insets.left, y: insets.top)
                 .transition(.scale(scale: 0.85, anchor: .bottomTrailing).combined(with: .opacity))
             }
         }
+        // Host in window space: the panel's origin no longer depends on
+        // whether an overlay happens to inherit a safe area.
+        .ignoresSafeArea()
         .onGeometryChange(for: CGFloat.self) { proxy in
-            (proxy.size.height * LookAroundLayoutMetrics.splitHeightFraction).rounded()
-        } action: { splitInset in
-            lookAroundSplitInset = splitInset
+            proxy.size.height
+        } action: { windowHeight in
+            let insets = WindowSafeArea.insets
+            let safeHeight = max(0, windowHeight - insets.top - insets.bottom)
+            lookAroundSplitInset = (safeHeight * LookAroundLayoutMetrics.splitHeightFraction).rounded()
         }
         .animation(LookAroundLayoutMetrics.transitionSpring, value: lookAround.layout)
+        .animation(.smooth(duration: 0.35), value: padOverlayLift)
     }
 
     /// Where the imagery is of: the tracked ram's spot on its road, or
@@ -607,67 +790,178 @@ struct JourneyView: View {
     /// resized, so it always reads as one persistent surface rather than
     /// separate screens popping in and out.
     private var dockedPanel: some View {
-        Group {
-            if let ram = trackedRam {
-                // A real `TabView` in `.page` style rather than a manual
-                // `Group` swap: this is what makes the horizontal swipe
-                // between "Delivery" and "New Letter" actually work. Its
-                // drag recognizer only claims horizontal motion, so it
-                // never fights the vertical `ScrollView`s inside either
-                // page — the same coexistence Apple's own paged photo
-                // viewers rely on. The dots below stay as an explicit,
-                // always-visible second way to switch pages (VoiceOver in
-                // particular doesn't get a good swipe gesture from the
-                // hidden system page control), so the built-in index
-                // display is turned off to avoid showing two sets of dots.
-                TabView(selection: $panelPage) {
-                    deliveryPage(for: ram)
-                        .tag(PanelPage.delivery)
-                    composePage
-                        .tag(PanelPage.compose)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-            } else {
-                VStack(spacing: 0) {
-                    if isPanelCollapsed {
-                        IdleCourierCard(name: ramCompanionStore.companion?.name ?? "Your ram")
-                            .padding(.horizontal, 16)
-                            .padding(.top, 20)
-                            .padding(.bottom, 8)
-                    }
-                    composePage
-                }
-                .transition(.opacity)
+        // A real `TabView` in `.page` style rather than a manual `Group`
+        // swap: this is what makes the horizontal swipe between pages
+        // actually work. Its drag recognizer only claims horizontal motion,
+        // so it never fights the vertical `ScrollView`s inside a page — the
+        // same coexistence Apple's own paged photo viewers rely on. The dots
+        // below stay as an explicit, always-visible second way to switch
+        // (VoiceOver in particular doesn't get a good swipe gesture from the
+        // hidden system page control), so the built-in index display is off.
+        //
+        // Pages: the mailbag (always), the live journey of the tracked ram
+        // (only while one is out), and the compose form.
+        // A paging `ScrollView` rather than `TabView(.page)`: the page
+        // TabView inside a resizing sheet could stay stuck a few points
+        // off-axis after a swipe or a detent change, leaving margin on the
+        // right and none on the left. Each page is pinned to the container's
+        // exact width, so the insets are always symmetric.
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                composePage
+                    .containerRelativeFrame(.horizontal)
+                    .id(PanelPage.compose)
+                mailbagPage
+                    .containerRelativeFrame(.horizontal)
+                    .id(PanelPage.mailbag)
             }
+            .scrollTargetLayout()
         }
-        // Sending a letter flips `trackedRam` from nil to the freshly
-        // dispatched ram in the very same beat the sheet's own detent
-        // grows to `.medium` (see `onChange(of: trackedRam?.id)` below) —
-        // without an explicit transition/animation here, the whole
-        // compose form was replaced by the tracking view in one instant,
-        // uncoordinated frame, which is what read as the sheet "loading
-        // strangely" right after tapping Send. A plain cross-fade tied to
-        // the same value change keeps that swap looking like one
-        // deliberate transition instead of a jump cut.
+        .scrollTargetBehavior(.paging)
+        .scrollIndicators(.hidden)
+        .scrollPosition(id: panelPageBinding)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .animation(.easeInOut(duration: 0.25), value: trackedRam?.id)
-        .animation(.easeInOut(duration: 0.2), value: isPanelCollapsed)
-        // The onboarding-style dots, only once there are two pages to
-        // show. A `safeAreaInset` rather than a `VStack` so the compose
-        // form's own scroll view keeps its content clear of them.
+        // One strip along the bottom on both pages: the code field, and the
+        // two page dots at its trailing edge.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if trackedRam != nil {
-                PanelPageControl(
-                    items: [
-                        .init(page: .delivery, title: String(localized: "Delivery")),
-                        .init(page: .compose, title: String(localized: "New Letter")),
-                    ],
-                    selection: $panelPage
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-                .transition(.opacity)
+            // The page dots are always there, collapsed or not, so the
+            // other page is one tap away at every size.
+            HStack(alignment: .bottom, spacing: 8) {
+                // Receiving belongs to the mailbag; on the compose page the
+                // sheet is about where the letter is going, so the code
+                // field stays out of the way there. The compact sheet is
+                // just the single featured ram's row — the code field
+                // doesn't belong there either, so it's the full Incoming
+                // tab or nothing.
+                if panelPage == .mailbag, !isPanelTiny, !isPanelCompact, mailbagPath.isEmpty,
+                   mailbagSection == .incoming {
+                    // `mailbagPath.isEmpty` keeps this to the mailbag's own
+                    // top level: a pushed page (the idle bag's "Write a
+                    // letter" CTA, a ram's bag, a letter) already has its
+                    // own bottom bar, and this code field — irrelevant to
+                    // any of those — was sitting underneath it too.
+                    CodeEntryBar(
+                        relay: relay,
+                        code: $codeDraft,
+                        focusRequest: codeFocusTick,
+                        onOpen: { ram, code in onOpenByCode(ram, code) },
+                        onNeedsRoom: {
+                            if isPanelCollapsed {
+                                withAnimation { panelDetent = .dockMedium }
+                            }
+                        }
+                    )
+                } else if isPanelCollapsed, panelPage == .compose || isPanelTiny {
+                    // On the dots' own line, so it never steals height from
+                    // the form above.
+                    Button {
+                        withAnimation { panelDetent = .dockMedium }
+                    } label: {
+                        Label("Expand", systemImage: "chevron.up")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens the full letter form")
+                } else {
+                    Spacer(minLength: 0)
+                }
+                PanelPageControl(items: panelPageItems, selection: $panelPage)
+                    .frame(height: 40)
             }
+            // The whole strip — Expand or the code field, and the dots —
+            // sits lower, closer to the bottom edge, so the ram's progress
+            // above it has the room.
+            // On iPad the sheet has no home-indicator inset to hide in, so the
+            // same offset pushed Expand and the dots out of the sheet.
+            .offset(y: isPad ? 0 : 20)
+            .padding(.horizontal, 16)
+            .padding(.bottom, isPad ? 10 : 0)
+            .padding(.top, 4)
         }
+    }
+
+    /// `scrollPosition(id:)` wants an optional binding; a nil write (which
+    /// the scroll view makes transiently) never clears the page.
+    private var panelPageBinding: Binding<PanelPage?> {
+        Binding(
+            get: { panelPage },
+            set: { if let newValue = $0 { panelPage = newValue } }
+        )
+    }
+
+    private var panelPageItems: [PanelPageControl<PanelPage>.Item] {
+        [
+            .init(page: .compose, title: String(localized: "New Letter")),
+            .init(page: .mailbag, title: String(localized: "Mailbag")),
+        ]
+    }
+
+    /// The mailbag, on its own page: every courier in transit. Tapping a
+    /// row opens the ram's bag.
+    private var mailbagPage: some View {
+        MailbagDrawerView(
+            isCollapsed: isPanelCollapsed,
+            isCompact: isPanelCompact,
+            isTiny: isPanelTiny,
+            path: $mailbagPath,
+            onShakeHandoff: onManualHoofbeat,
+            publishedLetters: relayOutbox.letters,
+            idleName: ramCompanionStore.companion?.name ?? String(localized: "Your ram"),
+            onExpand: {
+                withAnimation { panelDetent = .dockMedium }
+            },
+            onWriteLetter: {
+                mailbagPath.removeAll()
+                withAnimation { panelPage = .compose }
+            },
+            onClose: {
+                collapsePanelToTiny()
+            },
+            onCancelJourney: { ram in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    _ = flockViewModel.recall(ramId: ram.id)
+                }
+            },
+            section: $mailbagSection,
+            searchText: $archiveQuery
+        )
+    }
+
+    /// Folds the docked sheet from any size to the shortest detent.
+    ///
+    /// The shortest detent, not the taller "collapsed browsing" one — that
+    /// mid-height state often has nothing to show but the segmented picker
+    /// (no featured courier for the selected tab), which read as a broken,
+    /// near-empty sheet. The shortest detent always has content: the one
+    /// courier row, or the resting ram.
+    ///
+    /// The keyboard is dropped first: with the code field focused (an iPad
+    /// keeps it up far more readily than an iPhone) the system holds the
+    /// sheet at the height the keyboard needs, so the detent change never
+    /// visibly landed and Close looked dead.
+    private func collapsePanelToTiny() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+        )
+        var swap = Transaction()
+        swap.disablesAnimations = true
+        withTransaction(swap) { mailbagPath.removeAll() }
+        withAnimation(.smooth(duration: 0.35)) { panelDetent = .height(Self.tinyPanelHeight) }
+    }
+
+    /// "Enter a code" from elsewhere in the app (the nearby-sender marker):
+    /// fill the field with the code a phone nearby is sharing, if any, and
+    /// put the cursor in it.
+    private func showCodePage() {
+        if case .locked(let shared) = proximity.state { codeDraft = shared }
+        panelPage = .mailbag
+        mailbagSection = .incoming
+        withAnimation { panelDetent = .dockMedium }
+        codeFocusTick += 1
     }
 
     /// The compose form, on its own page. Sliding a finished letter to
@@ -677,15 +971,32 @@ struct JourneyView: View {
         ComposeLetterView(
             onDestinationSelected: {
                 withAnimation {
-                    panelDetent = .medium
+                    panelDetent = .dockMedium
                 }
             },
             onCancel: {
-                withAnimation {
-                    panelDetent = .height(collapsedPanelHeight)
-                }
+                // Swap the page first, with no animation of its own, so the
+                // content is already the mailbag while the sheet is still
+                // tall; then let the sheet's own detent animation be the
+                // only thing moving. Animating both at once made the
+                // close stutter.
+                var swap = Transaction()
+                swap.disablesAnimations = true
+                withTransaction(swap) { panelPage = .mailbag }
+                // Back to the shortest detent, not the taller "collapsed
+                // browsing" one — closing New Letter should read as
+                // dismissing the sheet almost all the way, the same as
+                // canceling anywhere else, not settling on a mid-height
+                // sheet that looks like it's still half-open.
+                panelDetent = .height(Self.tinyPanelHeight)
             },
-            isPanelExpanded: !isPanelCollapsed
+            relay: relay,
+            shepherdIDRequest: $sendToShepherdID,
+            isPanelExpanded: !isPanelCollapsed,
+            droppedDestination: $droppedDestination,
+            onChooseOnMap: { isDestinationPickerPresented = true },
+            isPanelCompact: isPanelCompact,
+            isPanelTiny: isPanelTiny
         )
     }
 
@@ -700,7 +1011,7 @@ struct JourneyView: View {
                 isMoving: ram.status == .walking && isPersonMoving,
                 onTap: {
                     withAnimation {
-                        panelDetent = .medium
+                        panelDetent = .dockMedium
                     }
                 },
                 onBreakSeal: { letterRam = ram }
@@ -733,7 +1044,8 @@ struct JourneyView: View {
     private var mapContent: some View {
         @Bindable var camera = camera
 
-        return Map(position: $camera.position, bounds: MapCameraBounds(maximumDistance: globeDistanceMeters)) {
+        return MapReader { proxy in
+        Map(position: $camera.position, bounds: MapCameraBounds(maximumDistance: globeDistanceMeters)) {
             // The system's own pulsing blue dot, always — it is a
             // MapKit content item, not view chrome, so it survives every
             // sheet detent, page switch and Look Around stage without
@@ -742,6 +1054,64 @@ struct JourneyView: View {
             // there"); while idle the ram sprite stands on top of it.
             // MapKit shows it only once location access is granted.
             UserAnnotation()
+
+            // The pin the sender dropped by pressing and holding.
+            if let pin = droppedDestination {
+                // The system's own map marker — the same balloon Maps uses.
+                Marker(pin.name, coordinate: pin.coordinate)
+                    .tint(Color.accentColor)
+            }
+
+            // Rams that went on with another courier, at the spot they were
+            // handed over — so a letter that left your hands is still on
+            // your map, with the name of whoever took it.
+            ForEach(flockViewModel.activeRams.filter { $0.status == .handedOff && presence.sighting(for: $0.id) == nil }) { ram in
+                if let position = ram.currentCoordinate {
+                    Annotation(handedOffLabel(for: ram), coordinate: position) {
+                        Image(systemName: "figure.walk.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                            .padding(4)
+                            .background(.regularMaterial, in: Circle())
+                    }
+                    .annotationTitles(.visible)
+                }
+            }
+
+            // Couriers who said yes in Settings, carrying rams I handed on:
+            // roughly where they are (about a kilometre), with who and what.
+            ForEach(presence.sightings) { sighting in
+                Annotation(sightingLabel(sighting), coordinate: sighting.coordinate) {
+                    Image(systemName: "figure.walk.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white, .blue)
+                        .padding(4)
+                        .background(.regularMaterial, in: Circle())
+                }
+                .annotationTitles(.visible)
+            }
+
+            // Couriers in Bluetooth range right now (Profile's "Couriers
+            // Nearby"): no real coordinates, so placed the same
+            // deterministic way Profile's own map places them, inside the
+            // in-range ring around you.
+            if let here = locationService.currentCoordinate {
+                ForEach(nearbyCouriers.couriers) { courier in
+                    Annotation(courier.name, coordinate: courier.placed(around: here)) {
+                        NearbyCourierMarker(courier: courier, diameter: 34) {
+                            withAnimation(.snappy) { selectedNearbyCourier = courier }
+                        }
+                    }
+                    .annotationTitles(.visible)
+                }
+            }
+
+            // Someone close by is sharing a receiving code (Settings → Nearby).
+            if isNearbySenderLocked, let here = locationService.currentCoordinate {
+                Annotation("", coordinate: here) {
+                    NearbySenderRadar(onTap: onNearbySender)
+                }
+            }
 
             if let ram = trackedRam {
                 // While a ram is aboard the packet the leg it is travelling
@@ -828,6 +1198,35 @@ struct JourneyView: View {
         // since `.standard` alone never renders the actual 3D globe no
         // matter how far out you pull the camera.
         .mapStyle(currentMapStyle)
+        .overlay(alignment: .top) {
+            if let courier = selectedNearbyCourier {
+                NearbyCourierCard(
+                    courier: courier,
+                    isSaved: savedCouriers.isSaved(name: courier.name),
+                    onToggleSave: { savedCouriers.toggle(courier, at: locationService.currentCoordinate) },
+                    onHandOver: onHandOverToNearby.map { handOver in
+                        {
+                            withAnimation(.snappy) { selectedNearbyCourier = nil }
+                            handOver(courier)
+                        }
+                    },
+                    onSendLetter: onSendLetterToNearby.map { sendLetter in
+                        {
+                            withAnimation(.snappy) { selectedNearbyCourier = nil }
+                            sendLetter(courier)
+                        }
+                    },
+                    onClose: { withAnimation(.snappy) { selectedNearbyCourier = nil } }
+                )
+                .padding(.top, 8)
+            }
+        }
+        .onChange(of: nearbyCouriers.couriers) { _, couriers in
+            if let selected = selectedNearbyCourier, !couriers.contains(selected) {
+                withAnimation(.snappy) { selectedNearbyCourier = nil }
+            }
+        }
+        .simultaneousGesture(dropPinGesture(proxy))
         // Tells a person-driven pan/zoom/rotate apart from a camera move
         // this view made itself (via `isProgrammaticCameraUpdate`), so
         // only the former breaks `isFollowingRam` — otherwise the user
@@ -838,6 +1237,8 @@ struct JourneyView: View {
         }
         .overlay(alignment: .bottomLeading) {
             mapControlsOverlay
+                .offset(y: -padOverlayLift)
+                .animation(.smooth(duration: 0.35), value: padOverlayLift)
         }
         // Where the map's usable area ends at the bottom — the docked
         // sheet's top edge, since the sheet's live detent is reserved as
@@ -907,8 +1308,58 @@ struct JourneyView: View {
         // outer safe area MapKit reads and doesn't shift where those
         // buttons are already positioned.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: reservedBottomInset)
+            // Eased over the sheet's own settle time, so the map's reserved
+            // area follows the sheet instead of snapping ahead of it.
+            Color.clear
+                .frame(height: reservedBottomInset)
+                .animation(.smooth(duration: 0.35), value: reservedBottomInset)
         }
+        // Whatever sits behind the map while it re-lays out must be the
+        // system background, never the black window behind it.
+        .background(Color(uiColor: .systemBackground))
+        }
+    }
+
+    // MARK: - Dropped destination pin
+
+    /// Press and hold anywhere on the map to mark it as the letter's
+    /// destination. Simultaneous, so ordinary pan/zoom is untouched.
+    private func dropPinGesture(_ proxy: MapProxy) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.5)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
+            .onEnded { value in
+                guard case .second(true, let drag?) = value,
+                      let coordinate = proxy.convert(drag.location, from: .local) else { return }
+                dropPin(at: coordinate)
+            }
+    }
+
+    private func dropPin(at coordinate: CLLocationCoordinate2D) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        Task {
+            let pin = await DroppedDestination.resolve(coordinate)
+            droppedDestination = pin
+            panelPage = .compose
+            withAnimation { panelDetent = .dockMedium }
+        }
+    }
+
+    private var isNearbySenderLocked: Bool {
+        if case .locked = proximity.state { return true }
+        return false
+    }
+
+    private func sightingLabel(_ sighting: CarrierPresenceService.Sighting) -> String {
+        let ramName = flockViewModel.activeRams.first { $0.id == sighting.ramID }?.name ?? ""
+        let carrier = sighting.carrierName.isEmpty ? String(localized: "A courier") : sighting.carrierName
+        return ramName.isEmpty ? carrier : "\(carrier) · \(ramName)"
+    }
+
+    /// "with Anna" for a ram that was handed on to a named courier.
+    private func handedOffLabel(for ram: Ram) -> String {
+        let last = ram.stamps.last(where: { $0.kind == .handoff })?.placeName ?? ""
+        let carrier = last.replacingOccurrences(of: "Handed to ", with: "")
+        return carrier.isEmpty || carrier == "Handed on" ? ram.name : "\(ram.name) · \(carrier)"
     }
 
     /// How much bottom space to reserve so MapKit's own attribution stays
@@ -918,14 +1369,40 @@ struct JourneyView: View {
         // No docked sheet while Look Around is expanded (see
         // `isDockedPanelPresented`), so nothing to keep clear of.
         if lookAround.layout.isExpanded { return 0 }
+        // iPad: the panel is a card, not a full-width bar, and resizing the
+        // map's safe area with every detent made the map jump and re-centre
+        // (worst when closing). One steady inset instead; the map stays put.
+        // The floating map controls and the Look Around card follow the
+        // sheet through `padOverlayLift` instead, which only moves overlays.
+        if isPad { return collapsedPanelHeight }
+        return livePanelHeight
+    }
+
+    /// The docked sheet's height at its current detent. Proportional to the
+    /// actual window, never a fixed 700 / 420: on a shorter phone those
+    /// exceeded the map's own height and squeezed it to nothing, which
+    /// showed as the map resizing wildly and a black band under the sheet.
+    private var livePanelHeight: CGFloat {
+        let window = windowFrameGlobal.height
+        guard window > 0 else { return collapsedPanelHeight }
         switch panelDetent {
         case .large:
-            return 700
-        case .medium:
-            return 420
+            return max(collapsedPanelHeight, min(window * 0.85, window - 160))
+        case .dockMedium:
+            return max(collapsedPanelHeight, min(window * 0.48, dockMediumMaxHeight))
         default:
-            return collapsedPanelHeight
+            return isPanelTiny ? Self.tinyPanelHeight : (isPanelCompact ? Self.compactComposeHeight : collapsedPanelHeight)
         }
+    }
+
+    /// How far, on iPad, the sheet's top edge is above (positive) or below
+    /// (negative) the steady inset the map reserves there. The map controls
+    /// and the Look Around preview card move by exactly this much, so they
+    /// ride on the sheet's edge like they do on iPhone, without the map's
+    /// own safe area changing (which made the camera jump).
+    private var padOverlayLift: CGFloat {
+        guard isPad, !lookAround.layout.isExpanded else { return 0 }
+        return livePanelHeight - collapsedPanelHeight
     }
 
     /// A small, purely informational "steps today" readout — the spot
@@ -940,8 +1417,7 @@ struct JourneyView: View {
                 .foregroundStyle(.secondary)
 
             Text("\(stepTracker.liveStepsToday)")
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                .monospacedDigit()
+                .font(.system(.subheadline, design: .rounded).weight(.semibold).monospacedDigit())
                 .foregroundStyle(.primary)
                 .contentTransition(.numericText(value: Double(stepTracker.liveStepsToday)))
                 .animation(.snappy, value: stepTracker.liveStepsToday)
@@ -1096,24 +1572,21 @@ struct JourneyView: View {
             // No binoculars button here: the floating Look Around
             // preview card (above the docked sheet) is the one entry
             // point, so the same feature is never drawn twice.
-            mapControlButton(
-                systemImage: "scope",
-                accessibilityLabel: "Find Ram",
-                tint: trackedRam == nil ? .secondary : (camera.isFollowingRam ? .primary : .accentColor),
-                action: {
-                    if trackedRam != nil {
-                        returnToRam()
-                    } else {
-                        locationService.resolveCurrentLocation()
-                        camera.centerOnUser(locationService.currentCoordinate, animated: true)
-                    }
-                }
-            )
+            // "Find Ram" only exists while a ram is tracked. With none, it
+            // did exactly what "My Location" does — two buttons, one job.
+            if trackedRam != nil {
+                mapControlButton(
+                    systemImage: "scope",
+                    accessibilityLabel: "Find Ram",
+                    tint: camera.isFollowingRam ? Color.primary : Color.accentColor,
+                    action: { returnToRam() }
+                )
+            }
 
             mapControlButton(
                 systemImage: "location.fill",
                 accessibilityLabel: "My Location",
-                tint: camera.focus == .user ? .accentColor : .primary,
+                tint: camera.focus == .user ? Color.accentColor : Color.primary,
                 action: {
                     locationService.resolveCurrentLocation()
                     if trackedRam == nil {
@@ -1269,8 +1742,7 @@ struct JourneyView: View {
 
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(ram.remainingSteps.formatted(.number.grouping(.automatic)))
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
+                        .font(.system(.title3, design: .rounded).weight(.semibold).monospacedDigit())
                         .contentTransition(.numericText(value: Double(ram.remainingSteps)))
                         .animation(.snappy, value: ram.remainingSteps)
 
@@ -1512,7 +1984,8 @@ struct JourneyView: View {
     }
 
     private func applyStepDelta(_ cumulativeSteps: Int) {
-        guard let ram = trackedRam else { return }
+        // Steps only ever belong to the ram the tracker was started for.
+        guard let ram = trackedRam, trackingRamId == ram.id else { return }
         let delta = max(0, cumulativeSteps - lastAppliedStepCount)
         guard delta > 0 else { return }
         lastAppliedStepCount = cumulativeSteps
@@ -1746,4 +2219,25 @@ struct JourneyView: View {
     )
     .environment(FlockViewModel.preview)
     .environment(LocationService())
+}
+
+// MARK: - Docked panel detents
+
+/// Tallest the medium detent gets (only iPad ever reaches it).
+private let dockMediumMaxHeight: CGFloat = 500
+
+/// Half the screen on a phone; on iPad half the screen would be an enormous
+/// card, so the same "medium" is capped to what a tall phone shows.
+private struct DockMediumDetent: CustomPresentationDetent {
+    static func height(in context: Context) -> CGFloat? {
+        min(context.maxDetentValue * 0.48, dockMediumMaxHeight)
+    }
+}
+
+extension PresentationDetent {
+    /// The docked panel's middle-tall size: the system medium on iPhone, a
+    /// capped equivalent on iPad.
+    @MainActor static var dockMedium: PresentationDetent {
+        UIDevice.current.userInterfaceIdiom == .pad ? .custom(DockMediumDetent.self) : .medium
+    }
 }

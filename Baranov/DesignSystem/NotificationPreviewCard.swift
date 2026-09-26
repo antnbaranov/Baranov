@@ -22,11 +22,11 @@ struct NotificationPreviewCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: "pawprint.fill")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(.white)
+                Image("NotificationIcon")
+                    .resizable()
+                    .scaledToFill()
                     .frame(width: 30, height: 30)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                 Text("Baranov")
                     .font(.footnote.weight(.medium))

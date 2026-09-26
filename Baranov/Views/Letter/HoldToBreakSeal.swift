@@ -85,7 +85,7 @@ struct HoldToBreakSeal: View {
     var resetToken = 0
     /// Colour of the progress ring; should read on the paper behind it.
     var ringColor: Color = .primary
-    var holdDuration: Double = 1.2
+    var holdDuration: Double = 1.5
     var lockedHint: LocalizedStringKey = "Not ready to open yet"
     var onLockedTap: () -> Void = {}
     let onBroken: () -> Void

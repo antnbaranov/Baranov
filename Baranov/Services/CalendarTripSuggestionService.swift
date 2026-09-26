@@ -72,6 +72,25 @@ final class CalendarTripSuggestionService {
 
     private static let cacheKey = "com.baranov.tripSuggestionsCache"
     private static let lastRefreshedKey = "com.baranov.tripSuggestionsLastRefreshedAt"
+    private static let dismissedKey = "com.baranov.tripSuggestionsDismissed"
+
+    /// Stable keys of suggestions the person removed. `TripSuggestion.id` is
+    /// regenerated on every refresh, so dismissals match on title + place.
+    private var dismissedKeys: Set<String> = Set(
+        UserDefaults.standard.stringArray(forKey: CalendarTripSuggestionService.dismissedKey) ?? []
+    )
+
+    private static func key(for suggestion: TripSuggestion) -> String {
+        "\(suggestion.title.lowercased())|\(suggestion.displayName.lowercased())"
+    }
+
+    /// Removes a suggestion and keeps it gone across refreshes and launches.
+    func dismiss(_ suggestion: TripSuggestion) {
+        dismissedKeys.insert(Self.key(for: suggestion))
+        UserDefaults.standard.set(Array(dismissedKeys), forKey: Self.dismissedKey)
+        suggestions.removeAll { Self.key(for: $0) == Self.key(for: suggestion) }
+        saveCache()
+    }
 
     /// Bounds how many raw event locations get geocoded per `refresh`,
     /// independent of how many actually pass the distance filter — a
@@ -135,14 +154,14 @@ final class CalendarTripSuggestionService {
                 .distance(from: referenceLocation)
             guard distanceMeters >= minimumDistanceMeters else { continue }
 
-            results.append(
-                TripSuggestion(
-                    title: event.title ?? "Trip",
-                    displayName: Self.displayName(for: placemark, fallback: location),
-                    coordinate: RamCoordinate(eventCoordinate),
-                    date: event.startDate
-                )
+            let suggestion = TripSuggestion(
+                title: event.title ?? "Trip",
+                displayName: Self.displayName(for: placemark, fallback: location),
+                coordinate: RamCoordinate(eventCoordinate),
+                date: event.startDate
             )
+            guard !dismissedKeys.contains(Self.key(for: suggestion)) else { continue }
+            results.append(suggestion)
         }
 
         suggestions = results

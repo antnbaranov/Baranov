@@ -30,6 +30,7 @@
 //
 
 import CoreLocation
+import CryptoKit
 import SwiftUI
 import UIKit
 
@@ -47,6 +48,14 @@ struct ComposeLetterView: View {
     /// persistent docked sheet.
     let onCancel: () -> Void
 
+    /// The letter relay. With it, the destination can be a Shepherd ID (or an
+    /// ear tag to hand over) instead of an address — see `isCodeMode`.
+    var relay: LetterRelayService?
+
+    /// A Shepherd ID handed in from elsewhere (a phone nearby): switches the
+    /// destination to code mode with it filled in, then clears itself.
+    var shepherdIDRequest: Binding<String?> = .constant(nil)
+
     /// Set by the enclosing docked panel (`JourneyView`) whenever the
     /// sheet itself has been dragged open past its collapsed search-bar
     /// height. Lets the rest of the compose form reveal itself the moment
@@ -58,6 +67,19 @@ struct ComposeLetterView: View {
     /// collapsed state by default.
     let isPanelExpanded: Bool
 
+    /// A destination the sender dropped on the map by pressing and holding.
+    /// Treated exactly like one picked from search; cleared with the chip.
+    var droppedDestination: Binding<DroppedDestination?> = .constant(nil)
+
+    /// Opens the full-screen map picker ("Choose on Map"), owned by `RootView`.
+    var onChooseOnMap: () -> Void = {}
+
+    /// The shortest detent: the destination and the first question of the
+    /// form. Never expands the rest.
+    var isPanelCompact = false
+    /// The very smallest sheet: only the destination field, nothing under it.
+    var isPanelTiny = false
+
     @Environment(FlockViewModel.self) private var flockViewModel
     @Environment(EntitlementService.self) private var entitlementService
     @Environment(\.openURL) private var openURL
@@ -65,9 +87,34 @@ struct ComposeLetterView: View {
     /// The sender's own name, captured once in `OnboardingView`. There is
     /// no field for it in this form — it's used as-is when dispatching.
     @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
-    @AppStorage(SealStyle.storageKey) private var sealStyleRaw = SealStyle.wax.rawValue
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.accessibilitySwitchControlEnabled) private var switchControlEnabled
 
     @Environment(LocationService.self) private var locationService
+    @Environment(RelayOutbox.self) private var outbox
+
+    /// The destination is a code, not an address. A Shepherd ID sends the
+    /// letter straight to that person's mailbag; with none you get an ear tag
+    /// to hand over. Either way the recipient chooses where the ram arrives,
+    /// so there is no ram, route or handoff to pick here.
+    @State private var isCodeMode = false
+    @State private var shepherdID = ""
+    @FocusState private var isShepherdIDFocused: Bool
+    @State private var savedCodes = SavedRecipientCodeStore()
+    @State private var isSavingCode = false
+    @State private var isSendingByCode = false
+    @State private var sentByCode: SentByCode?
+
+    private struct SentByCode {
+        /// Set when the letter wasn't addressed to a Shepherd ID.
+        let earTag: String?
+        let recipientName: String
+    }
+
+    private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+
+    private var hasShepherdID: Bool { !CourierCodeStore.address(from: shepherdID).isEmpty }
+    private var shepherdIDIsValid: Bool { !hasShepherdID || CourierCodeStore.isAddress(shepherdID) }
 
     @State private var targetCity = ""
     @State private var targetCoordinate: CLLocationCoordinate2D?
@@ -75,7 +122,6 @@ struct ComposeLetterView: View {
     @State private var handoffCoordinate: CLLocationCoordinate2D?
 
     @State private var ramName = ""
-    @State private var showsCustomRamName = false
     @State private var recipientName = ""
     @State private var messageBody = ""
     /// The wax the letter will be sealed with — crimson for everyone,
@@ -128,6 +174,17 @@ struct ComposeLetterView: View {
     @State private var isResolvingRoute = false
     @State private var resolutionError: LocalizedStringKey?
     @State private var isPasturePaywallPresented = false
+
+    // MARK: - Premium Touches (paid: Time-Capsule, Geo-Lock, Scratch-Off)
+
+    @State private var isPremiumTouchesExpanded = false
+    @State private var wantsTimeLock = false
+    @State private var unlockAt = Date().addingTimeInterval(3600 * 24)
+    @State private var wantsGeoLock = false
+    @State private var geofenceCoordinate: CLLocationCoordinate2D?
+    @State private var geofenceRadiusMeters: Double = LetterGeofence.defaultRadiusMeters
+    @State private var wantsScratchSecret = false
+    @State private var scratchSecretText = ""
 
     /// The unsent letter's home (see `LetterDraft`). Composing is never
     /// blocked by the pasture being full — the ceiling is only met at the
@@ -211,7 +268,7 @@ struct ComposeLetterView: View {
     /// its collapsed height, so the sender sees the whole form right away
     /// instead of it waiting on their first keystroke.
     private var isExpanded: Bool {
-        isDestinationConfirmed || isPanelExpanded
+        !isPanelCompact && isPanelExpanded
     }
 
     /// Every field the form is still waiting on, in the order they sit on
@@ -224,12 +281,16 @@ struct ComposeLetterView: View {
     /// it's captured in onboarding, not in this form, so the sender could
     /// never fix it from here; `senderName` falls back instead.
     private var missingRequirementKey: String? {
-        if targetCoordinate == nil { return "Pick a destination from the suggestions." }
-        if ramName.trimmed.isEmpty { return "Choose a ram to carry it." }
+        if isCodeMode {
+            if !shepherdIDIsValid { return "A Shepherd ID has 10 characters, like ABCDE-FGHJK." }
+        } else {
+            if targetCoordinate == nil { return "Pick a destination from the suggestions." }
+            if ramName.trimmed.isEmpty { return "Choose a ram to carry it." }
+        }
         if recipientName.trimmed.isEmpty { return "Say who the letter is for." }
-        if messageBody.trimmed.isEmpty { return "Write a message." }
-        if closure == nil { return "Seal the letter with wax, or send it open as a postcard." }
-        if needsHandoffCity, handoffPlan == nil, handoffCoordinate == nil {
+        if !hasContent { return "Write a message." }
+        if closure == nil { return "Hold the wax to seal the letter." }
+        if !isCodeMode, needsHandoffCity, handoffPlan == nil, handoffCoordinate == nil {
             return "Pick a handoff city from the suggestions."
         }
         return nil
@@ -260,20 +321,60 @@ struct ComposeLetterView: View {
     @State private var requirementNotice: LocalizedStringKey?
 
     var body: some View {
-        NavigationStack {
+        // No `NavigationStack` here: this view lives on one page of the
+        // docked sheet's paged `TabView`, and a UIKit navigation bar that
+        // is hidden/shown as the sheet resizes (and recycled with the
+        // page) triggers "Layout requested for visible navigation bar,
+        // when the top item belongs to a different navigation bar".
+        // Nothing in the composer pushes a screen, so a plain header
+        // that only appears once the form opens does the same job.
+        VStack(spacing: 0) {
+            if isExpanded {
+                composeHeader
+            } else if isPanelCompact || isPanelTiny {
+                // The shortest sheets name their page, so it's clear what
+                // the field below belongs to.
+                Text("New Letter")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, isPanelTiny ? 16 : 8)
+                    .accessibilityAddTraits(.isHeader)
+            }
             composerBody
-                .navigationTitle("Letter")
-                .navigationBarTitleDisplayMode(.inline)
-                // The search-first collapsed sheet stays a bare search
-                // bar; the standard bar appears once the form opens.
-                .toolbar(isExpanded ? .visible : .hidden, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button { cancelComposing() } label: { Image(systemName: "xmark") }
-                            .accessibilityLabel("Cancel")
-                    }
-                }
         }
+    }
+
+    /// Inline-title bar: cancel at the leading edge, "Letter" centred.
+    private var composeHeader: some View {
+        ZStack {
+            Text("Letter")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            HStack {
+                GlassCloseButton(label: "Cancel") { cancelComposing() }
+                Spacer()
+                if relay != nil {
+                    Button(action: toggleCodeMode) {
+                        Image(systemName: isCodeMode ? "mappin.and.ellipse" : "number")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 44, height: 44)
+                            .liquidGlass(in: Circle(), fallbackMaterial: .thinMaterial)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isCodeMode ? "Send by address" : "Send by code")
+                    .accessibilityHint(isCodeMode
+                        ? "Go back to choosing a place on the map"
+                        : "Write to someone far away with their Shepherd ID, or get an ear tag to send them")
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 44)
+        // Room above: the sheet's grabber sits at the very top edge and the
+        // close button was pressed right up under it.
+        .padding(.top, 14)
     }
 
     private var composerBody: some View {
@@ -300,6 +401,9 @@ struct ComposeLetterView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 4)
                         .padding(.bottom, 24)
+                        .transition(.opacity)
+                } else if !isPanelTiny {
+                    collapsedForm
                         .transition(.opacity)
                 }
             }
@@ -335,6 +439,10 @@ struct ComposeLetterView: View {
         }
         .task {
             restoreDraftIfNeeded()
+            applyShepherdIDRequest(shepherdIDRequest.wrappedValue)
+        }
+        .onChange(of: shepherdIDRequest.wrappedValue) { _, id in
+            applyShepherdIDRequest(id)
         }
         .onDisappear {
             // This view is rebuilt whenever the docked panel switches
@@ -376,11 +484,53 @@ struct ComposeLetterView: View {
         locationService.currentCoordinate
     }
 
+    // MARK: - Short sheet
+
+    /// What sits under the destination field while the sheet is short: the
+    /// next step of the form, "Choose Your Ram" — not Slide to Dispatch,
+    /// which can't succeed until the letter is written. "Expand" lives in
+    /// the bottom strip beside the page dots (see `JourneyView`).
+    private var collapsedForm: some View {
+        VStack(spacing: 10) {
+            if isPanelCompact {
+                // The shortest size asks the form's first question; the
+                // Expand hint sits under it, beside the page dots.
+                ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName, onAddressSelected: recipientAddressPicked)
+            } else {
+                if !isCodeMode {
+                    fieldSection("Choose Your Ram") {
+                        ramPicker
+                    }
+                }
+                // iPad has room under the ram: the next question shows too.
+                if isPad {
+                    ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName, onAddressSelected: recipientAddressPicked)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+    }
+
+    /// Only settles the destination from the recipient's address when there
+    /// isn't one already — a destination the sender explicitly picked should
+    /// never be swapped out by tapping an address suggestion under the
+    /// recipient field.
+    private func recipientAddressPicked(_ addressText: String, _ coordinate: CLLocationCoordinate2D) {
+        guard targetCoordinate == nil else { return }
+        targetCity = addressText
+        targetCoordinate = coordinate
+        locationService.resolveCurrentLocation()
+        onDestinationSelected()
+    }
+
     // MARK: - Destination
 
     private var destinationRow: some View {
         Group {
-            if isDestinationConfirmed {
+            if isCodeMode {
+                shepherdIDField
+            } else if isDestinationConfirmed {
                 confirmedDestinationSummary
             } else {
                 PlaceSearchField(
@@ -406,16 +556,36 @@ struct ComposeLetterView: View {
                         if focused {
                             onDestinationSelected()
                         }
-                    }
+                    },
+                    onChooseOnMap: onChooseOnMap
                 )
             }
         }
         .padding(.horizontal, 20)
         // A bit more breathing room above the destination field — it sits
         // right under the sheet's own drag indicator, and 10pt read as
-        // too tight against it.
-        .padding(.top, 20)
+        // too tight against it. The shortest sheet has a title above it.
+        .padding(.top, isPanelTiny ? 10 : 20)
         .padding(.bottom, isExpanded ? 6 : 0)
+        .onChange(of: droppedDestination.wrappedValue) { _, pin in
+            guard let pin else { return }
+            applyDroppedDestination(pin)
+        }
+        .onAppear {
+            // A pin chosen in the map picker arrives while the docked panel
+            // is hidden, so this form may be created after the value was set
+            // and `onChange` never sees it.
+            if targetCoordinate == nil, let pin = droppedDestination.wrappedValue {
+                applyDroppedDestination(pin)
+            }
+        }
+    }
+
+    private func applyDroppedDestination(_ pin: DroppedDestination) {
+        targetCity = pin.name
+        targetCoordinate = pin.coordinate
+        locationService.resolveCurrentLocation()
+        onDestinationSelected()
     }
 
     /// A destination has already been picked — this collapses the search
@@ -448,6 +618,7 @@ struct ComposeLetterView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Clear destination")
             .layoutPriority(1)
         }
         .pillFieldBackground()
@@ -455,29 +626,27 @@ struct ComposeLetterView: View {
 
     // MARK: - Expanded form
 
-    private var expandedFields: some View {
+    @ViewBuilder private var expandedFields: some View {
+        if let sentByCode {
+            codeSentCard(sentByCode)
+                .padding(.top, 14)
+        } else {
+            expandedFormFields
+        }
+    }
+
+    private var expandedFormFields: some View {
         VStack(alignment: .leading, spacing: 20) {
-            fieldSection("Choose Your Ram") {
-                ramPicker
+            if !isCodeMode {
+                fieldSection("Choose Your Ram") {
+                    ramPicker
+                }
+                .padding(.top, 14)
             }
-            .padding(.top, 14)
 
             fieldSection(nil) {
                 VStack(spacing: 10) {
-                    ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName) { addressText, coordinate in
-                        // Only settles the destination from the
-                        // recipient's address when there isn't one
-                        // already — a destination the sender explicitly
-                        // picked (and is now looking at, confirmed, at
-                        // the top of the sheet) should never get silently
-                        // swapped out just because they tapped an address
-                        // suggestion under the recipient field.
-                        guard targetCoordinate == nil else { return }
-                        targetCity = addressText
-                        targetCoordinate = coordinate
-                        locationService.resolveCurrentLocation()
-                        onDestinationSelected()
-                    }
+                    ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName, onAddressSelected: recipientAddressPicked)
                     if closure != .sealed {
                         messageField
                             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
@@ -485,20 +654,22 @@ struct ComposeLetterView: View {
                 }
             }
 
+            // Paper, wax and Slide to Dispatch are always on the page —
+            // sending explains anything still missing instead of hiding.
             fieldSection(nil) {
                 closureSection
             }
 
-            if needsHandoffCity {
+            if needsHandoffCity, !isCodeMode {
                 handoffSection
             }
 
-            startingLocationNotice
+            if !isCodeMode { startingLocationNotice }
 
             if let resolutionError {
                 Label(resolutionError, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.accentColor)
             }
 
             if let requirementNotice {
@@ -515,7 +686,13 @@ struct ComposeLetterView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.2), value: draftSavedNotice)
+    }
+
+    /// Words on the page or a drawing — either counts as a letter.
+    private var hasContent: Bool {
+        !messageBody.trimmed.isEmpty || attachedPhoto != nil
     }
 
     /// The letter is finished and waiting on a free ram. Says where it
@@ -565,7 +742,17 @@ struct ComposeLetterView: View {
     /// `TransitProgressStrip`.
     private var sendButton: some View {
         Group {
-            if needsHandoffCity && handoffPlan != nil && !showsManualHandoffField {
+            if isCodeMode {
+                SlideToActionControl(
+                    title: "Slide to Send",
+                    role: .dispatch,
+                    isBusy: isSendingByCode || isAwaitingLocation,
+                    busyTitle: busyTitle,
+                    isReady: canSend
+                ) {
+                    Task { await send() }
+                }
+            } else if needsHandoffCity && handoffPlan != nil && !showsManualHandoffField {
                 SlideToActionControl(
                     title: "Slide to Dispatch via \(handoffCity.trimmed)",
                     role: .dispatch,
@@ -593,6 +780,8 @@ struct ComposeLetterView: View {
     private var busyTitle: LocalizedStringKey? {
         if isAwaitingLocation {
             return "Finding Your Location…"
+        } else if isSendingByCode {
+            return "Sending…"
         } else if isPlanningHandoff {
             return "Finding a Port…"
         } else if isResolvingRoute {
@@ -607,7 +796,7 @@ struct ComposeLetterView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
             content()
@@ -617,25 +806,16 @@ struct ComposeLetterView: View {
     // MARK: - Message (with dictation)
 
     /// A sheet of paper, not a form field. Serif type (the system's own
-    /// New York), a "Dear —," line that fills in as soon as the recipient
-    /// is known, today's date and where the letter is being written, room
+    /// New York), today's date and where the letter is being written, room
     /// for a real letter, and a rotating prompt for the blank-page moment.
     /// Nothing here is decoration for its own sake — every part of it is
     /// what a page you'd actually write on has.
     private var messageField: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(recipientName.trimmed.isEmpty ? "Dear —," : "Dear \(recipientName.trimmed),")
-                    .font(.system(.body, design: .serif).italic())
-                    .foregroundStyle(recipientName.trimmed.isEmpty ? paperStyle.ink.opacity(0.4) : paperStyle.ink)
-                    .contentTransition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: recipientName)
-                Spacer()
-                Text(letterDateline)
-                    .font(.caption2)
-                    .foregroundStyle(paperStyle.ink.opacity(0.5))
-                    .lineLimit(1)
-            }
+            Text(letterDateline)
+                .font(.caption2)
+                .foregroundStyle(paperStyle.ink.opacity(0.5))
+                .lineLimit(1)
 
             // The idea stays visible while writing — the model's line when
             // there is one, otherwise the next static prompt — so the
@@ -687,16 +867,20 @@ struct ComposeLetterView: View {
                 }
                 .accessibilityLabel("Show another writing idea")
 
-                Spacer(minLength: 0)
-
                 dictationButton
+
+                Spacer(minLength: 0)
             }
             .compactGlassButton()
 
             // Paper colour lives on the sheet itself, right under
             // Draw / Idea, so the colour is chosen where it is seen.
-            paperPicker
-                .frame(maxWidth: .infinity)
+            // Colour is part of sealing: an open postcard travels plain,
+            // so it never looks dressed up as something secure.
+            if closure != .postcard {
+                paperPicker
+                    .frame(maxWidth: .infinity)
+            }
         }
         .padding(14)
         // No stroke/border here anymore — a hard-edged rectangle around
@@ -761,21 +945,19 @@ struct ComposeLetterView: View {
         .transition(.opacity)
     }
 
-    /// Icon only, a circular tertiary fill; tints and pulses while listening.
+    /// Styled exactly like Draw and Idea (it sits in the same row and takes
+    /// that row's compact glass style); only the tint changes, to red and
+    /// pulsing, while it is listening.
     private var dictationButton: some View {
         let isRecording = messageDictationService.isRecording
         return Button {
             messageDictationService.toggleRecording(appendingTo: messageBody)
         } label: {
-            Image(systemName: "mic.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(isRecording ? Color.red : Color.secondary)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Color(uiColor: .tertiarySystemFill)))
+            Label(isRecording ? "Stop" : "Dictate", systemImage: "mic.fill")
                 .symbolEffect(.pulse, isActive: isRecording)
-                .contentShape(Circle())
+                .frame(minHeight: 24)
         }
-        .buttonStyle(.plain)
+        .tint(isRecording ? Color.red : Color.secondary)
         .animation(.easeInOut(duration: 0.2), value: isRecording)
         .accessibilityLabel("Dictate Message")
         .sensoryFeedback(isRecording ? .start : .stop, trigger: isRecording)
@@ -785,9 +967,9 @@ struct ComposeLetterView: View {
         Button { openDoodle() } label: {
             Image(uiImage: photo)
                 .resizable()
-                .scaledToFill()
+                .scaledToFit()
                 .frame(maxWidth: .infinity)
-                .frame(height: 160)
+                .frame(maxHeight: 320)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -898,9 +1080,12 @@ struct ComposeLetterView: View {
     /// destination chip above it and the recipient field below — the way
     /// every row in Apple Maps' directions sheet is the same shape
     /// regardless of what it holds. Tapping it opens a system `Menu` of
-    /// the sender's real ram names (plus "Custom Name…"); the row itself
-    /// always shows the current pick, so there's no separate chip strip
-    /// at a different size.
+    /// the sender's real ram names (plus "Expand the Pasture" for anyone
+    /// out of slots); the row itself always shows the current pick, so
+    /// there's no separate chip strip at a different size. Rams are never
+    /// renamed here — a name is stamped for a ram's whole life the moment
+    /// it's born (see `RamLedger`/`RamCompanionStore`), so this menu only
+    /// ever chooses among real, existing names.
     private var ramPicker: some View {
         VStack(alignment: .leading, spacing: 10) {
             Menu {
@@ -908,10 +1093,9 @@ struct ComposeLetterView: View {
                     Button {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             ramName = name
-                            showsCustomRamName = false
                         }
                     } label: {
-                        if !showsCustomRamName, ramName == name {
+                        if ramName == name {
                             Label(name, systemImage: "checkmark")
                         } else {
                             Text(name)
@@ -922,12 +1106,9 @@ struct ComposeLetterView: View {
                 Divider()
 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        showsCustomRamName = true
-                        ramName = ""
-                    }
+                    isPasturePaywallPresented = true
                 } label: {
-                    Label("Custom Name…", systemImage: "pencil")
+                    Label("Expand the Pasture…", systemImage: "lock")
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -951,27 +1132,17 @@ struct ComposeLetterView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Ram")
             .accessibilityValue(ramRowTitle)
-
-            if showsCustomRamName {
-                TextField("Ram's Name", text: $ramName)
-                    .textFieldStyle(.plain)
-                    .pillFieldBackground()
-                    .transition(.opacity)
-            }
         }
         .onAppear {
-            guard ramName.trimmed.isEmpty, !showsCustomRamName,
+            guard ramName.trimmed.isEmpty,
                   let defaultName = ramPickerOptions.first
             else { return }
             ramName = defaultName
         }
     }
 
-    private var ramRowTitle: LocalizedStringKey {
-        if showsCustomRamName {
-            return ramName.trimmed.isEmpty ? "Custom Name" : LocalizedStringKey(ramName.trimmed)
-        }
-        return ramName.trimmed.isEmpty ? "Choose a Ram" : LocalizedStringKey(ramName.trimmed)
+    private var ramRowTitle: String {
+        ramName.trimmed.isEmpty ? String(localized: "Choose a Ram") : ramName.trimmed
     }
 
     // MARK: - Closing the letter (seal or postcard)
@@ -1014,13 +1185,15 @@ struct ComposeLetterView: View {
             .padding(.top, 4)
             .animation(.easeInOut(duration: 0.25), value: paperStyle)
 
+            premiumTouchesSection
+
             // Two clearly separate panels. Seal: a gesture (wax colour,
             // then hold). Open: an ordinary tappable row.
             VStack(spacing: 12) {
                 waxPicker
 
                 VStack(spacing: 6) {
-                    if sealStyleRaw == SealStyle.prompt.rawValue {
+                    if SealStyle.resolved(voiceOver: voiceOverEnabled, switchControl: switchControlEnabled) == .prompt {
                         Button {
                             withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
                                 closure = .sealed
@@ -1049,37 +1222,13 @@ struct ComposeLetterView: View {
             .padding(16)
             .frame(maxWidth: .infinity)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    closure = .postcard
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "envelope.open")
-                        .font(.system(size: 17, weight: .medium))
-                    Text("Send open")
-                        .font(.body.weight(.medium))
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Send it open, as a postcard")
-            .sensoryFeedback(.selection, trigger: closure == .postcard)
         }
         .frame(maxWidth: .infinity)
     }
 
     /// Which paper the letter travels on.
     private var paperPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 4) {
             ForEach(EnvelopePaper.allCases) { option in
                 let isUnlocked = option.isIncludedFree || entitlementService.hasPastureExpansion
@@ -1129,6 +1278,7 @@ struct ComposeLetterView: View {
             }
             .frame(width: 44, height: 44)
         }
+        }
         .sensoryFeedback(.selection, trigger: waxPickTick)
     }
 
@@ -1137,6 +1287,7 @@ struct ComposeLetterView: View {
     /// swatch says so, tapping one opens the paywall, and nothing here
     /// ever blocks sending.
     private var waxPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
         HStack(spacing: 4) {
             ForEach(SealColor.allCases) { wax in
                 let isUnlocked = wax.isIncludedFree || entitlementService.hasPastureExpansion
@@ -1172,7 +1323,190 @@ struct ComposeLetterView: View {
                 .accessibilityAddTraits(sealColor == wax ? .isSelected : [])
             }
         }
+        }
         .sensoryFeedback(.selection, trigger: waxPickTick)
+    }
+
+    /// Three paid touches, folded under one disclosure so the ordinary
+    /// compose flow — most letters use none of them — stays exactly as
+    /// short as it always was. Locked entirely behind a single row until
+    /// the sender is on "Expand the Pasture"; opening it while locked
+    /// goes straight to the paywall instead of teasing three separate
+    /// dead ends.
+    @ViewBuilder
+    private var premiumTouchesSection: some View {
+        let isUnlocked = entitlementService.hasPastureExpansion
+
+        VStack(spacing: 0) {
+            Button {
+                if isUnlocked {
+                    withAnimation(.snappy) { isPremiumTouchesExpanded.toggle() }
+                } else {
+                    isPasturePaywallPresented = true
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "wand.and.stars")
+                        .foregroundStyle(.secondary)
+                    Text("Premium Touches")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer(minLength: 8)
+                    if !isUnlocked {
+                        Image(systemName: "lock.fill")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        Image(systemName: isPremiumTouchesExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if isUnlocked, isPremiumTouchesExpanded {
+                VStack(spacing: 14) {
+                    timeLockRow
+                    Divider()
+                    geoLockRow
+                    Divider()
+                    scratchSecretRow
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// Time-Capsule: locks decryption until a chosen moment.
+    private var timeLockRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $wantsTimeLock.animation(.snappy)) {
+                Label("Time-Capsule", systemImage: "lock.clock.fill")
+                    .font(.subheadline.weight(.medium))
+            }
+            if wantsTimeLock {
+                DatePicker("Unlocks", selection: $unlockAt, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                    .font(.subheadline)
+                Text("The letter still arrives on foot as usual — it just won't decrypt before this moment, even with the right ear tag.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Geo-Lock: locks decryption to a radius around a point — "right
+    /// here" at compose time, kept deliberately simple rather than a
+    /// whole second map picker for a letter that already has one
+    /// destination.
+    private var geoLockRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: Binding(
+                get: { wantsGeoLock },
+                set: { newValue in
+                    withAnimation(.snappy) {
+                        wantsGeoLock = newValue
+                        if newValue, geofenceCoordinate == nil {
+                            geofenceCoordinate = locationService.currentCoordinate
+                            if geofenceCoordinate == nil { locationService.resolveCurrentLocation() }
+                        }
+                    }
+                }
+            )) {
+                Label("Geo-Lock", systemImage: "location.fill")
+                    .font(.subheadline.weight(.medium))
+            }
+            if wantsGeoLock {
+                if let geofenceCoordinate {
+                    Label {
+                        Text("Locked to your spot right now (\(Int(geofenceRadiusMeters))m radius)")
+                    } icon: {
+                        Image(systemName: "mappin.circle.fill")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                } else {
+                    Label("Finding your location…", systemImage: "location.slash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .task {
+                            // Polled rather than `.onChange`, same reason as
+                            // elsewhere in this view: `CLLocationCoordinate2D`
+                            // isn't Equatable in a way `.onChange` can watch.
+                            locationService.resolveCurrentLocation()
+                            while geofenceCoordinate == nil, wantsGeoLock, !Task.isCancelled {
+                                try? await Task.sleep(for: .milliseconds(400))
+                                if let resolved = locationService.currentCoordinate {
+                                    geofenceCoordinate = resolved
+                                }
+                            }
+                        }
+                }
+                Picker("Radius", selection: $geofenceRadiusMeters) {
+                    Text("50 m").tag(50.0)
+                    Text("100 m").tag(100.0)
+                    Text("250 m").tag(250.0)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: .infinity)
+                Text("The ram still needs to reach \(recipientName.trimmed.isEmpty ? "the recipient" : recipientName.trimmed)'s city — this is a second, tighter lock on top of that, right down to the exact spot.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Scratch-Off Secret: a short second line, revealed only by
+    /// scratching it clear on arrival (`ScratchOffRevealView`).
+    private var scratchSecretRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $wantsScratchSecret.animation(.snappy)) {
+                Label("Scratch-Off Secret", systemImage: "sparkles")
+                    .font(.subheadline.weight(.medium))
+            }
+            if wantsScratchSecret {
+                TextField("A short secret line", text: $scratchSecretText, axis: .vertical)
+                    .lineLimit(1...3)
+                    .padding(10)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .onChange(of: scratchSecretText) { _, newValue in
+                        if newValue.count > 120 { scratchSecretText = String(newValue.prefix(120)) }
+                    }
+                Text("Travels sealed, alongside the letter itself. The recipient scratches it clear after opening the letter, not before.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// What the compose form actually hands to `Letter.write`, for the
+    /// three Premium Touches — `nil`/empty when a toggle is off, so an
+    /// ordinary letter is completely unaffected by this section existing.
+    private var composedUnlockAt: Date? { wantsTimeLock ? unlockAt : nil }
+
+    private var composedGeofence: LetterGeofence? {
+        guard wantsGeoLock, let geofenceCoordinate else { return nil }
+        return LetterGeofence(coordinate: geofenceCoordinate, radiusMeters: geofenceRadiusMeters)
+    }
+
+    private var composedScratchSecret: String? {
+        guard wantsScratchSecret else { return nil }
+        let trimmed = scratchSecretText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     /// The letter has gone into its envelope. The message field above is
@@ -1406,7 +1740,7 @@ struct ComposeLetterView: View {
                 } label: {
                     Label("Location access is off, so there's no starting city yet — tap to turn it on in Settings.", systemImage: "location.slash")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
             } else if locationService.isResolving {
@@ -1434,6 +1768,7 @@ struct ComposeLetterView: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             targetCity = ""
             targetCoordinate = nil
+            droppedDestination.wrappedValue = nil
             resetHandoffState()
             resolutionError = nil
             requirementNotice = nil
@@ -1457,9 +1792,274 @@ struct ComposeLetterView: View {
         // carry over. A deliberately abandoned letter takes its draft
         // with it.
         resetForm()
+        isCodeMode = false
+        sentByCode = nil
         draftStore.clear()
         draftSavedNotice = false
         onCancel()
+    }
+
+    // MARK: - Send by code
+
+    private func toggleCodeMode() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isCodeMode.toggle()
+            sentByCode = nil
+            resolutionError = nil
+            requirementNotice = nil
+            resetHandoffState()
+        }
+        if isCodeMode { onDestinationSelected() }
+    }
+
+    private func applyShepherdIDRequest(_ id: String?) {
+        guard let id else { return }
+        shepherdID = CourierCodeStore.formatted(id)
+        withAnimation { isCodeMode = true; sentByCode = nil }
+        shepherdIDRequest.wrappedValue = nil
+        onDestinationSelected()
+    }
+
+    /// The destination, as a code: the recipient's Shepherd ID (optional).
+    private var shepherdIDField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !savedCodes.saved.isEmpty {
+                savedCodeChips
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "number")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField("Their Shepherd ID (optional)", text: $shepherdID)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .keyboardType(.asciiCapable)
+                    .focused($isShepherdIDFocused)
+                    .onChange(of: shepherdID) { _, new in
+                        let formatted = CourierCodeStore.formatted(new)
+                        if formatted != new { shepherdID = formatted }
+                    }
+                    .onChange(of: isShepherdIDFocused) { _, focused in
+                        if focused { onDestinationSelected() }
+                    }
+                if hasShepherdID {
+                    Button { shepherdID = "" } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear")
+                }
+                // Save this code for next time — only once it's a whole,
+                // valid Shepherd ID, and only offered once (a code
+                // already on file shows a filled bookmark instead).
+                if hasShepherdID, shepherdIDIsValid {
+                    let alreadySaved = savedCodes.entry(forCode: shepherdID) != nil
+                    Button {
+                        if !alreadySaved { isSavingCode = true }
+                    } label: {
+                        Image(systemName: alreadySaved ? "bookmark.fill" : "bookmark")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(alreadySaved)
+                    .accessibilityLabel(alreadySaved ? "Already saved" : "Save this code")
+                }
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .background(.thinMaterial, in: Capsule())
+
+            Text(shepherdIDIsValid
+                 ? LocalizedStringKey("Know their Shepherd ID? The letter lands straight in their mailbag. Leave it empty and you'll get an ear tag to send them instead. They choose where the ram arrives.")
+                 : LocalizedStringKey("A Shepherd ID has 10 characters, like ABCDE-FGHJK."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .sheet(isPresented: $isSavingCode) {
+            SaveRecipientCodeSheet(code: CourierCodeStore.formatted(shepherdID)) { name, locationName, locationCoordinate, notes in
+                savedCodes.add(
+                    name: name,
+                    code: shepherdID,
+                    locationName: locationName,
+                    locationCoordinate: locationCoordinate.map { RamCoordinate(latitude: $0.latitude, longitude: $0.longitude) },
+                    notes: notes
+                )
+            }
+        }
+    }
+
+    /// Saved Shepherd IDs as a horizontal row of chips. Tapping one just
+    /// fills the field with that code — it never opens or navigates
+    /// anywhere else; picking a saved recipient is still "send by code".
+    private var savedCodeChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(savedCodes.saved) { entry in
+                    Button {
+                        shepherdID = entry.code
+                        isShepherdIDFocused = false
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .foregroundStyle(.secondary)
+                            Text(entry.name)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            CourierCodeStore.address(from: shepherdID) == CourierCodeStore.address(from: entry.code)
+                                ? AnyShapeStyle(Color.accentColor.opacity(0.18))
+                                : AnyShapeStyle(Color(uiColor: .tertiarySystemFill)),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+
+    /// What the sender sees once the letter is with the relay — right here,
+    /// in the sheet, not on another screen.
+    private func codeSentCard(_ result: SentByCode) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(.green)
+
+            if let earTag = result.earTag {
+                VStack(spacing: 6) {
+                    Text("Ear tag").font(.subheadline).foregroundStyle(.secondary)
+                    Text(earTag)
+                        .scaledFont(size: 30, weight: .semibold, design: .monospaced)
+                        .kerning(1)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .textSelection(.enabled)
+                    Text("One ear tag finds the letter and opens its seal.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                ShareLink(item: earTagShareMessage(earTag)) {
+                    Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .controlSize(.large)
+                .tint(Color.accentColor)
+            } else {
+                VStack(spacing: 6) {
+                    Text("It's in \(result.recipientName)'s mailbag")
+                        .font(.headline)
+                    Text("They'll see it the next time Baranov is open. There's nothing to send them.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+
+            Text("You'll get a notification when \(result.recipientName) claims it.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button("Write another") {
+                withAnimation { sentByCode = nil }
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func earTagShareMessage(_ earTag: String) -> String {
+        String(localized: "\(senderName) sent you a letter through Baranov. In the app, open the mailbag and type this ear tag: \(earTag). The same ear tag opens the seal when the ram arrives.")
+    }
+
+    private func sendByCode() async {
+        guard let relay else { return }
+        guard let origin = await awaitCurrentCoordinate() else {
+            withAnimation {
+                resolutionError = locationService.authorizationDenied
+                    ? "Location access is off, so there's no starting point. Turn it on in Settings, then try again."
+                    : "Couldn't find your starting location. Move somewhere with a clearer signal and try again."
+            }
+            sendAttemptWarningTick += 1
+            return
+        }
+
+        isSendingByCode = true
+        resolutionError = nil
+        defer { isSendingByCode = false }
+
+        // An addressed letter needs the recipient's public key first.
+        var recipientKey: Curve25519.KeyAgreement.PublicKey?
+        if hasShepherdID {
+            do {
+                recipientKey = try await relay.publicKey(ofAddress: CourierCodeStore.address(from: shepherdID))
+            } catch RelayError.notFound {
+                resolutionError = "Nobody has that Shepherd ID. Check it and try again."
+                sendAttemptWarningTick += 1
+                return
+            } catch {
+                resolutionError = LocalizedStringKey((error as? LocalizedError)?.errorDescription
+                    ?? String(localized: "The post office couldn't be reached. Try again."))
+                sendAttemptWarningTick += 1
+                return
+            }
+        }
+
+        let to = recipientName.trimmed
+        let written = Letter.write(
+            senderName: senderName,
+            recipientName: to,
+            messageBody: messageBody.trimmed,
+            sealColor: sealColor,
+            attachment: attachedPhoto?.jpegData(compressionQuality: 0.6),
+            unlockAt: composedUnlockAt,
+            geofence: composedGeofence,
+            scratchSecret: composedScratchSecret
+        )
+        var letter = written.letter
+        letter.paper = paper
+        letter.paperCustomHex = customPaperHex
+        let code = written.receivingCode
+
+        do {
+            var addressed: LetterRelayService.Recipient?
+            if let recipientKey {
+                let wrapped = try LetterKeyWrap.wrap(code: code, to: recipientKey)
+                addressed = LetterRelayService.Recipient(address: CourierCodeStore.address(from: shepherdID), wrappedKey: wrapped)
+            }
+            let id = try await relay.publish(
+                letter: letter,
+                code: code,
+                originName: currentCity.trimmed.isEmpty ? String(localized: "Somewhere") : currentCity.trimmed,
+                origin: origin,
+                ramName: nil,
+                addressedTo: addressed
+            )
+            outbox.add(letterID: letter.id, code: id, recipientName: to)
+            SoundEffectPlayer.shared.play(.dispatchWhoosh)
+            SharingInvitation.noteLetterSent()
+            draftStore.clear()
+            resetForm()
+            withAnimation { sentByCode = SentByCode(earTag: addressed == nil ? code : nil, recipientName: to) }
+        } catch {
+            // Nothing was published, so the key minted for this attempt is useless.
+            SealKeyVault.remove(for: letter.id)
+            resolutionError = LocalizedStringKey((error as? LocalizedError)?.errorDescription
+                ?? String(localized: "The post office couldn't accept that. Try again."))
+            sendAttemptWarningTick += 1
+        }
     }
 
     // MARK: - Sending
@@ -1473,6 +2073,13 @@ struct ComposeLetterView: View {
             return
         }
         requirementNotice = nil
+
+        // By code: the letter goes through the relay and the recipient's own
+        // ram brings it home, so none of the ram/route work below applies.
+        if isCodeMode {
+            await sendByCode()
+            return
+        }
 
         // A finished letter with no ram free to carry it: keep it, whole,
         // and open "Expand the Pasture" — never a dead slider, never a
@@ -1672,8 +2279,10 @@ struct ComposeLetterView: View {
     /// private one.
     private func makeLetter() -> Letter {
         var letter = makeUnpapered()
-        letter.paper = paper
-        letter.paperCustomHex = customPaperHex
+        if closure != .postcard {
+            letter.paper = paper
+            letter.paperCustomHex = customPaperHex
+        }
         return letter
     }
 
@@ -1692,7 +2301,10 @@ struct ComposeLetterView: View {
                 recipientName: recipientName.trimmed,
                 messageBody: messageBody.trimmed,
                 sealColor: sealColor,
-                attachment: attachedPhoto?.jpegData(compressionQuality: 0.6)
+                attachment: attachedPhoto?.jpegData(compressionQuality: 0.6),
+                unlockAt: composedUnlockAt,
+                geofence: composedGeofence,
+                scratchSecret: composedScratchSecret
             ).letter
         }
     }
@@ -1705,6 +2317,19 @@ struct ComposeLetterView: View {
             return
         }
         SoundEffectPlayer.shared.play(.dispatchWhoosh)
+        SharingInvitation.noteLetterSent()
+        // Tell the root a letter just left; it decides whether this is
+        // the first one and, if so, shows the payoff moment.
+        NotificationCenter.default.post(
+            name: .firstLetterDispatched,
+            object: nil,
+            userInfo: [
+                "recipient": recipientName.trimmed,
+                "ramName": ram.name,
+                "targetCity": ram.targetCity,
+                "meters": ram.totalStepsRequired
+            ]
+        )
         // The letter is on the road: nothing left to restore, and the
         // form is cleared for the next one. `trackedRam` in `JourneyView`
         // becomes non-nil immediately and its panel shows the journey on
@@ -1743,7 +2368,6 @@ struct ComposeLetterView: View {
             targetLatitude: targetCoordinate?.latitude,
             targetLongitude: targetCoordinate?.longitude,
             ramName: ramName.trimmed,
-            usesCustomRamName: showsCustomRamName,
             recipientName: recipientName.trimmed,
             messageBody: messageBody,
             sealColor: sealColor,
@@ -1762,12 +2386,14 @@ struct ComposeLetterView: View {
 
         targetCity = draft.targetCity
         targetCoordinate = draft.targetCoordinate
-        showsCustomRamName = draft.usesCustomRamName
         ramName = draft.ramName
         recipientName = draft.recipientName
         messageBody = draft.messageBody
-        sealColor = draft.sealColor
-        closure = draft.closure.map { $0 == .sealed ? LetterClosure.sealed : .postcard }
+        // A wax the person no longer has (a lapsed subscription) falls back
+        // to crimson rather than quietly sending a locked colour.
+        sealColor = (draft.sealColor.isIncludedFree || entitlementService.hasPastureExpansion) ? draft.sealColor : .crimson
+        // Every letter is encrypted now; a draft saved as an open postcard restarts at the seal.
+        closure = draft.closure == .sealed ? LetterClosure.sealed : nil
         // Only a letter that was actually slid and turned away gets the
         // "Saved to Drafts" notice back — and only while that's still
         // the situation.
@@ -1785,8 +2411,8 @@ struct ComposeLetterView: View {
         targetCoordinate = nil
         resetHandoffState()
         ramName = ""
-        showsCustomRamName = false
         recipientName = ""
+        shepherdID = ""
         messageBody = ""
         attachedPhoto = nil
         paper = .cream
@@ -1814,6 +2440,7 @@ private extension String {
 
 #Preview {
     ComposeLetterView(onDestinationSelected: {}, onCancel: {}, isPanelExpanded: false)
+        .environment(RelayOutbox())
         .environment(FlockViewModel.preview)
         .environment(EntitlementService())
         .environment(LocationService())

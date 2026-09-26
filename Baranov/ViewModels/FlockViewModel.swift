@@ -78,8 +78,11 @@ final class FlockViewModel {
 
     func startOrUpdateLiveActivity(for ram: Ram) {
         let state = contentState(for: ram)
-        if ActivityAuthorizationInfo().areActivitiesEnabled {
-            if let existing = liveActivities[ram.id] {
+        // One Live Activity for the whole flock: the ram that is walking now (or the
+        // first one). Other rams never spawn their own card.
+        let primary = activeRams.first(where: { $0.status == .walking }) ?? activeRams.first
+        if ActivityAuthorizationInfo().areActivitiesEnabled, primary == nil || primary?.id == ram.id {
+            if let existing = liveActivities[ram.id], existing.activityState == .active {
                 let now = Date()
                 if let last = lastActivityUpdate[ram.id], now.timeIntervalSince(last) < activityUpdateInterval {
                     // Throttle ActivityKit updates to avoid system limits
@@ -88,15 +91,32 @@ final class FlockViewModel {
                     Task { await existing.update(using: state) }
                 }
             } else {
-                let attrs = RamActivityAttributes(ramName: ram.name, fromCity: ram.currentCity, toCity: ram.targetCity)
-                do {
-                    let activity = try Activity.request(
-                        attributes: attrs,
-                        content: .init(state: state, staleDate: Date().addingTimeInterval(30 * 60))
-                    )
-                    liveActivities[ram.id] = activity
+                liveActivities.removeValue(forKey: ram.id)
+                // After a relaunch our in-memory map is empty but the system may still be
+                // showing the old card: adopt a matching one, and end every other leftover.
+                let leftovers = Activity<RamActivityAttributes>.activities
+                let adopted = leftovers.first {
+                    $0.attributes.ramName == ram.name && $0.attributes.toCity == ram.targetCity
+                }
+                for old in leftovers where old.id != adopted?.id {
+                    Task { await old.end(nil, dismissalPolicy: .immediate) }
+                }
+                liveActivities.removeAll()
+                if let adopted {
+                    liveActivities[ram.id] = adopted
                     lastActivityUpdate[ram.id] = Date()
-                } catch { /* not supported or authorized */ }
+                    Task { await adopted.update(using: state) }
+                } else {
+                    let attrs = RamActivityAttributes(ramName: ram.name, fromCity: ram.currentCity, toCity: ram.targetCity)
+                    do {
+                        let activity = try Activity.request(
+                            attributes: attrs,
+                            content: .init(state: state, staleDate: Date().addingTimeInterval(30 * 60))
+                        )
+                        liveActivities[ram.id] = activity
+                        lastActivityUpdate[ram.id] = Date()
+                    } catch { /* not supported or authorized */ }
+                }
             }
         }
         PhoneWatchSessionManager.shared.syncRamState(
@@ -170,8 +190,11 @@ final class FlockViewModel {
     var hasFreeRamSlot: Bool {
         // A ram that has been passed to another carrier is kept here as
         // history, not as livestock: it walks on nobody's steps and must
-        // not go on occupying a pen the person has paid for.
-        activeRams.filter { $0.status != .handedOff }.count < maxAllowedRams
+        // not go on occupying a pen the person has paid for. The same
+        // goes for a ram that has reached the gate: it has left the
+        // letter there for the recipient to walk over and collect, so it
+        // is free to carry the next one.
+        activeRams.filter { $0.status != .handedOff && $0.status != .arrivedAtGate }.count < maxAllowedRams
     }
 
     /// Whether importing this AirDropped package would be admitted right
@@ -261,14 +284,35 @@ final class FlockViewModel {
         let trimmed = placeName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !ram.hasStamp(named: trimmed) else { return }
 
-        ram.stamps.append(JourneyStamp(
+        let stamp = JourneyStamp(
             placeName: trimmed,
             kind: kind,
             latitude: coordinate?.latitude ?? 0,
             longitude: coordinate?.longitude ?? 0,
             stepsAtStamp: ram.journeyStepsSoFar,
             carrierName: Self.currentCarrierName(fallback: ram.name)
-        ))
+        )
+        ram.stamps.append(stamp)
+
+        // Best-effort and fully offline-safe: the stamp exists immediately,
+        // and the sky is written onto it only if the lookup succeeds.
+        if let coordinate {
+            let stampId = stamp.id
+            Task { [weak self] in
+                guard let weather = await WeatherSnapshotService.snapshot(at: coordinate) else { return }
+                self?.attachWeather(weather, toStamp: stampId)
+            }
+        }
+    }
+
+    /// Writes a late-arriving weather reading onto the stamp it belongs to,
+    /// wherever that stamp lives now.
+    private func attachWeather(_ weather: StampWeather, toStamp stampId: UUID) {
+        for ramIndex in activeRams.indices {
+            guard let stampIndex = activeRams[ramIndex].stamps.firstIndex(where: { $0.id == stampId }) else { continue }
+            activeRams[ramIndex].stamps[stampIndex].weather = weather
+            return
+        }
     }
 
     /// Whoever is holding the ram right now — the person's own name from
@@ -299,24 +343,29 @@ final class FlockViewModel {
     /// delivered. Throws `LetterCipherError.wrongCode` — and changes
     /// nothing — if the code doesn't fit. No-ops unless the ram has
     /// actually arrived at the recipient's gate.
-    func openDeliveredLetter(ramId: UUID, receivingCode: String) throws {
+    /// `currentCoordinate` is only consulted when the letter carries a
+    /// Geo-Lock (paid) — pass the device's best current fix so an
+    /// `.outsideGeofence` throw actually reflects reality; omitting it on
+    /// a geofenced letter fails closed rather than skipping the check.
+    func openDeliveredLetter(ramId: UUID, receivingCode: String, currentCoordinate: CLLocationCoordinate2D? = nil) throws {
         guard let index = activeRams.firstIndex(where: { $0.id == ramId }) else { return }
         var ram = activeRams[index]
         guard ram.status == .arrivedAtGate, var letter = ram.letter else { return }
-        try letter.open(withReceivingCode: receivingCode)
+        try letter.open(withReceivingCode: receivingCode, currentCoordinate: currentCoordinate)
         ram.letter = letter
         ram.status = .delivered
         activeRams[index] = ram
     }
 
     /// Opens one of the passenger letters riding on a ram that has reached
-    /// the gate, for a recipient standing there with its code.
-    func openPassengerLetter(ramId: UUID, letterId: UUID, receivingCode: String) throws {
+    /// the gate, for a recipient standing there with its code. See
+    /// `openDeliveredLetter` for what `currentCoordinate` is for.
+    func openPassengerLetter(ramId: UUID, letterId: UUID, receivingCode: String, currentCoordinate: CLLocationCoordinate2D? = nil) throws {
         guard let index = activeRams.firstIndex(where: { $0.id == ramId }),
               let letterIndex = activeRams[index].passengerLetters.firstIndex(where: { $0.id == letterId })
         else { return }
         var letter = activeRams[index].passengerLetters[letterIndex]
-        try letter.open(withReceivingCode: receivingCode)
+        try letter.open(withReceivingCode: receivingCode, currentCoordinate: currentCoordinate)
         activeRams[index].passengerLetters[letterIndex] = letter
     }
 

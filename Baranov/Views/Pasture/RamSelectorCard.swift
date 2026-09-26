@@ -97,12 +97,11 @@ struct RamSelectorCard: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             onPassportTapped(ram)
                         } label: {
-                            Label("Passport", systemImage: "book.closed")
+                            Image(systemName: "map.fill")
                         }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                        .controlSize(.small)
-                        .accessibilityHint("Shows \(ram.name)'s passport and stamped visas")
+                        .glassIconButton()
+                        .accessibilityLabel("Passport & Journeys")
+                        .accessibilityHint("Shows every journey \(ram.name) has walked on a map, with its stamps")
                     }
                 }
                 .animation(.easeInOut(duration: 0.25), value: ram.id)
@@ -136,13 +135,27 @@ struct RamSelectorCard: View {
                     }
 
                     Spacer(minLength: 8)
+
+                    // The passport exists from day one, before any letter
+                    // has walked: an empty book waiting for its first stamp.
+                    if let onPassportTapped {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onPassportTapped(Ram.restingStub(for: companion))
+                        } label: {
+                            Image(systemName: "map.fill")
+                        }
+                        .glassIconButton()
+                        .accessibilityLabel("Passport & Journeys")
+                        .accessibilityHint("Opens \(companion.name)'s passport, ready for its first stamp")
+                    }
                 }
             }
         }
         .padding(14)
         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .alert("Rename Ram", isPresented: $isRenamePresented) {
-            TextField("Ram's Name", text: $renameDraft)
+            TextField("Ram's name", text: $renameDraft)
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 let trimmed = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -32,7 +32,6 @@ struct LetterDraft: Codable, Equatable, Sendable {
     var targetLatitude: Double?
     var targetLongitude: Double?
     var ramName: String
-    var usesCustomRamName: Bool
     var recipientName: String
     var messageBody: String
     var sealColor: SealColor

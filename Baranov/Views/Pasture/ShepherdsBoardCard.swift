@@ -15,21 +15,38 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ShepherdsBoardCard: View {
     let experiencePoints: Int
     let progress: ShepherdAchievement.Progress
     let isAuthenticated: Bool
+    /// GameKit hasn't answered yet — show "checking", never a sign-in button.
+    var isCheckingSignIn = false
     let isLoading: Bool
+    @Binding var scope: LeaderboardScope
     let topEntries: [LeaderboardRow]
     let localEntry: LeaderboardRow?
     let totalPlayers: Int
+    /// Titles and unlock texts from App Store Connect, keyed by achievement id.
+    var achievementInfo: [String: GameCenterAchievementInfo] = [:]
+    /// Achievements Game Center already lists as completed for this player.
+    var remoteCompletedIDs: Set<String> = []
+    /// The player's Game Center friends and whether we may read them.
+    var friends: [GameCenterFriend] = []
+    var friendsAccess: FriendsAccess = .unknown
+    /// Why the table is empty when it isn't simply "nobody yet".
+    var boardMessage: String? = nil
     let onSignInTapped: () -> Void
+    var onRequestFriends: () -> Void = {}
+    var onOpenFullBoard: () -> Void = {}
 
     @State private var earnedTick = 0
+    @State private var selectedAchievement: ShepherdAchievement = .firstLetter
 
     private var earned: Set<ShepherdAchievement> {
         Set(ShepherdAchievement.earned(progress))
+            .union(ShepherdAchievement.allCases.filter { remoteCompletedIDs.contains($0.rawValue) })
     }
 
     var body: some View {
@@ -68,7 +85,7 @@ struct ShepherdsBoardCard: View {
                 trigger: experiencePoints
             ) { values in
                 Text("\(experiencePoints)")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .scaledFont(size: 34, weight: .bold, design: .rounded)
                     .monospacedDigit()
                     .contentTransition(.numericText(countsDown: false))
                     .scaleEffect(values.scale, anchor: .bottom)
@@ -99,7 +116,7 @@ struct ShepherdsBoardCard: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(isAuthenticated ? "Not ranked yet" : "Not signed in")
+                    Text(isAuthenticated ? "Not ranked yet" : (isCheckingSignIn ? "Checking…" : "Not signed in"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -116,17 +133,165 @@ struct ShepherdsBoardCard: View {
 
     @ViewBuilder
     private var board: some View {
-        if !isAuthenticated {
-            Button(action: onSignInTapped) {
+        if isCheckingSignIn {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Checking Game Center…")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        } else if !isAuthenticated {
+            signInRow
+        } else {
+            VStack(spacing: 10) {
+                Picker("Table", selection: $scope) {
+                    ForEach(LeaderboardScope.allCases) { option in
+                        Text(option.title).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                tableContent
+            }
+        }
+    }
+
+    private var signInRow: some View {
+        Button(action: onSignInTapped) {
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.title3)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Sign in to Game Center")
+                        .font(.subheadline.weight(.semibold))
+                    Text("See where you stand among other shepherds.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(10)
+            .background(.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var tableContent: some View {
+        if scope == .friends, friendsAccess != .authorized {
+            friendsAccessRow
+        } else {
+            if topEntries.isEmpty {
+                HStack(spacing: 8) {
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(emptyMessage)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                VStack(spacing: 6) {
+                    ForEach(Array(topEntries.enumerated()), id: \.element.id) { index, row in
+                        boardRow(row)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .move(edge: .trailing)
+                                        .combined(with: .opacity)
+                                        .animation(.spring(response: 0.45, dampingFraction: 0.8)
+                                            .delay(Double(min(index, 5)) * 0.05)),
+                                    removal: .opacity
+                                )
+                            )
+                    }
+                    if let localEntry, !topEntries.contains(where: { $0.isLocalPlayer }) {
+                        Divider().padding(.vertical, 2)
+                        boardRow(localEntry)
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
+                    }
+                }
+            }
+            if scope == .friends {
+                unrankedFriends
+            }
+        }
+    }
+
+    private var emptyMessage: LocalizedStringKey {
+        if isLoading { return "Fetching the table…" }
+        if let boardMessage { return LocalizedStringKey(boardMessage) }
+        return scope == .friends
+            ? "None of your friends are on the table yet."
+            : "The table is empty — be the first shepherd on it."
+    }
+
+    /// Friends who haven't earned a place yet, so the list is never
+    /// missing anyone the player expects to see.
+    @ViewBuilder
+    private var unrankedFriends: some View {
+        let ranked = Set(topEntries.map(\.id))
+        let others = friends.filter { !ranked.contains($0.id) }
+        if !others.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Friends not on the table yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                ForEach(others.prefix(10)) { friend in
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 28, height: 28)
+                        Text(friend.displayName)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var friendsAccessRow: some View {
+        if friendsAccess == .denied {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Friends are turned off for Baranov.")
+                    .font(.subheadline.weight(.semibold))
+                Text("Allow Baranov to see your Game Center friends in Settings to compare tables.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    Link("Open Settings", destination: url)
+                        .font(.footnote.weight(.semibold))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            Button(action: onRequestFriends) {
                 HStack(spacing: 10) {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
+                    Image(systemName: "person.2.fill")
                         .font(.title3)
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.tint)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Sign in to Game Center")
+                        Text("Show my friends")
                             .font(.subheadline.weight(.semibold))
-                        Text("See where you stand among other shepherds.")
+                        Text("Game Center will ask once before Baranov can see them.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -139,36 +304,6 @@ struct ShepherdsBoardCard: View {
                 .background(.background.opacity(0.5), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
-        } else if topEntries.isEmpty {
-            HStack(spacing: 8) {
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Text(isLoading ? "Fetching the board…" : "The board is empty — be the first shepherd on it.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-        } else {
-            VStack(spacing: 6) {
-                ForEach(Array(topEntries.enumerated()), id: \.element.id) { index, row in
-                    boardRow(row)
-                        .transition(
-                            .asymmetric(
-                                insertion: .move(edge: .trailing)
-                                    .combined(with: .opacity)
-                                    .animation(.spring(response: 0.45, dampingFraction: 0.8)
-                                        .delay(Double(index) * 0.05)),
-                                removal: .opacity
-                            )
-                        )
-                }
-                if let localEntry, !topEntries.contains(where: { $0.isLocalPlayer }) {
-                    Divider().padding(.vertical, 2)
-                    boardRow(localEntry)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-            }
         }
     }
 
@@ -202,79 +337,139 @@ struct ShepherdsBoardCard: View {
 
     private var achievements: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text("Badges")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .textCase(.uppercase)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("\(earned.count) of \(ShepherdAchievement.allCases.count)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
             }
 
+            // Pictures only: the card's front is the badge, and turning it
+            // over (tap) tells its story. Generous spacing and vertical
+            // room so the selected card can lift and flip without being
+            // clipped by the row.
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 12) {
-                    ForEach(ShepherdAchievement.allCases) { achievement in
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(Array(ShepherdAchievement.allCases.enumerated()), id: \.element.id) { index, achievement in
                         AchievementBadge(
                             achievement: achievement,
+                            title: title(for: achievement),
                             isEarned: earned.contains(achievement),
-                            fraction: achievement.fraction(progress)
-                        )
+                            fraction: achievement.fraction(progress),
+                            isSelected: achievement == selectedAchievement,
+                            // The same hand-placed tilts as the passport's milestones.
+                            tilt: [-2.0, 1.5, -1.0, 2.0, -1.5, 1.0][index % 6]
+                        ) {
+                            withAnimation(.snappy) { selectedAchievement = achievement }
+                        }
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, 12)
+                .padding(.horizontal, 4)
             }
+            .sensoryFeedback(.selection, trigger: selectedAchievement)
         }
+    }
+
+    private func title(for achievement: ShepherdAchievement) -> String {
+        let remote = achievementInfo[achievement.rawValue]?.title ?? ""
+        return remote.isEmpty ? achievement.title : remote
     }
 }
 
-/// One badge: a ring that fills toward the goal, a tinted disc once
-/// earned, the title underneath. Tapping it explains what it's for.
+/// One badge, drawn with the same collectible card face as the passport's
+/// Milestones (`FeatCardFace`) so the two read as one family. Scaled down to
+/// sit in a row; tapping turns the card over.
 private struct AchievementBadge: View {
     let achievement: ShepherdAchievement
+    let title: String
     let isEarned: Bool
     let fraction: Double
+    let isSelected: Bool
+    let tilt: Double
+    let onSelect: () -> Void
 
-    @State private var showsCaption = false
+    private var feat: Feat {
+        let color: Color
+        let rarity: FeatRarity
+        switch achievement {
+        case .firstLetter: color = .orange; rarity = .common
+        case .sealBroken: color = .red; rarity = .common
+        case .tenKilometres: color = .teal; rarity = .rare
+        case .hundredKilometres: color = .indigo; rarity = .legendary
+        case .oceanCrossing: color = .blue; rarity = .rare
+        case .fullPasture: color = .purple; rarity = .legendary
+        }
+        return Feat(id: achievement.rawValue, symbol: achievement.symbolName,
+                    title: LocalizedStringKey(title),
+                    earnedLine: achievement.localizedCaption, lockedLine: achievement.localizedCaption,
+                    targetMeters: nil, isEarned: isEarned, color: color, rarity: rarity,
+                    progress: fraction)
+    }
+
+    @State private var isFlipped = false
 
     var body: some View {
         Button {
-            withAnimation(.snappy) { showsCaption.toggle() }
+            withAnimation(.spring(duration: 0.5, bounce: 0.3)) { isFlipped.toggle() }
+            onSelect()
         } label: {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.secondary.opacity(0.2), lineWidth: 3)
-                    Circle()
-                        .trim(from: 0, to: isEarned ? 1 : fraction)
-                        .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut(duration: 0.6), value: fraction)
-                    Circle()
-                        .fill(isEarned ? AnyShapeStyle(Color.accentColor.gradient) : AnyShapeStyle(.thinMaterial))
-                        .padding(6)
-                    Image(systemName: achievement.symbolName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(isEarned ? Color.white : Color.secondary)
-                        .symbolEffect(.bounce, value: isEarned)
-                }
-                .frame(width: 58, height: 58)
-
-                Text(showsCaption ? achievement.localizedCaption : achievement.localizedTitle)
-                    .font(.caption2.weight(isEarned ? .semibold : .regular))
-                    .foregroundStyle(isEarned ? .primary : .secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(showsCaption ? nil : 2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: showsCaption ? 170 : 74)
-                    .contentTransition(.opacity)
+            // The same double-sided card as the passport's milestones: tap
+            // to turn it over, tap again to turn it back. The name and the
+            // story are on the back; nothing is repeated under the card.
+            FlippingCard(angle: isFlipped ? 180 : 0) {
+                FeatCardFace(feat: feat, totalMeters: 0, side: .front)
+            } back: {
+                FeatCardFace(feat: feat, totalMeters: 0, side: .back)
             }
+            .frame(width: 156, height: 212)
+            .rotationEffect(.degrees(tilt))
+            .scaleEffect(isSelected ? 1.04 : 1)
+            .animation(.spring(duration: 0.35, bounce: 0.45), value: isSelected)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(achievement.title), \(isEarned ? "earned" : "\(Int(fraction * 100)) percent")")
-        .accessibilityHint(achievement.caption)
+        .sensoryFeedback(.impact(weight: .light), trigger: isFlipped)
+        .accessibilityLabel("\(title), \(isEarned ? "earned" : "\(Int(fraction * 100)) percent")")
+        .accessibilityValue(achievement.caption)
+        .accessibilityHint("Turns the card over")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
+/// A card that turns over. The angle is animatable, and the face drawn
+/// follows it — front up to the edge-on midpoint, back after, pre-mirrored
+/// so its text reads the right way round. Drawing one face at a time (rather
+/// than stacking both and fading) means the back can never be hidden behind
+/// the picture.
+private struct FlippingCard<Front: View, Back: View>: View, Animatable {
+    var angle: Double
+    @ViewBuilder let front: () -> Front
+    @ViewBuilder let back: () -> Back
+
+    init(angle: Double, @ViewBuilder front: @escaping () -> Front, @ViewBuilder back: @escaping () -> Back) {
+        self.angle = angle
+        self.front = front
+        self.back = back
+    }
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    var body: some View {
+        ZStack {
+            if angle < 90 {
+                front()
+            } else {
+                back().rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            }
+        }
+        .rotation3DEffect(.degrees(angle), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
     }
 }
 
@@ -284,6 +479,7 @@ private struct AchievementBadge: View {
         progress: .init(ramsDispatched: 3, lettersDelivered: 1, metresWalked: 24_000, handoffsMade: 0, mostRamsAtOnce: 2),
         isAuthenticated: true,
         isLoading: false,
+        scope: .constant(.everyone),
         topEntries: [
             LeaderboardRow(id: "a", rank: 1, displayName: "Marta", score: 4_120, isLocalPlayer: false),
             LeaderboardRow(id: "b", rank: 2, displayName: "Teo", score: 2_300, isLocalPlayer: false),
@@ -302,6 +498,7 @@ private struct AchievementBadge: View {
         progress: .init(ramsDispatched: 0, lettersDelivered: 0, metresWalked: 0, handoffsMade: 0, mostRamsAtOnce: 0),
         isAuthenticated: false,
         isLoading: false,
+        scope: .constant(.everyone),
         topEntries: [],
         localEntry: nil,
         totalPlayers: 0,

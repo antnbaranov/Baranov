@@ -28,7 +28,26 @@
 //  the sender chooses at compose time by either pressing a wax seal into
 //  the letter or leaving it open.
 //
+//  Three paid-only locks, each independent and each optional, gate a
+//  sealed letter's decryption on top of the receiving code itself:
+//
+//  - `unlockAt` (Time-Capsule): won't decrypt before this moment, even
+//    with the right code.
+//  - `geofence` (Geo-Lock): won't decrypt until the device is physically
+//    within `geofence.radiusMeters` of a point the sender chose.
+//  - `sealedScratchSecret` (Scratch-Off Secret): a second, short line
+//    that decrypts alongside the body but stays hidden behind a
+//    scratchable foil on screen (`ScratchOffRevealView`) even after the
+//    seal itself is broken — a reveal-within-a-reveal.
+//
+//  None of these apply to an open postcard: postcards have no receiving
+//  code to hang a lock on, and are the deliberately low-ceremony tier —
+//  every extra lock here is something a subscriber adds to a *sealed*
+//  letter, never a new way to gate reading one at all (see
+//  `PasturePaywallView`'s "no letter is ever behind this screen").
+//
 
+import CoreLocation
 import Foundation
 
 struct Letter: Identifiable, Codable, Sendable, Hashable {
@@ -56,6 +75,20 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     /// `#RRGGBB` picked on the colour wheel; overrides `paper` when set.
     var paperCustomHex: String?
 
+    /// Time-Capsule (paid). `nil` means no time lock. See `isTimeLocked`.
+    private(set) var unlockAt: Date?
+    /// Geo-Lock (paid). `nil` means no geo-lock. See `isOutsideGeofence(of:)`.
+    private(set) var geofence: LetterGeofence?
+    /// Scratch-Off Secret (paid): sealed exactly like `attachment`, under
+    /// the same per-letter key, so it travels as ciphertext and decrypts
+    /// the moment the main seal breaks — it just isn't *shown* yet.
+    private(set) var sealedScratchSecret: Data?
+    /// The secret line's plain text, once this device may show it. Still
+    /// hidden behind the scratch-off foil in the UI even once this is
+    /// set — `hasScratchedSecret` (view-local, not persisted) is what
+    /// actually reveals it on screen.
+    private(set) var revealedScratchSecret: String?
+
     // MARK: - Writing a letter
 
     /// Writes an *open postcard*: a letter that travels unencrypted, in
@@ -64,6 +97,9 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     /// and nothing goes in `SealKeyVault`. The arrival ritual still runs
     /// (`isSealed` starts true) — the recipient lifts the postcard out of
     /// the satchel — it just opens without a code.
+    ///
+    /// No Time-Capsule, Geo-Lock, or Scratch-Off Secret here: those hang
+    /// off the receiving code a postcard doesn't have.
     static func writeOpen(
         senderName: String,
         recipientName: String,
@@ -108,7 +144,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         recipientName: String,
         messageBody: String,
         sealColor: SealColor = .crimson,
-        attachment: Data? = nil
+        attachment: Data? = nil,
+        unlockAt: Date? = nil,
+        geofence: LetterGeofence? = nil,
+        scratchSecret: String? = nil
     ) -> (letter: Letter, receivingCode: String) {
         let code = generateReceivingCode()
         let letter = Letter(
@@ -117,7 +156,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
             messageBody: messageBody,
             receivingCode: code,
             sealColor: sealColor,
-            attachment: attachment
+            attachment: attachment,
+            unlockAt: unlockAt,
+            geofence: geofence,
+            scratchSecret: scratchSecret
         )
         SealKeyVault.store(code, for: letter.id)
         return (letter, code)
@@ -125,8 +167,9 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
 
     /// Seals `messageBody` with `receivingCode`. Pass `isSealed: false`
     /// only for a letter that should start out open (previews, an
-    /// already-delivered fixture) — its plaintext is then kept as
-    /// `revealedBody` too.
+    /// already-delivered fixture) — its plaintext, attachment and
+    /// scratch secret are then kept revealed too, and its locks (if any)
+    /// are assumed already satisfied.
     init(
         id: UUID = UUID(),
         senderName: String,
@@ -136,7 +179,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         createdAt: Date = Date(),
         receivingCode: String,
         sealColor: SealColor = .crimson,
-        attachment: Data? = nil
+        attachment: Data? = nil,
+        unlockAt: Date? = nil,
+        geofence: LetterGeofence? = nil,
+        scratchSecret: String? = nil
     ) {
         self.id = id
         self.senderName = senderName
@@ -144,6 +190,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         self.isSealed = isSealed
         self.createdAt = createdAt
         self.sealColor = sealColor
+        self.unlockAt = unlockAt
+        self.geofence = geofence
         // Sealing can only fail if CryptoKit itself fails to seal a few
         // bytes with a fresh key — not a condition worth crashing a letter
         // over; an empty body simply reads as an empty letter.
@@ -153,6 +201,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
             try? LetterCipher.sealData($0, receivingCode: receivingCode, letterID: id)
         }
         self.revealedAttachment = isSealed ? nil : attachment
+        self.sealedScratchSecret = scratchSecret.flatMap {
+            try? LetterCipher.sealData(Data($0.utf8), receivingCode: receivingCode, letterID: id)
+        }
+        self.revealedScratchSecret = isSealed ? nil : scratchSecret
     }
 
     // MARK: - Reading a letter
@@ -182,20 +234,85 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         return SealKeyVault.code(for: id)
     }
 
-    /// Breaks the seal: decrypts the body with `code` and marks the letter
-    /// open. Throws `LetterCipherError.wrongCode` if the code doesn't fit,
-    /// leaving the letter exactly as it was.
-    mutating func open(withReceivingCode code: String) throws {
+    /// Whether this letter carries any paid lock beyond the receiving
+    /// code itself — used by the arrival screen to decide whether it
+    /// needs to show a countdown, a "get closer" prompt, or neither.
+    var hasExtraLock: Bool { unlockAt != nil || geofence != nil }
+
+    /// Whether a Time-Capsule letter's clock hasn't struck yet. Always
+    /// `false` for a letter with no `unlockAt`.
+    var isTimeLocked: Bool {
+        guard let unlockAt else { return false }
+        return Date() < unlockAt
+    }
+
+    /// Whether a Geo-Lock letter's recipient is still too far from the
+    /// drop point to open it. `coordinate == nil` (no location fix yet)
+    /// counts as "still outside" — the lock fails closed, never open, on
+    /// a missing fix. Always `false` for a letter with no `geofence`.
+    func isOutsideGeofence(of coordinate: CLLocationCoordinate2D?) -> Bool {
+        guard let geofence else { return false }
+        guard let coordinate else { return true }
+        return !geofence.contains(coordinate)
+    }
+
+    /// How far the recipient still has to travel to satisfy a Geo-Lock,
+    /// or `nil` when there's no geofence, no location fix, or they're
+    /// already inside the radius.
+    func geofenceDistanceRemaining(from coordinate: CLLocationCoordinate2D?) -> CLLocationDistance? {
+        guard let geofence, let coordinate else { return nil }
+        let remaining = geofence.distance(from: coordinate) - geofence.radiusMeters
+        return remaining > 0 ? remaining : nil
+    }
+
+    /// Whether this letter has a Scratch-Off Secret at all — independent
+    /// of whether it's been scratched clear yet, which is view-local
+    /// state (`ScratchOffRevealView` never persists "scratched", by
+    /// design: the moment is meant to happen once, live).
+    var hasScratchSecret: Bool { sealedScratchSecret != nil }
+
+    /// The secret line's plain text, once this device holds it — `nil`
+    /// until the seal breaks, exactly like `messageBody`.
+    var scratchSecretText: String? { revealedScratchSecret }
+
+    /// Breaks the seal: decrypts the body with `code` and marks the
+    /// letter open. Throws `LetterCipherError.wrongCode` if the code
+    /// doesn't fit, `.timeLocked` if a Time-Capsule's clock hasn't struck
+    /// yet, or `.outsideGeofence` if a Geo-Lock's radius isn't satisfied
+    /// — leaving the letter exactly as it was in every failure case.
+    ///
+    /// `currentCoordinate` only matters when `geofence` is set; pass the
+    /// device's best current fix. Omitting it on a geofenced letter fails
+    /// closed (`.outsideGeofence(metersAway: nil)`) rather than silently
+    /// skipping the check.
+    mutating func open(withReceivingCode code: String, currentCoordinate: CLLocationCoordinate2D? = nil) throws {
         if !isEncrypted, revealedBody != nil {
             // An open postcard (or a legacy letter that shipped its
-            // plaintext); nothing to decrypt, no code needed.
+            // plaintext); nothing to decrypt, no locks to check.
             isSealed = false
             return
         }
+
+        if let unlockAt, Date() < unlockAt {
+            throw LetterCipherError.timeLocked(until: unlockAt)
+        }
+        if let geofence {
+            guard let currentCoordinate else {
+                throw LetterCipherError.outsideGeofence(metersAway: nil)
+            }
+            guard geofence.contains(currentCoordinate) else {
+                throw LetterCipherError.outsideGeofence(metersAway: geofence.distance(from: currentCoordinate))
+            }
+        }
+
         let body = try LetterCipher.open(sealedBody, receivingCode: code, letterID: id)
         revealedBody = body
         if let attachment {
             revealedAttachment = try? LetterCipher.openData(attachment, receivingCode: code, letterID: id)
+        }
+        if let sealedScratchSecret {
+            let plain = try? LetterCipher.openData(sealedScratchSecret, receivingCode: code, letterID: id)
+            revealedScratchSecret = plain.flatMap { String(data: $0, encoding: .utf8) }
         }
         isSealed = false
         SealKeyVault.store(code, for: id)
@@ -205,15 +322,17 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
 
     private enum CodingKeys: String, CodingKey {
         case id, senderName, recipientName, sealedBody, revealedBody, isSealed, createdAt, sealColor, attachment, revealedAttachment, paper, paperCustomHex
+        case unlockAt, geofence, sealedScratchSecret, revealedScratchSecret
         // Legacy keys from builds before letters were actually encrypted.
         case messageBody, receivingCode
     }
 
     /// A hand-written decode so a `.ram` package or cache written by an
     /// older build still lands: those carried `messageBody` in the clear
-    /// and had no `sealedBody`/`sealColor`. Offline-first resilience means
-    /// a letter already mid-journey must keep loading, not vanish because
-    /// the wire format grew.
+    /// and had no `sealedBody`/`sealColor`, and every build before the
+    /// three paid locks existed simply has none of them. Offline-first
+    /// resilience means a letter already mid-journey must keep loading,
+    /// not vanish because the wire format grew.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -226,6 +345,10 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         revealedAttachment = try container.decodeIfPresent(Data.self, forKey: .revealedAttachment)
         paper = try container.decodeIfPresent(EnvelopePaper.self, forKey: .paper) ?? .cream
         paperCustomHex = try container.decodeIfPresent(String.self, forKey: .paperCustomHex)
+        unlockAt = try container.decodeIfPresent(Date.self, forKey: .unlockAt)
+        geofence = try container.decodeIfPresent(LetterGeofence.self, forKey: .geofence)
+        sealedScratchSecret = try container.decodeIfPresent(Data.self, forKey: .sealedScratchSecret)
+        revealedScratchSecret = try container.decodeIfPresent(String.self, forKey: .revealedScratchSecret)
 
         if let sealed = try container.decodeIfPresent(Data.self, forKey: .sealedBody) {
             sealedBody = sealed
@@ -254,20 +377,18 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         try container.encodeIfPresent(revealedAttachment, forKey: .revealedAttachment)
         try container.encode(paper, forKey: .paper)
         try container.encodeIfPresent(paperCustomHex, forKey: .paperCustomHex)
+        try container.encodeIfPresent(unlockAt, forKey: .unlockAt)
+        try container.encodeIfPresent(geofence, forKey: .geofence)
+        try container.encodeIfPresent(sealedScratchSecret, forKey: .sealedScratchSecret)
+        try container.encodeIfPresent(revealedScratchSecret, forKey: .revealedScratchSecret)
     }
 
     // MARK: - Receiving codes
 
-    /// A fresh, human-typeable receiving code — grouped `XXXX-XXXX` for
-    /// readability, drawn from an alphabet that leaves out characters
-    /// that are easy to mix up when read off a phone screen or typed in
-    /// by hand (`0`/`O`, `1`/`I`/`L`).
+    /// A fresh letter code — the one code that both finds the letter at the
+    /// relay and opens its seal (see `LetterCode`).
     static func generateReceivingCode() -> String {
-        let alphabet = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
-        let characters = (0..<8).map { _ in alphabet.randomElement()! }
-        let first = String(characters[0..<4])
-        let second = String(characters[4..<8])
-        return "\(first)-\(second)"
+        LetterCode.generate()
     }
 
     /// A ready-to-send message handing this letter's receiving code to

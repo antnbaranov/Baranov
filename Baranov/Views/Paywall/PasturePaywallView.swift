@@ -65,7 +65,7 @@ struct PasturePaywallView: View {
     @State private var demoWax: SealColor = .crimson
     @State private var waxTick = 0
 
-    private let privacyPolicyURL = URL(string: "https://github.com/antnbaranov/Baranov/blob/main/PRIVACY.md")!
+    @State private var legalDocument: LegalDocument?
     private let termsOfUseURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 
     private var companionName: String {
@@ -100,16 +100,14 @@ struct PasturePaywallView: View {
             .background(.regularMaterial)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .symbolRenderingMode(.hierarchical)
+                // Same standard close control as Pasture.
+                ToolbarItem(placement: .topBarLeading) {
+                    if #available(iOS 26.0, *) {
+                        Button(role: .close) { dismiss() }
+                    } else {
+                        Button { dismiss() } label: { Image(systemName: "xmark") }
+                            .accessibilityLabel("Close")
                     }
-                    .accessibilityLabel("Close")
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -170,19 +168,38 @@ struct PasturePaywallView: View {
 
     // MARK: - Pasture scene
 
-    private static let previewRamNames = ["Juniper", "Basalt", "Thistle", "Clove", "Ember"]
+    /// Sample rams shown in the pasture preview (every pen but the
+    /// person's own). Routed through the string catalog — rather than a
+    /// hardcoded English array — so a translated build shows names in
+    /// that language's own script instead of Latin names sitting oddly
+    /// next to Cyrillic, Chinese, etc. copy. English and Russian are
+    /// filled in here; every other language falls back to the English
+    /// name until translated in the catalog.
+    private static var previewRamNames: [String] {
+        [
+            String(localized: "Juniper", comment: "Sample ram name shown in the paywall's pasture preview. A name that would suit a farm animal — keep all 5 preview ram names in the same language/script as each other when translating."),
+            String(localized: "Basalt", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Thistle", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Clove", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Ember", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+        ]
+    }
 
     private var pastureScene: some View {
         VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                ForEach(0..<FlockViewModel.pastureCapacity, id: \.self) { index in
-                    PasturePenView(
-                        index: index,
-                        isOpen: index < previewedSlots,
-                        isOwned: index < entitlementService.allowedRamSlots,
-                        name: index == 0 ? companionName : Self.previewRamNames[index % Self.previewRamNames.count]
-                    )
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(0..<FlockViewModel.pastureCapacity, id: \.self) { index in
+                        PasturePenView(
+                            index: index,
+                            isOpen: index < previewedSlots,
+                            isOwned: index < entitlementService.allowedRamSlots,
+                            name: index == 0 ? companionName : Self.previewRamNames[index % Self.previewRamNames.count]
+                        )
+                        .frame(width: 64)
+                    }
                 }
+                .frame(minWidth: 0, maxWidth: .infinity)
             }
             .frame(height: 112)
 
@@ -344,13 +361,18 @@ struct PasturePaywallView: View {
             )
             FeatureRow(
                 symbol: "seal.fill",
-                title: "Every Wax Colour",
-                subtitle: "Gold, forest, navy, plum, ink — the recipient breaks the one you chose."
+                title: "Every Wax Colour, Plus Three Rare Ones",
+                subtitle: "Gold to obsidian black — including three shimmering rare finishes and heirloom parchment."
             )
             FeatureRow(
-                symbol: "checkmark.shield.fill",
-                title: "Cancel Anytime, Keep Everything",
-                subtitle: "Rams already walking finish their journey either way."
+                symbol: "lock.clock.fill",
+                title: "Time-Capsules & Geo-Locks",
+                subtitle: "Hold a letter for a future date, or lock it to a real spot on the ground."
+            )
+            FeatureRow(
+                symbol: "sparkles",
+                title: "Scratch-Off Secrets",
+                subtitle: "Hide a second line behind a foil the recipient scratches clear by hand."
             )
         }
         .padding(16)
@@ -478,7 +500,7 @@ struct PasturePaywallView: View {
 
                 Text("·")
                     .foregroundStyle(.tertiary)
-                Link("Privacy", destination: privacyPolicyURL)
+                Button("Privacy") { legalDocument = .privacy }
                 Text("·")
                     .foregroundStyle(.tertiary)
                 Link("Terms", destination: termsOfUseURL)
@@ -487,11 +509,17 @@ struct PasturePaywallView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.top, 2)
+
+            Text("For RevenueCat Shipaton 2026 · Anton Baranov @antnbaranov")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 20)
         .padding(.top, 14)
         .padding(.bottom, 10)
         .background(.ultraThinMaterial)
+        .sheet(item: $legalDocument) { LegalDocumentView(document: $0) }
     }
 }
 
@@ -530,18 +558,22 @@ private struct PlanRow: View {
                     .font(.title3)
                     .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.4))
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
-                        if let badge {
-                            Text(badge)
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(.thinMaterial, in: Capsule())
-                                .foregroundStyle(.primary)
-                        }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let badge {
+                        // Its own line, after the full title text — never
+                        // inline with it, so a long localized title (e.g.
+                        // "Expand the Pasture · Annual" in Russian) can
+                        // wrap to two lines without the badge landing in
+                        // the middle of it.
+                        Text(badge)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.thinMaterial, in: Capsule())
+                            .foregroundStyle(.primary)
                     }
                     Text(subtitle)
                         .font(.caption)
@@ -810,6 +842,14 @@ final class PasturePaywallViewModel {
             let offerings = try await Purchases.shared.offerings()
             guard let current = offerings.current else { return }
             options = current.availablePackages.map(PaywallOption.init(package:))
+            #if DEBUG
+            // Prices here come from the RevenueCat offering, not from the
+            // local .storekit file. If these lines show old IDs/prices, the
+            // RevenueCat dashboard (Products / Offerings) is what to update.
+            for package in current.availablePackages {
+                print("[Paywall] offering '\(current.identifier)' package \(package.identifier) → \(package.storeProduct.productIdentifier) \(package.storeProduct.localizedPriceString)")
+            }
+            #endif
             selectedOption = bestValueSubscription() ?? options.first
         } catch {
             // Non-fatal: the picker falls back to a "pricing unavailable"

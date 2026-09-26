@@ -286,7 +286,7 @@ struct LetterEnvelopeView<Seal: View>: View {
         let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         return ZStack {
             shape.fill(paper.color)
-            PaperGrain().clipShape(shape)
+            PaperGrain(isHeavy: paper.hasHeavyGrain).clipShape(shape)
 
             // The two side folds meeting at the flap's tip.
             Path { path in

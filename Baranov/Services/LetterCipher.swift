@@ -6,11 +6,11 @@
 //  figure of speech. A letter's body exists on the wire — inside a `.ram`
 //  transit package, on another shepherd's phone mid-relay, in the flock
 //  cache on disk — only as ChaCha20-Poly1305 ciphertext. The key is
-//  derived from the letter's receiving code, which never travels with the
-//  ram: the sender keeps it in `SealKeyVault` and hands it to the
-//  recipient out of band (iMessage, in person, however they like), so
-//  whoever carries a ram across an ocean carries something they cannot
-//  read.
+//  derived from the letter's code (`LetterCode`), which never travels with
+//  the ram: the sender keeps it in `SealKeyVault` and hands it to the
+//  recipient out of band (iMessage, in person) or wraps it to their profile
+//  address (`LetterKeyWrap`), so whoever carries a ram across an ocean
+//  carries something they cannot read.
 //
 //  Design notes, stated plainly rather than oversold:
 //  - Key derivation is HKDF-SHA256 over the normalized code, salted with
@@ -18,12 +18,13 @@
 //    unrelated keys.
 //  - The letter id is also bound in as authenticated additional data,
 //    so a ciphertext can't be transplanted from one letter onto another.
-//  - A receiving code has 8 characters from a 31-symbol alphabet (~40
-//    bits). That's a deliberate trade — a human has to read it off one
-//    screen and type it into another — and it is more than enough to
-//    keep a letter private from the people relaying it. It is not meant
-//    to resist a determined offline attacker with the ciphertext in hand,
-//    and this app never claims otherwise.
+//  - A letter code has 12 characters from a 31-symbol alphabet (~59
+//    bits); older letters used 8 (~40). That's a deliberate trade — a
+//    human has to read it off one screen and type it into another — and
+//    it keeps a letter private from the people relaying it. It is a
+//    human-typeable secret, not a passphrase, so it is not meant to
+//    withstand an unlimited offline attack, and this app never claims
+//    otherwise.
 //
 
 import CryptoKit
@@ -34,6 +35,13 @@ enum LetterCipherError: Error, Equatable {
     case wrongCode
     /// The sealed body isn't a well-formed ChaChaPoly box.
     case malformed
+    /// A Time-Capsule letter (paid) — the right code, but `unlockAt`
+    /// hasn't arrived yet.
+    case timeLocked(until: Date)
+    /// A Geo-Lock letter (paid) — the right code, but the device isn't
+    /// within the sender's chosen radius of the drop point yet. `nil`
+    /// when no location fix was available to check against at all.
+    case outsideGeofence(metersAway: Double?)
 }
 
 enum LetterCipher {

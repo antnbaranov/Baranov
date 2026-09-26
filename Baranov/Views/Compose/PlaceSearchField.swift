@@ -43,6 +43,12 @@ struct PlaceSearchField: View {
     /// tall — an empty-looking sheet with just this one field in it.
     var onFocusChange: ((Bool) -> Void)? = nil
 
+    /// When set, the empty field shows a "Choose on Map" pin button in place
+    /// of the dictation microphone; tapping it hands over to a map picker
+    /// where the person marks the spot instead of typing a name. Fields
+    /// without it keep the microphone.
+    var onChooseOnMap: (() -> Void)? = nil
+
     @State private var completer = PlaceSearchCompleter()
     @State private var dictationService = DictationService()
     @State private var isResolving = false
@@ -88,6 +94,7 @@ struct PlaceSearchField: View {
                             .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Stop dictation")
                 } else if !text.isEmpty {
                     Button {
                         text = ""
@@ -98,6 +105,17 @@ struct PlaceSearchField: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                } else if let onChooseOnMap {
+                    Button {
+                        isFocused = false
+                        onChooseOnMap()
+                    } label: {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(Color.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Choose on Map")
                 } else {
                     Button {
                         dictationService.toggleRecording(appendingTo: text)

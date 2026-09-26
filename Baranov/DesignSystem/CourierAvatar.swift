@@ -68,7 +68,6 @@ struct CourierAvatarView: View {
     let image: UIImage?
     let name: String
     var diameter: CGFloat = 112
-
     private var initials: String {
         let parts = name.split(separator: " ").prefix(2).compactMap(\.first)
         return parts.isEmpty ? "?" : String(parts).uppercased()

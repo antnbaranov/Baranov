@@ -2,9 +2,10 @@
 //  ProximityCodeDiscovery.swift
 //  Baranov
 //
-//  Passive, shake-free discovery of a nearby pickup code. The sender
-//  advertises a receiving code (only while they've asked to share it);
-//  the receiver browses while the Couriers screen is open. No session is
+//  Passive, shake-free discovery of a nearby code. A person advertises
+//  their profile code (only while they've asked to share it) so a friend
+//  standing next to them can put a letter straight into their mailbag; the
+//  other phone browses while Nearby is on. No session is
 //  ever opened — the code rides in the Bonjour `discoveryInfo` and that
 //  is all that is exchanged.
 //

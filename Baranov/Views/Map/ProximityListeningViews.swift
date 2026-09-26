@@ -48,7 +48,7 @@ struct ProximityStatusRow: View {
                 .symbolEffect(.variableColor.iterative, isActive: isBroadcasting || state == .listening)
                 .foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(isBroadcasting ? "Sharing your receiving code" : "Looking for someone who's sending")
+                Text(isBroadcasting ? "Sharing your Shepherd ID" : "Looking for someone who's sending")
                     .font(.subheadline.weight(.semibold))
                 Text(isBroadcasting ? "Anyone nearby who is listening can pick it up for the next minute or so."
                                     : "Keep this screen open near the sender.")

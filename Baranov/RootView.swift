@@ -41,15 +41,46 @@ struct RootView: View {
     @State private var locationService = LocationService()
     private let telemetryService = TelemetryService()
     private let carrierUserId: UUID
+    /// The receiver's letter relay (claim codes) — same host as the telemetry.
+    private let relay: LetterRelayService
+    @State private var relayOutbox = RelayOutbox()
+    /// Letters other people addressed to this person's profile code.
+    @State private var letterInbox = LetterInbox()
+    @State private var presenceService: CarrierPresenceService
+    /// Passive nearby-sender discovery, on only when Settings → Nearby is.
+    @State private var proximity = ProximityCodeDiscovery()
+    /// Nearby couriers over Bluetooth/peer Wi-Fi — browsing runs whenever
+    /// the app is active (Profile and the main map both show the result);
+    /// advertising this device's own name and trip is opt-in separately
+    /// (Profile's "Open to carry" toggle).
+    @State private var nearbyCouriers = NearbyCourierService()
+    /// Couriers met nearby and kept — saved from the map or Profile.
+    @State private var savedCouriers = SavedCourierStore()
+    @AppStorage("com.baranov.nearbyRadar") private var nearbyRadar = false
 
     @State private var isCapacityPaywallPresented = false
+    /// The one-time offer to be reachable nearby (see `SharingInvitation`).
+    @State private var isSharingInvitePresented = false
+    /// The payoff after the very first letter leaves (see
+    /// `FirstLetterCelebrationView`); shown once, ever.
+    @State private var firstLetterMoment: FirstLetterMoment?
+    @State private var opensPaywallAfterCelebration = false
+    @AppStorage("com.baranov.hasSeenFirstLetterMoment") private var hasSeenFirstLetterMoment = false
     @State private var incomingImportErrorMessage: String?
 
     /// Whether Pasture's modal sheet is up — owned here (see the header
     /// doc) and handed down to `JourneyView` only so its docked panel
     /// knows to hide itself while Pasture is showing.
     @State private var isPasturePresented = false
-    @State private var isCouriersPresented = false
+    /// The profile sheet (identity, postal code, trips).
+    @State private var isProfilePresented = false
+    /// "Enter Code" (above the map) and "Send by Code" (Outgoing tab of the mailbag).
+    @State private var isEnterCodePresented = false
+    /// A Shepherd ID picked up from a phone nearby, handed to the compose page.
+    @State private var sendToShepherdID: String?
+    /// "Choose on Map" from the compose sheet's destination field, and its result.
+    @State private var isDestinationPickerPresented = false
+    @State private var pickedDestination: DroppedDestination?
     /// A receiving code found nearby, handed to the letter sheet that opens next.
     @State private var proximityCode: String?
 
@@ -58,6 +89,8 @@ struct RootView: View {
     /// `LetterDetailView` is the only modal competing with Pasture for
     /// the presentation slot.
     @State private var letterRam: Ram?
+    /// The ram whose bag is open — set by tapping its card in the mailbag.
+    @State private var bagRam: Ram?
 
     /// Coming back to the foreground is the moment to reconcile the packet
     /// schedule: a crossing runs on the wall clock, so a ship that sailed
@@ -104,10 +137,22 @@ struct RootView: View {
         _flockViewModel = State(initialValue: FlockViewModel(store: .default))
         let userId = Self.loadOrCreateCarrierUserId()
         carrierUserId = userId
+        let receiverURL = TelemetryService().baseURL
+        relay = LetterRelayService(baseURL: receiverURL)
+        _presenceService = State(initialValue: CarrierPresenceService(baseURL: receiverURL, carrierUserID: userId))
         _hoofbeatRelay = State(initialValue: HoofbeatRelay(
             carrierName: UserDefaults.standard.string(forKey: "com.baranov.carrierDisplayName") ?? "",
             installID: userId
         ))
+    }
+
+    /// Applies whatever an App Intent (Siri, Shortcuts, Spotlight) asked the app to show.
+    private func consumePendingAppAction() {
+        switch PendingAppAction.consume() {
+        case .openPasture: isPasturePresented = true
+        case .enterLetterCode: isEnterCodePresented = true
+        case nil: break
+        }
     }
 
     var body: some View {
@@ -115,20 +160,46 @@ struct RootView: View {
             telemetryService: telemetryService,
             carrierUserId: carrierUserId,
             isPasturePresented: $isPasturePresented,
-            isCouriersPresented: $isCouriersPresented,
+            isProfilePresented: $isProfilePresented,
+            isEnterCodePresented: $isEnterCodePresented,
+            sendToShepherdID: $sendToShepherdID,
+            isDestinationPickerPresented: $isDestinationPickerPresented,
+            pickedDestination: $pickedDestination,
             letterRam: $letterRam,
-            onManualHoofbeat: { triggerManualHoofbeat() }
+            bagRam: $bagRam,
+            relay: relay,
+            onOpenByCode: { ram, code in
+                proximityCode = code
+                letterRam = ram
+            },
+            onManualHoofbeat: { triggerManualHoofbeat() },
+            onNearbySender: { openNearbySender() },
+            onHandOverToNearby: handOverAction,
+            onSendLetterToNearby: sendLetterAction
         )
             .environment(flockViewModel)
+            .environment(relayOutbox)
+            .environment(letterInbox)
+            .environment(presenceService)
+            .environment(proximity)
+            .environment(nearbyCouriers)
+            .environment(savedCouriers)
             .environment(entitlementService)
             .environment(locationService)
+            .task { ReelOverlayWindow.shared.install() }
             .overlay(alignment: .top) {
                 HoofbeatOverlay(
                     phase: hoofbeatRelay.phase,
                     successTick: hoofbeatRelay.successTick,
+                    partnerName: hoofbeatRelay.partnerName,
                     onDismiss: { hoofbeatRelay.reset() },
                     onRetry: { triggerManualHoofbeat() }
                 )
+            }
+            .task {
+                // Once per launch: counts the session, then maybe offers sharing.
+                SharingInvitation.registerSession()
+                await considerSharingInvitation()
             }
             .task {
                 await entitlementService.refresh()
@@ -141,9 +212,35 @@ struct RootView: View {
             .task {
                 await runPacketSchedule()
             }
-            .onChange(of: scenePhase) { _, phase in
+            .task {
+                await runRelayTicks()
+            }
+            .task(id: nearbyRadar) {
+                syncNearbyRadar()
+            }
+            .onChange(of: scenePhase) { old, phase in
+                syncNearbyRadar()
+                if phase == .active {
+                    // Just browsing here; Profile layers in this device's
+                    // own name/trip (its "Open to carry" toggle) while
+                    // it's the one on screen.
+                    nearbyCouriers.start(announce: nil)
+                } else {
+                    nearbyCouriers.stop()
+                }
+                if phase == .active { Analytics.shared.track(.appOpened) }
+                if phase == .active, old == .background {
+                    SharingInvitation.registerSession()
+                    Task { await considerSharingInvitation() }
+                }
+                if phase == .background { Task { await Analytics.shared.flush() } }
                 guard phase == .active else { return }
                 Task { await tickPacketSchedule() }
+                consumePendingAppAction()
+            }
+            .task {
+                consumePendingAppAction()
+                nearbyCouriers.start(announce: nil)
             }
             .onChange(of: entitlementService.allowedRamSlots) { _, slots in
                 flockViewModel.maxAllowedRams = slots
@@ -173,6 +270,17 @@ struct RootView: View {
                 guard url.scheme?.caseInsensitiveCompare("baranov") != .orderedSame else { return }
                 Task { await receiveTransitFile(at: url) }
             }
+            .sheet(isPresented: $isSharingInvitePresented) {
+                SharingInvitationView(
+                    onTurnOn: {
+                        SharingInvitation.turnOn()
+                        isSharingInvitePresented = false
+                    },
+                    onNotNow: { isSharingInvitePresented = false }
+                )
+                .environment(\.locale, currentLocale)
+                .preferredColorScheme(appAppearance.colorScheme)
+            }
             .sheet(isPresented: $isCapacityPaywallPresented) {
                 PasturePaywallView()
                     .environment(flockViewModel)
@@ -180,41 +288,75 @@ struct RootView: View {
                     .environment(\.locale, currentLocale)
                     .preferredColorScheme(appAppearance.colorScheme)
             }
+            .onReceive(NotificationCenter.default.publisher(for: .firstLetterDispatched)) { note in
+                guard !hasSeenFirstLetterMoment, firstLetterMoment == nil else { return }
+                let info = note.userInfo ?? [:]
+                let moment = FirstLetterMoment(
+                    recipient: info["recipient"] as? String ?? "",
+                    ramName: info["ramName"] as? String ?? "",
+                    targetCity: info["targetCity"] as? String ?? "",
+                    meters: info["meters"] as? Int ?? 0
+                )
+                hasSeenFirstLetterMoment = true
+                Task { @MainActor in
+                    // Let the compose panel finish handing over to the
+                    // journey view before anything is presented on top.
+                    try? await Task.sleep(for: .milliseconds(900))
+                    firstLetterMoment = moment
+                }
+            }
+            .sheet(item: $firstLetterMoment, onDismiss: {
+                // Opened from the celebration's button: present the
+                // paywall only once that sheet is fully gone.
+                if opensPaywallAfterCelebration {
+                    opensPaywallAfterCelebration = false
+                    isCapacityPaywallPresented = true
+                }
+            }) { moment in
+                FirstLetterCelebrationView(
+                    moment: moment,
+                    canUpsell: entitlementService.allowedRamSlots <= 1,
+                    onExpand: { opensPaywallAfterCelebration = true }
+                )
+                .presentationDragIndicator(.visible)
+                .environment(\.locale, currentLocale)
+                .preferredColorScheme(appAppearance.colorScheme)
+            }
             .sheet(isPresented: $isPasturePresented) {
                 NavigationStack {
                     PastureView()
                 }
                 .presentationDragIndicator(.visible)
+                .environment(\.dismissPasture, DismissPastureAction { isPasturePresented = false })
                 .environment(flockViewModel)
                 .environment(entitlementService)
                 .environment(locationService)
                 .environment(\.locale, currentLocale)
                 .preferredColorScheme(appAppearance.colorScheme)
             }
-            .sheet(isPresented: $isCouriersPresented) {
-                CouriersView(onOpenLetter: { ram, code in
-                    proximityCode = code
-                    isCouriersPresented = false
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(450))
-                        letterRam = ram
-                    }
-                })
+            .sheet(isPresented: $isProfilePresented) {
+                ProfileView(onHandOver: handOverAction, onSendLetter: sendLetterAction)
                     .presentationDragIndicator(.visible)
-                    .environment(flockViewModel)
-                    .environment(entitlementService)
                     .environment(locationService)
+                    .environment(nearbyCouriers)
+                    .environment(savedCouriers)
                     .environment(\.locale, currentLocale)
                     .preferredColorScheme(appAppearance.colorScheme)
             }
+            .sheet(isPresented: $isDestinationPickerPresented) {
+                DestinationMapPicker { pin in
+                    pickedDestination = pin
+                }
+                .presentationDragIndicator(.visible)
+                .environment(locationService)
+                .environment(\.locale, currentLocale)
+                .preferredColorScheme(appAppearance.colorScheme)
+            }
+            .sheet(item: $bagRam) { ram in
+                ramBagSheet(for: ram)
+            }
             .sheet(item: $letterRam, onDismiss: { proximityCode = nil }) { ram in
-                LetterDetailView(ram: ram, prefilledCode: proximityCode)
-                    .presentationDragIndicator(.visible)
-                    .environment(flockViewModel)
-                    .environment(entitlementService)
-                    .environment(locationService)
-                    .environment(\.locale, currentLocale)
-                    .preferredColorScheme(appAppearance.colorScheme)
+                letterDetailSheet(for: ram)
             }
             .alert(
                 "Couldn't Receive Letter",
@@ -229,6 +371,34 @@ struct RootView: View {
             }
             .environment(\.locale, currentLocale)
             .preferredColorScheme(appAppearance.colorScheme)
+    }
+
+    /// The ram's bag, built outside `body` for the same reason. The letter
+    /// opens inside the bag itself, as a pushed page.
+    private func ramBagSheet(for ram: Ram) -> some View {
+        RamBagView(ramId: ram.id, onShakeHandoff: { triggerManualHoofbeat() })
+        .presentationDragIndicator(.visible)
+        .environment(flockViewModel)
+        .environment(entitlementService)
+        .environment(locationService)
+        .environment(\.locale, currentLocale)
+        .preferredColorScheme(appAppearance.colorScheme)
+    }
+
+    /// The letter sheet, built outside `body` so the compiler type-checks
+    /// it on its own.
+    private func letterDetailSheet(for ram: Ram) -> some View {
+        LetterDetailView(
+            ram: ram,
+            prefilledCode: proximityCode,
+            onShakeHandoff: { triggerManualHoofbeat() }
+        )
+        .presentationDragIndicator(.visible)
+        .environment(flockViewModel)
+        .environment(entitlementService)
+        .environment(locationService)
+        .environment(\.locale, currentLocale)
+        .preferredColorScheme(appAppearance.colorScheme)
     }
 
     /// Decodes an AirDropped `RamTransitPackage` and hands it to the flock,
@@ -281,7 +451,7 @@ struct RootView: View {
 
     /// Toolbar-button alternative to the physical shake: arms the relay
     /// with `Date()` as the shake instant and offers the same candidate a
-    /// real shake would.  The wider `matchWindow` (3.5 s) gives both people
+    /// real shake would.  The `matchWindow` (4 s) gives both people
     /// enough room to tap within a few seconds of each other.
     private func triggerManualHoofbeat() {
         hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate())
@@ -291,17 +461,41 @@ struct RootView: View {
     /// then whatever is selected, then anything still in play. `nil` means
     /// this device has nothing to give and will only receive.
     private func handoffCandidate() -> RamTransitPackage? {
+        handoffRam().map { RamTransitPackage(ram: $0) }
+    }
+
+    private func handoffRam() -> Ram? {
         // Only rams a person can actually take: one already at sea belongs
         // to the packet, and one already handed on belongs to someone
         // else — offering either would fork the letter in two.
         let rams = flockViewModel.activeRams.filter { ram in
             ram.status == .grazing || ram.status == .walking || ram.status == .waitingForHandoff
         }
-        let candidate = rams.first { $0.status == .waitingForHandoff }
+        return rams.first { $0.status == .waitingForHandoff }
             ?? rams.first { $0.id == flockViewModel.selectedRamId }
             ?? rams.first
+    }
 
-        return candidate.map { RamTransitPackage(ram: $0) }
+    /// "Send a letter to <their city>": hands the courier's trip destination to Compose exactly like a map
+    /// pin drop, so the destination is already filled in when the panel opens.
+    private var sendLetterAction: (NearbyCourier) -> Void {
+        { courier in
+            guard let latitude = courier.tripLatitude, let longitude = courier.tripLongitude else { return }
+            pickedDestination = DroppedDestination(
+                latitude: latitude,
+                longitude: longitude,
+                name: courier.tripCity.isEmpty ? String(localized: "Dropped Pin") : courier.tripCity
+            )
+        }
+    }
+
+    /// Tapping a courier nearby (map or Profile) and choosing "Hand over": arms the same mutual-shake relay as
+    /// a real shake, and the HUD names who we're waiting for. It works even with nothing to give, in which case
+    /// this phone only receives.
+    private var handOverAction: ((NearbyCourier) -> Void)? {
+        { courier in
+            hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate(), partnerName: courier.name)
+        }
     }
 
     /// Admits a ram that arrived over a hoofbeat handoff, through exactly
@@ -317,6 +511,76 @@ struct RootView: View {
             receivedAt: locationService.currentCoordinate
         )
         return package.ram.name
+    }
+
+    // MARK: - Relay, presence and nearby senders
+
+    /// Once a minute while the app runs: tell the receiver where a courier
+    /// carrying someone else's ram is (only if they opted in), look up where
+    /// the couriers carrying MY handed-on rams are, and check whether any
+    /// letter I published by code has been claimed.
+    private func runRelayTicks() async {
+        while !Task.isCancelled {
+            await presenceService.tick(
+                rams: flockViewModel.activeRams,
+                myName: carrierDisplayName,
+                coordinate: locationService.currentCoordinate
+            )
+            await relayOutbox.refresh(using: relay) { letter in
+                notificationService.announceLetterClaimed(recipientName: letter.recipientName, code: letter.code)
+            }
+            await letterInbox.refresh(using: relay)
+            try? await Task.sleep(for: .seconds(60))
+        }
+    }
+
+    /// Listens for a nearby sender only while the app is on screen and the
+    /// person has switched Nearby on in Settings.
+    private func syncNearbyRadar() {
+        if nearbyRadar && scenePhase == .active {
+            proximity.startListening()
+        } else {
+            proximity.stopListening()
+        }
+    }
+
+    /// Offers nearby sharing once, when the moment is right (see
+    /// `SharingInvitation`): after a few seconds of the app simply being open,
+    /// with nothing else on screen.
+    private func considerSharingInvitation() async {
+        guard SharingInvitation.isDue else { return }
+        try? await Task.sleep(for: .seconds(4))
+        guard SharingInvitation.isDue, scenePhase == .active, !needsOnboarding,
+              !isPasturePresented, !isProfilePresented, !isCapacityPaywallPresented,
+              !isDestinationPickerPresented, firstLetterMoment == nil,
+              letterRam == nil, bagRam == nil else { return }
+        SharingInvitation.markAsked()
+        isSharingInvitePresented = true
+    }
+
+    /// The map's nearby-sender marker was tapped. A nearby profile code means
+    /// someone wants a letter from me: open the compose page with it filled in.
+    /// Otherwise, if the shared code opens a letter waiting at my gate, go
+    /// straight to the seal; failing that, open the code field.
+    private func openNearbySender() {
+        guard case .locked(let shared) = proximity.state else { return }
+        if CourierCodeStore.isAddress(shared) {
+            sendToShepherdID = shared
+            proximity.resumeListening()
+            return
+        }
+        let code = LetterCipher.normalize(shared)
+        let match = flockViewModel.activeRams.first { ram in
+            guard ram.status == .arrivedAtGate, let letter = ram.letter, letter.isEncrypted else { return false }
+            return (try? LetterCipher.open(letter.sealedBody, receivingCode: code, letterID: letter.id)) != nil
+        }
+        if let match {
+            proximityCode = shared
+            letterRam = match
+            proximity.resumeListening()
+        } else {
+            isEnterCodePresented = true
+        }
     }
 
     // MARK: - The packet schedule

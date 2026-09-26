@@ -23,7 +23,13 @@ import CoreLocation
 import SwiftUI
 
 struct CarrierDirectoryView: View {
+    /// What the sheet is for. `.couriers` manages other people you know are
+    /// headed somewhere; `.myTrip` registers the person's own trip, which
+    /// needs a destination and nothing else.
+    enum Mode { case couriers, myTrip }
+
     let directory: KnownCarrierDirectory
+    var mode: Mode = .couriers
     var gameCenterService: GameCenterService? = nil
     var prefilledName: String? = nil
 
@@ -37,39 +43,58 @@ struct CarrierDirectoryView: View {
     @State private var hasLoadedGameCenterFriends = false
 
     @State private var addTick = 0
-    @State private var pendingDeleteOffsets: IndexSet?
+    @State private var pendingDelete: KnownCarrier?
     @State private var showsDeleteConfirmation = false
     @FocusState private var isFormFocused: Bool
 
     private var canAdd: Bool {
-        !name.trimmed.isEmpty && destinationCoordinate != nil
+        destinationCoordinate != nil && (mode == .myTrip || !name.trimmed.isEmpty)
+    }
+
+    /// The person's own trips are managed from Profile, so they stay out of
+    /// the list of other couriers.
+    private var otherCouriers: [KnownCarrier] {
+        directory.carriers.filter { !$0.name.hasPrefix("You (") }
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ContactSuggestionField(placeholder: "Their Name", text: $name)
+                    if mode == .couriers {
+                        ContactSuggestionField(placeholder: "Their Name", text: $name)
+                    }
 
-                    PlaceSearchField(placeholder: "Where are they headed?", text: $destinationCity) { title, coordinate in
+                    PlaceSearchField(
+                        placeholder: mode == .myTrip ? "Where are you headed?" : "Where are they headed?",
+                        text: $destinationCity
+                    ) { title, coordinate in
                         destinationCity = title
                         destinationCoordinate = coordinate
                     }
 
                     Button {
-                        addCarrier()
+                        add()
                     } label: {
-                        Label("Add Carrier", systemImage: "person.badge.plus")
+                        if mode == .myTrip {
+                            Label("Add Trip", systemImage: "airplane.departure")
+                        } else {
+                            Label("Add Courier", systemImage: "person.badge.plus")
+                        }
                     }
                     .disabled(!canAdd)
                 } header: {
-                    Text("Add a Carrier")
+                    Text(mode == .myTrip ? LocalizedStringKey("Your Trip") : LocalizedStringKey("Add a Courier"))
                 } footer: {
-                    Text("A letter waiting for a handoff can be AirDropped straight to anyone here whose destination matches, or is within \(KnownCarrierDirectory.matchRadiusKm) km of, where it's actually going.")
+                    if mode == .myTrip {
+                        Text("Letters heading somewhere near your destination can be handed to you.")
+                    } else {
+                        Text("A letter waiting for a handoff can be AirDropped straight to anyone here whose destination matches, or is within \(KnownCarrierDirectory.matchRadiusKm) km of, where it's actually going.")
+                    }
                 }
                 .listRowSeparator(.hidden)
 
-                if !gameCenterFriends.isEmpty {
+                if mode == .couriers, !gameCenterFriends.isEmpty {
                     Section {
                         ForEach(gameCenterFriends) { friend in
                             Button {
@@ -85,9 +110,9 @@ struct CarrierDirectoryView: View {
                     }
                 }
 
-                if !directory.carriers.isEmpty {
-                    Section("Known Carriers") {
-                        ForEach(directory.carriers) { carrier in
+                if mode == .couriers, !otherCouriers.isEmpty {
+                    Section("Your Couriers") {
+                        ForEach(otherCouriers) { carrier in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(carrier.name)
                                     .font(.subheadline.weight(.medium))
@@ -95,15 +120,17 @@ struct CarrierDirectoryView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                        }
-                        .onDelete { offsets in
-                            pendingDeleteOffsets = offsets
-                            showsDeleteConfirmation = true
+                            .swipeActions {
+                                Button("Remove", role: .destructive) {
+                                    pendingDelete = carrier
+                                    showsDeleteConfirmation = true
+                                }
+                            }
                         }
                     }
                 }
             }
-            .navigationTitle("Carriers")
+            .navigationTitle(mode == .myTrip ? LocalizedStringKey("Add a Trip") : LocalizedStringKey("Couriers"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -111,40 +138,45 @@ struct CarrierDirectoryView: View {
                         .fontWeight(.semibold)
                 }
             }
-            .confirmationDialog("Remove Carrier?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
+            .confirmationDialog("Remove Courier?", isPresented: $showsDeleteConfirmation, titleVisibility: .visible) {
                 Button("Remove", role: .destructive) {
-                    if let offsets = pendingDeleteOffsets {
-                        withAnimation { directory.remove(at: offsets) }
+                    if let carrier = pendingDelete {
+                        withAnimation { directory.remove(carrier) }
                     }
-                    pendingDeleteOffsets = nil
+                    pendingDelete = nil
                 }
             }
             .sensoryFeedback(.success, trigger: addTick)
             .task {
-                if name.isEmpty, let prefilledName {
+                if mode == .couriers, name.isEmpty, let prefilledName {
                     name = prefilledName
                 }
-                guard !hasLoadedGameCenterFriends, let gameCenterService else { return }
+                guard mode == .couriers, !hasLoadedGameCenterFriends, let gameCenterService else { return }
                 hasLoadedGameCenterFriends = true
                 gameCenterFriends = await gameCenterService.loadFriends()
             }
         }
     }
 
-    private func addCarrier() {
+    private func add() {
         guard let destinationCoordinate else { return }
+        let city = destinationCity.trimmed
         directory.add(
-            name: name.trimmed,
-            destinationCity: destinationCity.trimmed,
+            name: mode == .myTrip ? "You (\(city))" : name.trimmed,
+            destinationCity: city,
             destinationCoordinate: RamCoordinate(destinationCoordinate)
         )
+        addTick += 1
+        if mode == .myTrip {
+            dismiss()
+            return
+        }
         withAnimation(.snappy) {
             name = ""
             destinationCity = ""
             self.destinationCoordinate = nil
         }
         isFormFocused = false
-        addTick += 1
     }
 }
 

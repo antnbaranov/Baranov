@@ -267,6 +267,24 @@ struct Ram: Identifiable, Codable, Hashable, Sendable {
         return Self.interpolatedPoint(along: routeCoordinates, metersWalked: Double(stepsWalked))?.bearing
     }
 
+    /// How close (in metres) the recipient has to be to the spot where a
+    /// letter was left before it can be picked up — GPS is good to tens of
+    /// metres, and a gate is a place, not a doorstep.
+    static let pickupRadiusMeters: CLLocationDistance = 150
+
+    /// Where the letter is left when the ram reaches the gate: the end of
+    /// the route it walked, falling back to the letter's final destination.
+    var gateCoordinate: CLLocationCoordinate2D? {
+        routeCoordinates.last?.clLocationCoordinate ?? finalDestinationCoordinate.clLocationCoordinate
+    }
+
+    /// Straight-line distance from a position to the gate, in metres.
+    func distanceToGate(from position: CLLocationCoordinate2D) -> CLLocationDistance? {
+        guard let gate = gateCoordinate else { return nil }
+        return CLLocation(latitude: position.latitude, longitude: position.longitude)
+            .distance(from: CLLocation(latitude: gate.latitude, longitude: gate.longitude))
+    }
+
     /// The exact first vertex of the current leg's polyline — where a
     /// freshly dispatched ram stands, and what `FlockViewModel.dispatch`
     /// guarantees `currentCoordinate` resolves to by forcing
@@ -362,5 +380,25 @@ struct Ram: Identifiable, Codable, Hashable, Sendable {
         let degrees = atan2(y, x) * 180 / .pi
 
         return (degrees + 360).truncatingRemainder(dividingBy: 360)
+    }
+}
+
+
+extension Ram {
+    /// A ram with no journey behind it, standing in for the person's
+    /// companion so its passport can open before any letter has walked.
+    /// Marked delivered so nothing treats it as in flight, and given a
+    /// fixed id so the goals and notes kept on its passport survive
+    /// between visits.
+    static func restingStub(for companion: RamCompanion) -> Ram {
+        Ram(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000C0DE") ?? UUID(),
+            name: companion.name,
+            status: .delivered,
+            totalStepsRequired: 0,
+            currentCity: "",
+            targetCity: "",
+            finalDestinationCoordinate: RamCoordinate(latitude: 0, longitude: 0)
+        )
     }
 }

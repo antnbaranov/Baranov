@@ -32,9 +32,11 @@ struct LetterArrivalView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(FlockViewModel.self) private var flockViewModel
+    @Environment(EntitlementService.self) private var entitlementService
 
     @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
-    @AppStorage(SealStyle.storageKey) private var sealStyleRaw = SealStyle.wax.rawValue
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.accessibilitySwitchControlEnabled) private var switchControlEnabled
     @Environment(LocationService.self) private var locationService
 
     @State private var sealProgress: Double = 0
@@ -46,6 +48,12 @@ struct LetterArrivalView: View {
     @State private var crackTick = 0
     @State private var crackTask: Task<Void, Never>?
     @State private var closeTick = 0
+
+    /// The rendered Journey Certificate — a paid, shareable alternative
+    /// to the free doodle attachment (see `JourneyCertificateView`).
+    /// Rendered lazily, once, the first time the revealed state appears.
+    @State private var certificateImage: UIImage?
+    @State private var isPaywallPresented = false
 
     /// The receiving code the recipient types in — the letter's actual
     /// decryption key (see `LetterCipher`). Pre-filled only if this very
@@ -70,14 +78,28 @@ struct LetterArrivalView: View {
     @State private var muse = LetterMuseService()
     @State private var roadNarration: String?
 
-    private var hasCompleteCode: Bool {
-        LetterCipher.normalize(enteredCode).count == 8
-    }
+    private var hasCompleteCode: Bool { LetterCode.isUsableKey(enteredCode) }
+
+    /// Whether this phone already holds the letter's code — from claiming it
+    /// by code or from the mailbag — so there is nothing left to type.
+    @State private var holdsCode = false
 
     /// A postcard needs no code; a sealed letter needs the whole one.
     private var isEncrypted: Bool { letter?.isEncrypted ?? true }
 
-    private var canBreak: Bool { !isEncrypted || hasCompleteCode }
+    /// Time-Capsule (paid): the letter's clock hasn't struck yet.
+    private var isTimeLocked: Bool { letter?.isTimeLocked ?? false }
+
+    /// Geo-Lock (paid): the recipient isn't within the sender's chosen
+    /// radius of the drop point yet. `nil` location counts as outside.
+    private var isGeoLocked: Bool { letter?.isOutsideGeofence(of: locationService.currentCoordinate) ?? false }
+
+    /// How much further to walk to satisfy a Geo-Lock, for display only.
+    private var geofenceDistanceRemaining: Double? {
+        letter?.geofenceDistanceRemaining(from: locationService.currentCoordinate)
+    }
+
+    private var canBreak: Bool { (!isEncrypted || hasCompleteCode) && !isTimeLocked && !isGeoLocked }
 
     /// Whether the stored carrier name matches who this letter is for.
     /// Case/whitespace-insensitive — same normalization the AirDrop
@@ -144,6 +166,7 @@ struct LetterArrivalView: View {
                 }
                 if enteredCode.isEmpty, let known = letter?.receivingCode {
                     enteredCode = known
+                    holdsCode = true
                 }
             }
         }
@@ -213,9 +236,13 @@ struct LetterArrivalView: View {
     private var sealedEnvelope: some View {
         VStack(spacing: 20) {
             if isEncrypted {
-                codeEntry
+                if holdsCode { codeOnPhoneNote } else { codeEntry }
             } else {
                 postcardNote
+            }
+
+            if hasCompleteCode || !isEncrypted {
+                lockStatusBanner
             }
 
             Text(holdInstruction)
@@ -254,22 +281,84 @@ struct LetterArrivalView: View {
             if let wrongCodeMessage {
                 Label(wrongCodeMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.accentColor)
                     .transition(.opacity)
             }
         }
         .onDisappear { crackTask?.cancel() }
     }
 
-    private var usesPrompt: Bool { sealStyleRaw == SealStyle.prompt.rawValue }
+    /// A Time-Capsule countdown or a Geo-Lock distance — shown only once
+    /// there's a code to act on, so it never competes with the code-entry
+    /// prompt for attention. Silent (no view) for a letter with neither
+    /// lock, which is every non-paid letter.
+    @ViewBuilder
+    private var lockStatusBanner: some View {
+        if isTimeLocked, let unlockAt = letter?.unlockAt {
+            TimelineView(.periodic(from: .now, by: 1)) { _ in
+                Label {
+                    Text("Unlocks in \(Self.countdownFormatter.string(from: Date(), to: unlockAt) ?? "a moment")")
+                } icon: {
+                    Image(systemName: "lock.clock.fill")
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.thinMaterial, in: Capsule())
+            }
+        } else if isGeoLocked {
+            Label {
+                if let geofenceDistanceRemaining {
+                    Text("About \(Int(geofenceDistanceRemaining.rounded()))m away — walk closer to open it")
+                } else {
+                    Text("Turn on Location Services to open this letter")
+                }
+            } icon: {
+                Image(systemName: "location.fill")
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.thinMaterial, in: Capsule())
+            .task {
+                // A live-ish distance while the recipient actually walks
+                // toward the drop point, without asking `LocationService`
+                // for continuous updates just for this one screen.
+                while isGeoLocked, !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(8))
+                    locationService.resolveCurrentLocation()
+                }
+            }
+        }
+    }
+
+    private static let countdownFormatter: DateComponentsFormatter = {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.day, .hour, .minute, .second]
+        formatter.unitsStyle = .abbreviated
+        formatter.maximumUnitCount = 2
+        return formatter
+    }()
+
+    private var usesPrompt: Bool {
+        SealStyle.resolved(voiceOver: voiceOverEnabled, switchControl: switchControlEnabled) == .prompt
+    }
 
     private var holdInstruction: String {
         if usesPrompt {
             if !isEncrypted { return String(localized: "Tap to lift the postcard out") }
-            return hasCompleteCode ? String(localized: "Tap the seal!") : String(localized: "Enter your receiving code to unlock the seal")
+            if !hasCompleteCode { return String(localized: "Enter your ear tag to unlock the seal") }
+            if isTimeLocked { return String(localized: "This letter is still time-locked") }
+            if isGeoLocked { return String(localized: "Walk closer to open this letter") }
+            return String(localized: "Tap the seal!")
         }
         if !isEncrypted { return "Hold to lift the postcard out" }
-        return hasCompleteCode ? "Hold the seal to break it" : "Enter your receiving code to unlock the seal"
+        if !hasCompleteCode { return "Enter your ear tag to unlock the seal" }
+        if isTimeLocked { return "This letter is still time-locked" }
+        if isGeoLocked { return "Walk closer to open this letter" }
+        return "Hold the seal to break it"
     }
 
     private var monogram: String { (letter?.senderName ?? "").sealMonogram }
@@ -286,7 +375,7 @@ struct LetterArrivalView: View {
                 .contentShape(Circle())
                 .onTapGesture { breakSeal() }
                 .accessibilityLabel(isEncrypted ? "Wax seal" : "Postcard")
-                .accessibilityHint(canBreak ? "Tap to open the letter" : "Enter the receiving code first")
+                .accessibilityHint(canBreak ? "Tap to open the letter" : "Enter the ear tag first")
                 .accessibilityAddTraits(.isButton)
         } else {
             waxHoldTarget
@@ -344,7 +433,7 @@ struct LetterArrivalView: View {
             }
         }
         .accessibilityLabel(isEncrypted ? "Wax seal" : "Postcard")
-        .accessibilityHint(canBreak ? "Touch and hold to open the letter" : "Enter the receiving code first")
+        .accessibilityHint(canBreak ? "Touch and hold to open the letter" : "Enter the ear tag first")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(named: isEncrypted ? "Break Seal" : "Open Letter") {
             if canBreak {
@@ -391,7 +480,11 @@ struct LetterArrivalView: View {
             return
         }
         do {
-            try flockViewModel.openDeliveredLetter(ramId: ram.id, receivingCode: enteredCode)
+            try flockViewModel.openDeliveredLetter(
+                ramId: ram.id,
+                receivingCode: enteredCode,
+                currentCoordinate: locationService.currentCoordinate
+            )
             sensoryTrigger.toggle()
             withAnimation { wrongCodeMessage = nil }
             isPressing = false
@@ -406,6 +499,24 @@ struct LetterArrivalView: View {
                     isRevealed = true
                 }
             }
+        } catch let error as LetterCipherError {
+            wrongCodeTick += 1
+            isPressing = false
+            withAnimation(.easeOut(duration: 0.2)) {
+                sealProgress = 0
+                switch error {
+                case .timeLocked(let until):
+                    wrongCodeMessage = "Not yet — this letter unlocks \(until.formatted(date: .abbreviated, time: .shortened))."
+                case .outsideGeofence(let metersAway):
+                    if let metersAway {
+                        wrongCodeMessage = "Not quite there yet — about \(Int(metersAway.rounded()))m to go."
+                    } else {
+                        wrongCodeMessage = "This letter needs your exact location to open. Check Location Services and try again."
+                    }
+                case .wrongCode, .malformed:
+                    wrongCodeMessage = "That code doesn't fit this seal. Check the message from \(letter?.senderName ?? "the sender")."
+                }
+            }
         } catch {
             wrongCodeTick += 1
             isPressing = false
@@ -416,16 +527,25 @@ struct LetterArrivalView: View {
         }
     }
 
+    private var codeOnPhoneNote: some View {
+        Label("Your ear tag is on this phone.", systemImage: "key.fill")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private var codeEntry: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Receiving Code")
+            Text("Ear tag")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
                 Image(systemName: "key.fill")
                     .foregroundStyle(.secondary)
-                TextField("XXXX-XXXX", text: $enteredCode)
+                TextField("XXXX-XXXX-XXXX", text: $enteredCode)
                     .font(.title3.weight(.semibold).monospaced())
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
@@ -447,7 +567,7 @@ struct LetterArrivalView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .animation(.snappy, value: hasCompleteCode)
 
-            Text("The ram carried only ciphertext. The sender shared this code with you separately — it's the key.")
+            Text("The ram carried only ciphertext. The ear tag you were given is the key.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -478,6 +598,10 @@ struct LetterArrivalView: View {
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .accessibilityLabel("Drawing attached to the letter")
+            }
+
+            if let secret = letter.scratchSecretText {
+                ScratchOffRevealView(secretText: secret)
             }
 
             Divider()
@@ -531,8 +655,82 @@ struct LetterArrivalView: View {
                     withAnimation(.easeInOut(duration: 0.3)) { roadNarration = story }
                 }
             }
+
+            certificateSection(letter: letter)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .sheet(isPresented: $isPaywallPresented) {
+            PasturePaywallView()
+        }
+    }
+
+    // MARK: - Journey Certificate (paid)
+
+    /// A shareable card built entirely from the journey's own stamps —
+    /// the paid alternative to drawing something to attach. Gated on
+    /// `hasPastureExpansion` (the same entitlement that already unlocks
+    /// every wax colour) rather than a separate product.
+    @ViewBuilder
+    private func certificateSection(letter: Letter) -> some View {
+        if entitlementService.hasPastureExpansion {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Journey Certificate", systemImage: "doc.badge.gearshape")
+                    .font(.subheadline.weight(.semibold))
+                Text("A shareable card of this journey, built from the real stamps above — not a drawing.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let certificateImage {
+                    ShareLink(
+                        item: Image(uiImage: certificateImage),
+                        preview: SharePreview("Journey Certificate", image: Image(uiImage: certificateImage))
+                    ) {
+                        Label("Share Certificate", systemImage: "square.and.arrow.up")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                        .task {
+                            certificateImage = await JourneyCertificateRenderer.image(ram: liveRam, letter: letter)
+                        }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        } else {
+            Button {
+                isPaywallPresented = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "doc.badge.gearshape")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Share a Journey Certificate")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text("A shareable card of this journey's real stamps \u{2014} unlocked by expanding the pasture.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "lock.fill")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
     }
 }
 

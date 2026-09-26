@@ -397,7 +397,7 @@ struct RamCardView: View {
     /// than introducing a separate, bespoke "compose an iMessage" screen.
     private func shareCodeButton(_ shareMessage: String) -> some View {
         ShareLink(item: shareMessage) {
-            Label("Share Receiving Code", systemImage: "square.and.arrow.up")
+            Label("Share Ear Tag", systemImage: "square.and.arrow.up")
         }
         .buttonStyle(ShareCodeGlassButtonStyle(tint: PastureTheme.green, expands: true))
         .simultaneousGesture(TapGesture().onEnded { impact(.light) })

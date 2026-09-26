@@ -10,6 +10,7 @@
 //  place, what doesn't match.
 //
 
+import CoreLocation
 import SwiftUI
 
 struct LetterGateNoticeView: View {
@@ -26,32 +27,45 @@ struct LetterGateNoticeView: View {
             && recipientName.gateNormalized == storedDisplayName.gateNormalized
     }
 
-    private var cityMatches: Bool? {
-        guard let city = locationService.currentCityName else { return nil }
-        return city.gateNormalized == ram.targetCity.gateNormalized
+    private var distanceToGate: CLLocationDistance? {
+        guard let here = locationService.currentCoordinate else { return nil }
+        return ram.distanceToGate(from: here)
     }
 
-    private var isVerified: Bool { recipientNameMatches && cityMatches == true }
+    /// `nil` while there is no location fix yet.
+    private var isAtPickupSpot: Bool? {
+        distanceToGate.map { $0 <= Ram.pickupRadiusMeters }
+    }
+
+    private var isVerified: Bool { recipientNameMatches && isAtPickupSpot == true }
+
+    private var walkRowText: String {
+        if isAtPickupSpot == true { return String(localized: "You're at the pick-up spot") }
+        if let distance = distanceToGate {
+            return String(localized: "Walk to \(ram.targetCity) — \(DistanceFormatter.string(forMeters: Int(distance))) to go")
+        }
+        return String(localized: "Walk to \(ram.targetCity)")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if cityMatches == nil {
+            if isAtPickupSpot == nil {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text("Checking you're at the gate…")
+                    Text("Finding where you are…")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             } else {
-                Label("This Letter Isn't for You", systemImage: "lock.shield")
+                Label(recipientNameMatches ? "Left at the Gate for You" : "This Letter Isn't for You",
+                      systemImage: recipientNameMatches ? "figure.walk" : "lock.shield")
                     .font(.subheadline.weight(.semibold))
 
                 row(recipientNameMatches,
                     recipientNameMatches ? "Addressed to you" : "Addressed to \(recipientName.isEmpty ? "someone else" : recipientName)")
-                row(cityMatches == true,
-                    cityMatches == true ? "You're at the right gate" : "This gate is in \(ram.targetCity)")
+                row(isAtPickupSpot == true, walkRowText)
 
-                Text("The seal can only be broken by the recipient, standing at the destination city.")
+                Text("The letter was left at the gate. Only the recipient can collect it — by really walking there.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

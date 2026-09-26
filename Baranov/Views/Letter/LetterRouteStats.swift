@@ -65,7 +65,7 @@ struct LetterRouteIndicator: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(.quaternary)
                         .frame(height: trackHeight)
-                    Capsule().fill(Color.orange)
+                    Capsule().fill(Color.accentColor)
                         .frame(width: x, height: trackHeight)
 
                     Circle()
@@ -81,7 +81,7 @@ struct LetterRouteIndicator: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: badgeDiameter, height: badgeDiameter)
-                        .background(Color.orange, in: Circle())
+                        .background(Color.accentColor, in: Circle())
                         .position(x: x, y: badgeDiameter / 2)
                         .animation(.smooth(duration: 0.6), value: progress)
                 }

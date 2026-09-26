@@ -23,7 +23,7 @@ struct BreakSealButton: View {
         } label: {
             Image(systemName: "seal.fill")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Color.accentColor)
                 .frame(width: 44, height: 44)
         }
         .glassIconButton()

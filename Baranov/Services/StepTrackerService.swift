@@ -111,6 +111,12 @@ final class StepTrackerService {
     private var journeyObserverQuery: HKObserverQuery?
     private var todayObserverQuery: HKObserverQuery?
     private var journeyStartDate: Date?
+    /// Bumped on every start and stop of journey tracking. Pedometer and
+    /// HealthKit callbacks capture the value they were started under and
+    /// drop themselves if it has moved on — otherwise a late callback from
+    /// the *previous* ram's session (carrying its step total) could land in
+    /// the new session and teleport the freshly dispatched ram ahead.
+    @ObservationIgnored private var trackingSession = 0
     private var todayStartDate: Date?
 
     init(pedometer: CMPedometer = CMPedometer(), todayPedometer: CMPedometer = CMPedometer()) {
@@ -134,6 +140,8 @@ final class StepTrackerService {
         }
         guard !isTracking else { return }
 
+        trackingSession += 1
+        let session = trackingSession
         self.updateHandler = updateHandler
         self.journeyStartDate = date
         liveStepCount = 0
@@ -147,21 +155,23 @@ final class StepTrackerService {
             pedometer.startUpdates(from: date) { [weak self] data, error in
                 guard let self else { return }
                 Task { @MainActor in
+                    guard self.trackingSession == session else { return }
                     self.handlePedometerUpdate(data: data, error: error)
                 }
             }
         }
 
         requestHealthAuthorizationIfNeeded { [weak self] granted in
-            guard let self, granted, self.isTracking else { return }
+            guard let self, granted, self.isTracking, self.trackingSession == session else { return }
             self.isUsingHealthKit = true
-            self.startHealthObserving(from: date)
+            self.startHealthObserving(from: date, session: session)
         }
     }
 
     /// Stops any active tracking (CMPedometer and/or HealthKit observation).
     /// Safe to call even when tracking has not started.
     func stopTracking() {
+        trackingSession += 1
         pedometer.stopUpdates()
         if let query = journeyObserverQuery, let healthStore {
             healthStore.stop(query)
@@ -293,11 +303,11 @@ final class StepTrackerService {
     /// Runs an initial cumulative-sum fetch, then re-fetches every time
     /// HealthKit reports new step data for this window (e.g. once the
     /// paired Apple Watch syncs a batch of steps to Health).
-    private func startHealthObserving(from date: Date) {
+    private func startHealthObserving(from date: Date, session: Int) {
         guard let healthStore else { return }
 
         refreshHealthKitSteps(since: date) { [weak self] steps in
-            guard let self, self.isTracking, self.isUsingHealthKit else { return }
+            guard let self, self.isTracking, self.isUsingHealthKit, self.trackingSession == session else { return }
             self.healthKitJourneySteps = steps
             self.mergeJourneyCount()
         }
@@ -306,8 +316,10 @@ final class StepTrackerService {
             defer { completionHandler() }
             guard let self, error == nil else { return }
             Task { @MainActor in
-                guard self.isTracking, self.isUsingHealthKit, let start = self.journeyStartDate else { return }
+                guard self.isTracking, self.isUsingHealthKit, self.trackingSession == session,
+                      let start = self.journeyStartDate else { return }
                 self.refreshHealthKitSteps(since: start) { steps in
+                    guard self.trackingSession == session else { return }
                     self.healthKitJourneySteps = steps
                     self.mergeJourneyCount()
                 }

@@ -19,6 +19,7 @@ struct BaranovLiveActivityView: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RamActivityAttributes.self) { context in
             LockScreenLiveActivityView(attributes: context.attributes, state: context.state)
+                .activityBackgroundTint(.liveActivityBackground)
                 .activitySystemActionForegroundColor(.primary)
         } dynamicIsland: { context in
             DynamicIsland {
@@ -83,6 +84,18 @@ struct BaranovLiveActivityView: Widget {
     }
 }
 
+// MARK: - Background
+
+private extension Color {
+    /// Soft parchment in light mode, warm charcoal in dark mode, so the Lock Screen
+    /// card reads as a light, native card instead of the default near-black slab.
+    static let liveActivityBackground = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.20, green: 0.18, blue: 0.16, alpha: 0.92)
+            : UIColor(red: 0.98, green: 0.96, blue: 0.92, alpha: 0.92)
+    })
+}
+
 // MARK: - Lock Screen / banner
 
 struct LockScreenLiveActivityView: View {
@@ -101,6 +114,12 @@ struct LockScreenLiveActivityView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                    Text(routeDescription(from: attributes.fromCity, to: attributes.toCity))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
                 VStack(alignment: .trailing, spacing: 0) {
@@ -117,8 +136,6 @@ struct LockScreenLiveActivityView: View {
             }
 
             JourneyTrack(progress: state.progress, pose: state.pose, spriteHeight: 38)
-
-            RouteRow(from: attributes.fromCity, to: attributes.toCity, progress: state.progress)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -178,6 +195,11 @@ struct JourneyTrack: View {
     }
 }
 
+/// "A → B", or just the place name when origin and destination match.
+func routeDescription(from: String, to: String) -> String {
+    from == to || from.isEmpty ? to : "\(from) \u{2192} \(to)"
+}
+
 /// Route on the left (one line, truncates), percent on the right (never truncates).
 /// When origin and destination are the same place (e.g. arrived), the name is shown once.
 struct RouteRow: View {
@@ -185,9 +207,7 @@ struct RouteRow: View {
     let to: String
     let progress: Double
 
-    private var routeText: String {
-        from == to || from.isEmpty ? to : "\(from) \u{2192} \(to)"
-    }
+    private var routeText: String { routeDescription(from: from, to: to) }
 
     var body: some View {
         HStack(spacing: 8) {

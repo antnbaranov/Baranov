@@ -79,25 +79,36 @@ struct AirDropSuggestionsCard: View {
     // MARK: - Header
 
     private var header: some View {
-        HStack {
+        HStack(spacing: 8) {
             Label("Carriers", systemImage: "person.2.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             Spacer()
-            Button(action: onManageTapped) {
-                HStack(spacing: 4) {
-                    Text(knownCarrierCount == 0 ? "Add" : "\(knownCarrierCount) known")
-                    Image(systemName: "chevron.right")
-                        .font(.caption2.weight(.semibold))
+            if knownCarrierCount > 0 {
+                Button(action: onManageTapped) {
+                    HStack(spacing: 4) {
+                        Text("\(knownCarrierCount) known")
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.thinMaterial, in: Capsule())
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tint)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(.thinMaterial, in: Capsule())
+                .buttonStyle(.plain)
+                .accessibilityLabel("Manage carriers")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Manage carriers")
+            Button(action: onManageTapped) {
+                Label("Add Courier", systemImage: "plus")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .controlSize(.small)
+            .tint(Color.accentColor)
+            .accessibilityLabel("Add a courier")
         }
     }
 

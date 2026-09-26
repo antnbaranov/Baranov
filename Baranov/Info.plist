@@ -38,6 +38,8 @@
 		<string>_baranov-gate._udp</string>
 		<string>_baranov-post._tcp</string>
 		<string>_baranov-post._udp</string>
+		<string>_baranov-courier._tcp</string>
+		<string>_baranov-courier._udp</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Baranov uses your current location to set where a letter's journey starts.</string>

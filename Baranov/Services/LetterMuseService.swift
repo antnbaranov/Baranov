@@ -126,6 +126,39 @@ final class LetterMuseService {
         #endif
     }
 
+    /// One fresh, playful sentence comparing the distance walked to something
+    /// you can picture (or, at 0 m, teasing a ram that hasn't left the pen).
+    /// `nil` when the model isn't available or declines.
+    func compare(ramName: String, totalMeters: Int, avoiding previous: String?) async -> String? {
+        #if canImport(FoundationModels)
+        guard #available(iOS 26.0, *), Self.isSupported else { return nil }
+        isThinking = true
+        defer { isThinking = false }
+
+        let session = LanguageModelSession(instructions: """
+            You write one witty, gentle line for a ram's travel passport. \
+            Reply with ONE sentence of at most 22 words. \
+            If the distance is above zero, compare it to a real, well-known thing of matching size with a correct rough number. \
+            If the distance is zero, tease the ram for not having left yet. \
+            No quotation marks, no emoji, no second sentence.
+            """)
+        let distance = DistanceFormatter.string(forMeters: totalMeters)
+        var prompt = "The ram \(ramName) has walked \(totalMeters > 0 ? distance : "0 m")."
+        if let previous, !previous.isEmpty { prompt += " Say it differently from: \(previous)" }
+        do {
+            let response = try await session.respond(
+                to: prompt,
+                options: GenerationOptions(temperature: 1.0, maximumResponseTokens: 50)
+            )
+            return Self.spark(response.content)
+        } catch {
+            return nil
+        }
+        #else
+        return nil
+        #endif
+    }
+
     /// One short line: first sentence only, at most 20 words.
     private static func spark(_ text: String) -> String? {
         guard let line = cleaned(text) else { return nil }

@@ -116,9 +116,11 @@ struct DispatchStatusCard: View {
                         .contentTransition(.symbolEffect(.replace))
                 }
 
-                ProgressView(value: ram.progress)
-                    .progressViewStyle(.linear)
-                    .controlSize(.mini)
+                // The route slider sits right under the card's own line while
+                // the ram is on its way: start, the ram, where the letter goes.
+                if ram.isEnRoute {
+                    RouteProgressBar(ram: ram)
+                }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)

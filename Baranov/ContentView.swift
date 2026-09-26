@@ -39,6 +39,10 @@ struct ContentView: View {
                 RootView()
             }
         }
+        // A real background behind everything: while sheets scale the
+        // content back or the map re-lays out, what shows through is the
+        // system background, not the window's black.
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .environment(\.locale, currentLocale)
         .preferredColorScheme(appAppearance.colorScheme)
         .onOpenURL { url in

@@ -2,7 +2,7 @@
 //  PastureView.swift
 //  Baranov
 //
-//  The flock: the ram selector (your obойма — one free slot, the rest
+//  The flock: the ram selector (your clip — one free slot, the rest
 //  rented through RevenueCat) up top, a small "Settings" section for the
 //  actual app-level preferences (language, appearance, notifications —
 //  nothing about any one ram). Letters are no longer listed here: a
@@ -20,7 +20,12 @@
 //  Manual `.ram` file import used to live here too, but it only ever
 //  duplicated the automatic AirDrop/`onOpenURL` path, so it's gone.
 //
+//  "Expand the Pasture" has exactly one entry point in the app, and it
+//  is the section right below the ram selector — moved here from
+//  Settings so a full pasture's own screen is what offers to grow it.
+//
 
+import RevenueCatUI
 import SwiftUI
 import UIKit
 
@@ -29,6 +34,9 @@ struct PastureView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EntitlementService.self) private var entitlementService
     @State private var isPaywallPresented = false
+    @State private var isCustomerCenterPresented = false
+    @State private var legalDocument: LegalDocument?
+    @State private var socialURL: IdentifiableURL?
 
 
     /// App-level settings — not tied to any one ram. `appAppearanceRawValue`
@@ -42,11 +50,7 @@ struct PastureView: View {
     /// person has ever had out at once, kept across launches.
     @AppStorage("com.baranov.mostRamsAtOnce") private var mostRamsAtOnce = 0
 
-    @State private var gameCenterFriends: [GameCenterFriend] = []
-    @State private var carrierPrefillName: String?
-
-    @State private var carrierDirectory = KnownCarrierDirectory()
-    @State private var isCarrierDirectoryPresented = false
+    @State private var boardScope: LeaderboardScope = .everyone
 
     @State private var ramLedger = RamLedger()
     private var gameCenterService: GameCenterService { .shared }
@@ -54,6 +58,8 @@ struct PastureView: View {
     @Environment(LocationService.self) private var locationService
 
     @State private var ramCompanionStore = RamCompanionStore()
+    /// The ram whose passport (journeys map, stamps, log) is open.
+    @State private var passportRam: Ram?
 
     /// The ram the big selector card and the AirDrop card below it both
     /// focus on — falls back to the first ram in the flock so both cards
@@ -88,7 +94,8 @@ struct PastureView: View {
                     onRename: { ram, newName in renameRam(ram, to: newName) },
                     ledgerEntry: { ram in ramLedger.entry(forName: ram.name) },
                     companion: ramCompanionStore.companion,
-                    onRenameCompanion: { newName in ramCompanionStore.rename(to: newName) }
+                    onRenameCompanion: { newName in ramCompanionStore.rename(to: newName) },
+                    onPassportTapped: { passportRam = $0 }
                 )
             }
             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -96,22 +103,74 @@ struct PastureView: View {
             .listRowBackground(Color.clear)
 
             Section {
+                if entitlementService.hasPastureExpansion || entitlementService.hasAdoptedRam {
+                    Button {
+                        if entitlementService.isLive {
+                            isCustomerCenterPresented = true
+                        } else {
+                            isPaywallPresented = true
+                        }
+                    } label: {
+                        HStack {
+                            Text("Manage Subscription")
+                            Spacer()
+                            Text(entitlementService.hasPastureExpansion ? "Expanded" : "Adopted Ram")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                } else {
+                    Button {
+                        isPaywallPresented = true
+                    } label: {
+                        HStack {
+                            Label("Expand the Pasture", systemImage: "plus.circle.fill")
+                            Spacer()
+                            Text(flockViewModel.hasFreeRamSlot ? "1 ram, free forever" : "Pasture full")
+                                .foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
+
+            Section {
                 ShepherdsBoardCard(
                     experiencePoints: ramLedger.totalExperiencePoints,
                     progress: achievementProgress,
                     isAuthenticated: gameCenterService.isAuthenticated,
+                    isCheckingSignIn: gameCenterService.authState == .unknown,
                     isLoading: gameCenterService.isLoadingLeaderboard,
-                    topEntries: gameCenterService.topEntries,
-                    localEntry: gameCenterService.localEntry,
-                    totalPlayers: gameCenterService.totalPlayers,
-                    onSignInTapped: { gameCenterService.signIn() }
+                    scope: $boardScope,
+                    topEntries: gameCenterService.snapshot(for: boardScope).rows,
+                    localEntry: gameCenterService.snapshot(for: boardScope).local,
+                    totalPlayers: gameCenterService.snapshot(for: boardScope).total,
+                    achievementInfo: gameCenterService.achievementInfo,
+                    remoteCompletedIDs: gameCenterService.completedAchievementIDs,
+                    friends: gameCenterService.friends,
+                    friendsAccess: gameCenterService.friendsAccess,
+                    boardMessage: gameCenterService.boardMessage,
+                    onSignInTapped: { gameCenterService.signIn() },
+                    onRequestFriends: {
+                        Task {
+                            await gameCenterService.loadFriends(requestingAccess: true)
+                            await gameCenterService.refreshLeaderboard()
+                        }
+                    },
+                    onOpenFullBoard: { gameCenterService.presentLeaderboard() }
                 )
             }
             .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             .listRowBackground(Color.clear)
 
             // Footer: always the last thing on the Pasture screen.
-            PastureFooterView()
+            PastureFooterView(socialURL: $socialURL, legalDocument: $legalDocument)
         }
         .listStyle(.insetGrouped)
         .preferredColorScheme(appAppearance.colorScheme)
@@ -138,14 +197,6 @@ struct PastureView: View {
                 dismissButton
             }
         }
-        .sheet(isPresented: $isCarrierDirectoryPresented, onDismiss: { carrierPrefillName = nil }) {
-            CarrierDirectoryView(
-                directory: carrierDirectory,
-                gameCenterService: gameCenterService,
-                prefilledName: carrierPrefillName
-            )
-                .preferredColorScheme(appAppearance.colorScheme)
-        }
         .task {
             // Backfill: a ram that was already `.delivered` before this
             // view existed this session (e.g. app relaunch) still needs
@@ -163,6 +214,9 @@ struct PastureView: View {
         .onChange(of: gameCenterService.isAuthenticated) { _, isAuthenticated in
             guard isAuthenticated else { return }
             Task { await refreshGameCenter() }
+        }
+        .onChange(of: boardScope) { _, _ in
+            Task { await gameCenterService.refreshLeaderboard() }
         }
         .onChange(of: locationService.currentCityName) { _, newCityName in
             // Trip suggestions need a real "home" coordinate to measure
@@ -199,13 +253,29 @@ struct PastureView: View {
                 await gameCenterService.refreshLeaderboard()
             }
         }
+        .navigationDestination(item: $passportRam) { ram in
+            RamHistoryView(ram: liveRam(for: ram), ledgerEntry: ramLedger.entry(forName: ram.name))
+        }
+        .sheet(item: $legalDocument) { doc in
+            LegalDocumentView(document: doc)
+        }
+        .sheet(item: $socialURL) { item in
+            SafariView(url: item.url).ignoresSafeArea()
+        }
         .sheet(isPresented: $isPaywallPresented) {
             PasturePaywallView()
                 .environment(flockViewModel)
                 .environment(entitlementService)
                 .preferredColorScheme(appAppearance.colorScheme)
         }
+        .presentCustomerCenter(isPresented: $isCustomerCenterPresented)
         .environment(\.locale, Locale(identifier: selectedLanguageCode))
+    }
+
+    /// The flock's current copy of a ram, so an open passport keeps up with
+    /// a journey in flight.
+    private func liveRam(for ram: Ram) -> Ram {
+        flockViewModel.activeRams.first { $0.id == ram.id } ?? ram
     }
 
     /// Renames a ram in the flock and carries its ledger entry across.
@@ -221,19 +291,22 @@ struct PastureView: View {
     /// an `xmark` on earlier releases.
     @ViewBuilder
     private var dismissButton: some View {
-        if #available(iOS 26.0, *) {
-            Button(role: .close) { dismiss() }
-        } else {
-            Button { dismiss() } label: { Image(systemName: "xmark") }
-                .accessibilityLabel("Close")
-        }
+        CloseToolbarButton { dismiss() }
     }
 
     /// Friends and the board, fetched once signed in. Both best-effort.
     private func refreshGameCenter() async {
-        gameCenterFriends = await gameCenterService.loadFriends()
+        // Scores were only ever submitted right after a *new* delivery, so
+        // anyone who earned XP before signing in (or while offline) never
+        // reached the table. Submit what the ledger already holds first.
+        let totalXP = ramLedger.totalExperiencePoints
+        if totalXP > 0 {
+            await gameCenterService.submitScore(totalXP)
+        }
+        await gameCenterService.loadFriends()
         await gameCenterService.refreshLeaderboard()
         await gameCenterService.report(ShepherdAchievement.earned(achievementProgress))
+        await gameCenterService.refreshAchievements()
     }
 
     /// Everything the badges are judged against, from the ledger (every
@@ -252,32 +325,6 @@ struct PastureView: View {
             metresWalked: ledgerSteps + inFlightSteps,
             handoffsMade: ledgerHandoffs + inFlightHandoffs,
             mostRamsAtOnce: mostRamsAtOnce
-        )
-    }
-
-    /// Adds a calendar trip suggestion (already geocoded and distance-
-    /// filtered by `CalendarTripSuggestionService`) to the known-carriers
-    /// directory under your own name — the fast, tap-once alternative to
-    /// typing it into `CarrierDirectoryView` by hand.
-    private func addTripAsCarrier(_ suggestion: TripSuggestion) {
-        carrierDirectory.add(
-            name: "You (\(suggestion.title))",
-            destinationCity: suggestion.displayName,
-            destinationCoordinate: suggestion.coordinate
-        )
-    }
-
-    /// Which trip chips already have a matching "You (<title>)" entry in
-    /// the carrier directory — read back from the directory itself
-    /// (the actual source of truth) rather than a separate flag that could
-    /// drift from it, which is what let the checkmark forget itself
-    /// whenever `AirDropSuggestionsCard` got recreated.
-    private var addedTripSuggestionIDs: Set<UUID> {
-        let carrierNames = Set(carrierDirectory.carriers.map(\.name))
-        return Set(
-            calendarService.suggestions
-                .filter { carrierNames.contains("You (\($0.title))") }
-                .map(\.id)
         )
     }
 }

@@ -8,7 +8,7 @@
 //
 //  - Still travelling: an intact seal and a small pill with the
 //    estimated arrival. Nothing to press.
-//  - At the gate, recipient verified: hold the wax for 1.2 s. Haptics
+//  - At the gate, recipient verified: hold the wax for 1.5 s. Haptics
 //    build from rigid to heavy, the seal cracks and shatters, the flap
 //    swings up, the sheet slides out and unfolds below with the journey
 //    passport.
@@ -25,12 +25,19 @@
 //  (paper, wax, ink) live in `LetterStationery`.
 //
 
+import CoreLocation
 import SwiftUI
 
 struct LetterDetailView: View {
     let ram: Ram
     /// A receiving code found nearby (see `ProximityCodeDiscovery`).
     var prefilledCode: String?
+    /// Starts the shake handoff (owned by `RootView`, which holds the
+    /// relay). Both people then shake; nobody types a name.
+    var onShakeHandoff: (() -> Void)? = nil
+    /// Pushed inside another `NavigationStack` (the ram's bag): no stack or
+    /// close button of its own — the parent's back button does the job.
+    var isEmbedded = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(FlockViewModel.self) private var flockViewModel
@@ -45,6 +52,7 @@ struct LetterDetailView: View {
     @State private var sealResetToken = 0
     @State private var lockedTick = 0
     @FocusState private var isCodeFieldFocused: Bool
+    @State private var nearbyCouriers = NearbyCourierService()
 
     // Opening sequence
     @State private var isSealBroken = false
@@ -54,9 +62,11 @@ struct LetterDetailView: View {
     @State private var isRevealed: Bool
     @State private var revealTask: Task<Void, Never>?
 
-    init(ram: Ram, prefilledCode: String? = nil) {
+    init(ram: Ram, prefilledCode: String? = nil, onShakeHandoff: (() -> Void)? = nil, isEmbedded: Bool = false) {
         self.ram = ram
         self.prefilledCode = prefilledCode
+        self.onShakeHandoff = onShakeHandoff
+        self.isEmbedded = isEmbedded
         // A letter already read on this device opens straight to its
         // opened state — no replaying the ritual.
         let alreadyOpen = ram.status == .delivered && (ram.letter?.isReadable ?? false)
@@ -78,7 +88,9 @@ struct LetterDetailView: View {
     private var isAtGate: Bool { liveRam.status == .arrivedAtGate }
     private var isDelivered: Bool { liveRam.status == .delivered }
     private var isEncrypted: Bool { letter?.isEncrypted ?? true }
-    private var hasCompleteCode: Bool { LetterCipher.normalize(enteredCode).count == 8 }
+    private var hasCompleteCode: Bool { LetterCode.isUsableKey(enteredCode) }
+    /// Whether this phone already holds the letter's code, so there is nothing to type.
+    @State private var holdsCode = false
     private var canBreak: Bool { !isEncrypted || hasCompleteCode }
 
     private var paperStyle: PaperStyle {
@@ -91,13 +103,21 @@ struct LetterDetailView: View {
             && letter.recipientName.gateNormalized == storedDisplayName.gateNormalized
     }
 
-    /// `nil` while the device's city is still resolving.
-    private var cityMatches: Bool? {
-        guard let city = locationService.currentCityName else { return nil }
-        return city.gateNormalized == liveRam.targetCity.gateNormalized
+    /// How far this phone is from the spot where the letter was left;
+    /// `nil` while there is no location fix yet.
+    private var distanceToGate: CLLocationDistance? {
+        guard let here = locationService.currentCoordinate else { return nil }
+        return liveRam.distanceToGate(from: here)
     }
 
-    private var isVerifiedRecipient: Bool { recipientNameMatches && cityMatches == true }
+    /// Whether the recipient is physically at the pick-up spot — the
+    /// letter can only be collected by walking there. `nil` while the
+    /// location is still resolving.
+    private var isAtPickupSpot: Bool? {
+        distanceToGate.map { $0 <= Ram.pickupRadiusMeters }
+    }
+
+    private var isVerifiedRecipient: Bool { recipientNameMatches && isAtPickupSpot == true }
 
     private var sealInteraction: HoldToBreakSeal.Interaction {
         guard isAtGate, !isSealBroken else { return .display }
@@ -106,8 +126,8 @@ struct LetterDetailView: View {
 
     private var lockedHint: LocalizedStringKey {
         isVerifiedRecipient
-            ? "Enter your receiving code to unlock the seal"
-            : "The seal can only be broken by the recipient, standing at the destination city."
+            ? "Enter your ear tag to unlock the seal"
+            : "The seal can only be broken by the recipient, standing where the letter was left."
     }
 
     /// The whole journey, across handoffs, as 0…1.
@@ -126,7 +146,15 @@ struct LetterDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationStack {
+        if isEmbedded {
+            content
+        } else {
+            NavigationStack { content }
+        }
+    }
+
+    private var content: some View {
+        Group {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 24) {
@@ -157,9 +185,10 @@ struct LetterDetailView: View {
             .navigationTitle(liveRam.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: { Image(systemName: "xmark") }
-                        .accessibilityLabel("Close")
+                if !isEmbedded {
+                    ToolbarItem(placement: .topBarLeading) {
+                        CloseToolbarButton { dismiss() }
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom) { shareCodeBar }
@@ -174,7 +203,7 @@ struct LetterDetailView: View {
                     locationService.resolveCurrentLocation()
                 }
                 if enteredCode.isEmpty, let found = prefilledCode { enteredCode = found }
-                if enteredCode.isEmpty, let known = letter?.receivingCode { enteredCode = known }
+                if enteredCode.isEmpty, let known = letter?.receivingCode { enteredCode = known; holdsCode = true }
             }
             .onDisappear { revealTask?.cancel() }
         }
@@ -236,12 +265,12 @@ struct LetterDetailView: View {
                         .multilineTextAlignment(.center)
                         .contentTransition(.opacity)
 
-                    if isEncrypted { codeEntry } else { postcardNote }
+                    if isEncrypted { if holdsCode { codeOnPhoneNote } else { codeEntry } } else { postcardNote }
 
                     if let wrongCodeMessage {
                         Label(wrongCodeMessage, systemImage: "exclamationmark.triangle.fill")
                             .font(.footnote)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.accentColor)
                             .transition(.opacity)
                     }
                 }
@@ -257,7 +286,7 @@ struct LetterDetailView: View {
         if !isEncrypted { return "Hold to lift the postcard out" }
         return hasCompleteCode
             ? "Hold the wax to read the letter"
-            : "Enter your receiving code to unlock the seal"
+            : "Enter your ear tag to unlock the seal"
     }
 
     private var postcardNote: some View {
@@ -274,16 +303,25 @@ struct LetterDetailView: View {
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private var codeOnPhoneNote: some View {
+        Label("Your ear tag is on this phone.", systemImage: "key.fill")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private var codeEntry: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Receiving Code")
+            Text("Ear tag")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
                 Image(systemName: "key.fill")
                     .foregroundStyle(.secondary)
-                TextField("XXXX-XXXX", text: $enteredCode)
+                TextField("XXXX-XXXX-XXXX", text: $enteredCode)
                     .font(.title3.weight(.semibold).monospaced())
                     .textInputAutocapitalization(.characters)
                     .autocorrectionDisabled()
@@ -304,7 +342,7 @@ struct LetterDetailView: View {
             .padding(12)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-            Text("The ram carried only ciphertext. The sender shared this code with you separately — it's the key.")
+            Text("The ram carried only ciphertext. The ear tag you were given is the key.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -401,27 +439,101 @@ struct LetterDetailView: View {
                 PassageNoticeView(ram: liveRam)
 
                 if liveRam.status == .waitingForHandoff {
-                    HStack(spacing: 10) {
-                        ShareLink(
-                            item: RamTransitPackage(ram: liveRam),
-                            preview: SharePreview(
-                                "\(liveRam.name) → \(liveRam.legDestinationCity)",
-                                image: Image(systemName: "pawprint.circle.fill")
-                            )
-                        ) {
-                            Label("Hand Off via AirDrop", systemImage: "airplane.departure")
+                    nearbyCouriersList
+                    VStack(alignment: .leading, spacing: 8) {
+                        if onShakeHandoff != nil {
+                            Button { shakeHandoff() } label: {
+                                Label("Shake to Hand Off", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.accentColor)
                         }
-                        Button("It went with someone", systemImage: "checkmark.circle") {
-                            flockViewModel.markHandedOff(ramId: ram.id, to: nil)
+                        HStack(spacing: 10) {
+                            ShareLink(
+                                item: RamTransitPackage(ram: liveRam),
+                                preview: SharePreview(
+                                    "\(liveRam.name) → \(liveRam.legDestinationCity)",
+                                    image: Image(systemName: "pawprint.circle.fill")
+                                )
+                            ) {
+                                Label("AirDrop", systemImage: "airplane.departure")
+                            }
+                            Button("It went with someone", systemImage: "checkmark.circle") {
+                                flockViewModel.markHandedOff(ramId: ram.id, to: nil)
+                            }
                         }
                     }
                     .font(.footnote.weight(.semibold))
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.regular)
                 }
             }
             .transition(.opacity)
+            .task { nearbyCouriers.start(announce: nil) }
+            .onDisappear { nearbyCouriers.stop() }
         }
+    }
+
+    /// Couriers standing close by, the ones heading the same way first.
+    /// AirDrop cannot address a person, so this just says who to ask.
+    @ViewBuilder
+    private var nearbyCouriersList: some View {
+        let sorted = nearbyCouriers.couriers.sorted {
+            ($0.isGoingSameWay(as: liveRam) ? 0 : 1) < ($1.isGoingSameWay(as: liveRam) ? 0 : 1)
+        }
+        if !sorted.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Couriers Nearby", systemImage: "person.2.wave.2")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                ForEach(sorted) { courier in
+                    let sameWay = courier.isGoingSameWay(as: liveRam)
+                    Button { shakeHandoff() } label: {
+                    HStack(spacing: 10) {
+                        CourierAvatarView(image: nil, name: courier.name, diameter: 32)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(courier.name)
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.primary)
+                            Text(courier.tripCity.isEmpty
+                                 ? LocalizedStringKey("Open to carry")
+                                 : LocalizedStringKey("Heading to \(courier.tripCity)"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if sameWay {
+                            Text("Same way")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .padding(.vertical, 3)
+                                .padding(.horizontal, 8)
+                                .background(.thinMaterial, in: Capsule())
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Text("Starts a handoff. You both shake your phones."))
+                }
+                Text("Tap a courier or Shake to Hand Off, then you both shake your phones.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .sensoryFeedback(.selection, trigger: sorted.count)
+        }
+    }
+
+    private func shakeHandoff() {
+        dismiss()
+        onShakeHandoff?()
     }
 
     // MARK: - Share code (secondary)

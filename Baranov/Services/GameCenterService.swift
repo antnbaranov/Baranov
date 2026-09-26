@@ -25,6 +25,42 @@ import GameKit
 import Observation
 import UIKit
 
+enum GameCenterAuthState: Sendable {
+    /// GameKit hasn't answered yet — show a neutral state, not "Sign in".
+    case unknown
+    case signedIn
+    case signedOut
+}
+
+enum LeaderboardScope: String, CaseIterable, Identifiable, Sendable {
+    case everyone
+    case friends
+
+    var id: String { rawValue }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .everyone: "Everyone"
+        case .friends: "Friends"
+        }
+    }
+}
+
+enum FriendsAccess: Sendable {
+    case unknown
+    /// Never asked — asking shows the system prompt, so it waits for a tap.
+    case notDetermined
+    case authorized
+    case denied
+}
+
+/// One page of a leaderboard for one scope.
+struct LeaderboardSnapshot: Sendable {
+    var rows: [LeaderboardRow]
+    var local: LeaderboardRow?
+    var total: Int
+}
+
 @Observable
 @MainActor
 final class GameCenterService {
@@ -33,116 +69,171 @@ final class GameCenterService {
     /// for real with no other code changes.
     static let lettersDeliveredLeaderboardID = "com.baranov.lettersDelivered"
 
-    /// One shared instance for the whole app. Each screen used to create its
-    /// own `GameCenterService()`, so a second screen started life with
-    /// `isAuthenticated == false` (showing "Sign in" although the player was
-    /// already signed in) and re-installed `authenticateHandler`, which makes
-    /// GameKit ask again.
+    /// How many rows of the table the Pasture shows.
+    static let boardRowCount = 10
+
+    /// One shared instance for the whole app, so every screen agrees on
+    /// the sign-in state and `authenticateHandler` is installed once.
     static let shared = GameCenterService()
 
-    private(set) var isAuthenticated = GKLocalPlayer.local.isAuthenticated
-    private var didAttemptAuthentication = false
+    /// `.unknown` until GameKit answers (unless the OS already says signed
+    /// in). Screens show a neutral "checking" state for it rather than a
+    /// sign-in button that flashes and then disappears.
+    private(set) var authState: GameCenterAuthState = GKLocalPlayer.local.isAuthenticated ? .signedIn : .unknown
+    var isAuthenticated: Bool { authState == .signedIn }
 
-    /// The top of the leaderboard and where this player sits on it, as
-    /// last fetched by `refreshLeaderboard()` — what `ShepherdsBoardCard`
-    /// renders. Empty until signed in and the leaderboard exists in App
-    /// Store Connect.
-    private(set) var topEntries: [LeaderboardRow] = []
-    private(set) var localEntry: LeaderboardRow?
-    private(set) var totalPlayers = 0
+    private var didAttemptAuthentication = false
+    private var didPresentAuthUI = false
+    /// GameKit's sign-in controller, kept until it is actually on screen.
+    private var pendingAuthViewController: UIViewController?
+
+    /// Tables by scope, as last fetched by `refreshLeaderboard()`.
+    private(set) var snapshots: [LeaderboardScope: LeaderboardSnapshot] = [:]
     private(set) var isLoadingLeaderboard = false
     private(set) var leaderboardLastRefreshedAt: Date?
+    /// Why the table is empty when it isn't simply "nobody yet".
+    private(set) var boardMessage: String?
 
-    /// Achievement identifiers already reported this launch, so a flock
-    /// change never re-reports the same badge.
+    /// The player's Game Center friends and whether we may read them.
+    private(set) var friends: [GameCenterFriend] = []
+    private(set) var friendsAccess: FriendsAccess = .unknown
+
+    /// The badges as configured in App Store Connect, keyed by identifier.
+    private(set) var achievementInfo: [String: GameCenterAchievementInfo] = [:]
+
+    /// Identifiers Game Center already lists as completed for this player.
+    private(set) var completedAchievementIDs: Set<String> = []
+
+    /// Achievement identifiers already reported this launch.
     private var reportedAchievementIDs: Set<String> = []
 
-    /// Kicks off GameCenter authentication once per app launch. Safe to
-    /// call repeatedly — a request already made is a no-op. Never blocks
-    /// or alerts on failure (declined sign-in, no network, GameCenter
-    /// disabled): the rest of the app works identically either way, with
-    /// the Rankings button and score submission simply becoming inert.
-    ///
-    /// GameKit calls `authenticateHandler` with a non-nil view controller
-    /// whenever the player isn't already signed in at the OS level — that
-    /// controller has to actually be presented for sign-in to happen at
-    /// all. Silently discarding it (as this used to do) meant nobody who
-    /// wasn't already signed into Game Center system-wide ever saw a
-    /// sign-in prompt, so `isAuthenticated` just stayed false forever and
-    /// the access point never appeared. That's `presentAuthenticationViewController`
-    /// below.
-    func authenticateIfNeeded() {
-        if GKLocalPlayer.local.isAuthenticated { isAuthenticated = true }
-        guard !didAttemptAuthentication else { return }
-        didAttemptAuthentication = true
-
-        GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
-            Task { @MainActor in
-                guard let self else { return }
-
-                if let viewController {
-                    self.didPresentAuthUI = true
-                    self.presentAuthenticationViewController(viewController)
-                    return
-                }
-
-                self.isAuthenticated = (error == nil) && GKLocalPlayer.local.isAuthenticated
-                guard self.isAuthenticated else { return }
-
-                // The floating Game Center badge (the "rocket" in the
-                // top-right corner) is deliberately off: it sat on top of
-                // the app's own toolbar. The leaderboard is still one tap
-                // away from Pasture via `presentLeaderboard()`.
-                GKAccessPoint.shared.isActive = false
+    init() {
+        // Sign-in can change while the app is open (Settings, another
+        // device, GameKit re-authenticating): follow it instead of only
+        // trusting the first answer.
+        NotificationCenter.default.addObserver(
+            forName: .GKPlayerAuthenticationDidChangeNotificationName,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncAuthenticationState() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.syncAuthenticationState()
+                self?.presentPendingAuthenticationUI()
             }
         }
     }
 
-    private var didPresentAuthUI = false
+    /// Cached table for a scope, or empty.
+    func snapshot(for scope: LeaderboardScope) -> LeaderboardSnapshot {
+        snapshots[scope] ?? LeaderboardSnapshot(rows: [], local: nil, total: 0)
+    }
 
-    /// The "Sign in to Game Center" button. `authenticateIfNeeded()` is
-    /// once-per-launch, so after a dismissed or declined prompt (or a
-    /// sign-in done in Settings since launch) tapping the button did
-    /// nothing at all. This one always does something: picks up an
-    /// existing system sign-in, otherwise re-runs authentication so
-    /// GameKit shows its sheet again, and if GameKit won't show one any
-    /// more (it stops after repeated dismissals) opens this app's page in
-    /// Settings, where Game Center can be switched on.
-    func signIn() {
+    /// Brings `authState` in line with the OS. Only ever promotes to
+    /// signed-in or demotes from it; "signed out" for a player who was
+    /// never signed in is decided by GameKit's handler.
+    private func syncAuthenticationState() {
         if GKLocalPlayer.local.isAuthenticated {
-            isAuthenticated = true
+            authState = .signedIn
+        } else if authState == .signedIn {
+            authState = .signedOut
+            snapshots = [:]
+            friends = []
+            friendsAccess = .unknown
+            completedAchievementIDs = []
+            reportedAchievementIDs = []
+        }
+    }
+
+    /// Kicks off Game Center authentication once per app launch. Safe to
+    /// call repeatedly. Never blocks or alerts on failure: the rest of the
+    /// app works identically either way.
+    func authenticateIfNeeded() {
+        syncAuthenticationState()
+        presentPendingAuthenticationUI()
+        guard !didAttemptAuthentication else { return }
+        didAttemptAuthentication = true
+
+        GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, _ in
+            Task { @MainActor in
+                self?.handleAuthentication(viewController: viewController)
+            }
+        }
+    }
+
+    private func handleAuthentication(viewController: UIViewController?) {
+        if let viewController {
+            didPresentAuthUI = true
+            pendingAuthViewController = viewController
+            presentPendingAuthenticationUI()
             return
         }
+        pendingAuthViewController = nil
+        // The OS is the source of truth. A transient error while still
+        // authenticated must not flip the UI to "signed out".
+        if GKLocalPlayer.local.isAuthenticated {
+            authState = .signedIn
+            // The floating Game Center badge sat on top of the app's own
+            // toolbar; the table lives on the Pasture instead.
+            GKAccessPoint.shared.isActive = false
+        } else {
+            authState = .signedOut
+        }
+    }
+
+    /// The "Sign in to Game Center" button: picks up an existing system
+    /// sign-in, otherwise re-runs authentication so GameKit shows its
+    /// sheet again, and if GameKit won't show one any more opens this
+    /// app's page in Settings.
+    func signIn() {
+        syncAuthenticationState()
+        guard !isAuthenticated else { return }
         didPresentAuthUI = false
         didAttemptAuthentication = false
         authenticateIfNeeded()
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.5))
-            guard !isAuthenticated, !didPresentAuthUI,
+            try? await Task.sleep(for: .seconds(2.5))
+            guard authState != .signedIn, !didPresentAuthUI, pendingAuthViewController == nil,
                   let url = URL(string: UIApplication.openSettingsURLString) else { return }
             await UIApplication.shared.open(url)
         }
     }
 
-    /// Finds the frontmost presented view controller in the active scene
-    /// and presents GameKit's own sign-in UI on it. The only bit of UIKit
-    /// bridging this service needs — everything else GameKit shows
-    /// (profile, leaderboard, highlights) goes through `GKAccessPoint`
-    /// instead, which needs none of this.
-    private func presentAuthenticationViewController(_ viewController: UIViewController) {
-        guard
-            let windowScene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive })
-                ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
-            let rootViewController = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
-        else { return }
-
-        var topController = rootViewController
-        while let presented = topController.presentedViewController {
-            topController = presented
+    /// Presents GameKit's sign-in controller on the frontmost controller,
+    /// retrying briefly while a sheet is mid-transition or no scene is
+    /// active yet — dropping it would leave the player signed out with no
+    /// way to get the prompt back until relaunch.
+    private func presentPendingAuthenticationUI(attempt: Int = 0) {
+        guard let controller = pendingAuthViewController, controller.presentingViewController == nil else { return }
+        if let top = frontmostViewController(),
+           !top.isBeingPresented, !top.isBeingDismissed, !top.isMovingToParent {
+            top.present(controller, animated: true)
+            return
         }
-        topController.present(viewController, animated: true)
+        guard attempt < 10 else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            self?.presentPendingAuthenticationUI(attempt: attempt + 1)
+        }
+    }
+
+    private func frontmostViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard
+            let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first,
+            let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+        else { return nil }
+        var top = root
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
     }
 
     /// Submits the player's total lifetime experience points
@@ -176,31 +267,82 @@ final class GameCenterService {
                                      timeScope: .allTime)
     }
 
-    /// Loads the top three on the lifetime-experience leaderboard plus
-    /// the local player's own entry. Best-effort: unauthenticated, offline,
-    /// or an unconfigured leaderboard all just leave the last known rows
-    /// in place. The board is a nice thing to look at, never something the
-    /// pasture waits on.
+    /// Loads the top of the lifetime-experience table for everyone and,
+    /// when friend access was granted, for friends only — plus the local
+    /// player's own row. Best-effort: offline keeps the last rows; a
+    /// missing leaderboard says so instead of looking merely empty.
     func refreshLeaderboard() async {
         guard isAuthenticated, !isLoadingLeaderboard else { return }
         isLoadingLeaderboard = true
         defer { isLoadingLeaderboard = false }
 
+        let board: GKLeaderboard
         do {
-            let boards = try await GKLeaderboard.loadLeaderboards(IDs: [Self.lettersDeliveredLeaderboardID])
-            guard let board = boards.first else { return }
+            guard let found = try await GKLeaderboard.loadLeaderboards(IDs: [Self.lettersDeliveredLeaderboardID]).first else {
+                boardMessage = "The shepherds' table isn't set up in Game Center yet."
+                return
+            }
+            board = found
+        } catch {
+            boardMessage = "Couldn't reach Game Center. Pull to try again."
+            return
+        }
+        boardMessage = nil
+
+        if let everyone = await loadSnapshot(of: board, scope: .global) {
+            snapshots[.everyone] = everyone
+        }
+        if friendsAccess == .authorized, let friendsOnly = await loadSnapshot(of: board, scope: .friendsOnly) {
+            snapshots[.friends] = friendsOnly
+        }
+        leaderboardLastRefreshedAt = Date()
+    }
+
+    private func loadSnapshot(of board: GKLeaderboard, scope: GKLeaderboard.PlayerScope) async -> LeaderboardSnapshot? {
+        do {
             let (local, entries, total) = try await board.loadEntries(
-                for: .global,
+                for: scope,
                 timeScope: .allTime,
-                range: NSRange(location: 1, length: 3)
+                range: NSRange(location: 1, length: Self.boardRowCount)
             )
             let localID = GKLocalPlayer.local.gamePlayerID
-            topEntries = entries.map { LeaderboardRow(entry: $0, isLocalPlayer: $0.player.gamePlayerID == localID) }
-            localEntry = local.map { LeaderboardRow(entry: $0, isLocalPlayer: true) }
-            totalPlayers = total
-            leaderboardLastRefreshedAt = Date()
+            return LeaderboardSnapshot(
+                rows: entries.map { LeaderboardRow(entry: $0, isLocalPlayer: $0.player.gamePlayerID == localID) },
+                local: local.map { LeaderboardRow(entry: $0, isLocalPlayer: true) },
+                total: total
+            )
         } catch {
-            // Offline-first: keep whatever we last showed.
+            return nil
+        }
+    }
+
+    /// Reads the achievements configured in App Store Connect and this
+    /// player's completed ones. Best-effort: signed out, offline, or not
+    /// yet configured all leave the local titles and captions in place.
+    func refreshAchievements() async {
+        guard isAuthenticated else { return }
+        do {
+            let descriptions = try await GKAchievementDescription.loadAchievementDescriptions()
+            var info: [String: GameCenterAchievementInfo] = [:]
+            for description in descriptions {
+                info[description.identifier] = GameCenterAchievementInfo(
+                    title: description.title,
+                    unachievedDescription: description.unachievedDescription,
+                    achievedDescription: description.achievedDescription,
+                    maximumPoints: description.maximumPoints
+                )
+            }
+            achievementInfo = info
+        } catch {
+            // Keep whatever was last shown.
+        }
+        do {
+            let mine = try await GKAchievement.loadAchievements()
+            let done = Set(mine.filter(\.isCompleted).map(\.identifier))
+            completedAchievementIDs = done
+            reportedAchievementIDs.formUnion(done)
+        } catch {
+            // Local badges stand on their own.
         }
     }
 
@@ -227,22 +369,35 @@ final class GameCenterService {
         }
     }
 
-    /// The local player's Game Center friends, for `CarrierDirectoryView`
-    /// to offer as a fast way to fill in a known carrier's name — GameKit
-    /// has no idea where any of them are actually headed, so this only
-    /// ever prefills the name field, never the destination. Returns an
-    /// empty list (never throws into the UI) if unauthenticated, if the
-    /// person hasn't granted friend-list access, or if the request just
-    /// fails — friend discovery is a nice-to-have, not load-bearing.
-    func loadFriends() async -> [GameCenterFriend] {
+    /// The local player's Game Center friends. Reading them needs the
+    /// player's permission: with `requestingAccess` false this only reads
+    /// friends when access was already granted (so opening the Pasture
+    /// never throws a system prompt at anyone); with true, an undecided
+    /// player is asked — that is what the "Show my friends" button does.
+    /// Never throws into the UI; keeps the last known list on failure.
+    @discardableResult
+    func loadFriends(requestingAccess: Bool = false) async -> [GameCenterFriend] {
         guard isAuthenticated else { return [] }
         do {
             let status = try await GKLocalPlayer.local.loadFriendsAuthorizationStatus()
-            guard status == .authorized else { return [] }
+            switch status {
+            case .authorized:
+                friendsAccess = .authorized
+            case .notDetermined:
+                friendsAccess = .notDetermined
+                guard requestingAccess else { return friends }
+            default:
+                friendsAccess = .denied
+                return []
+            }
             let players = try await GKLocalPlayer.local.loadFriends()
-            return players.map { GameCenterFriend(id: $0.gamePlayerID, displayName: $0.displayName) }
+            friendsAccess = .authorized
+            friends = players.map { GameCenterFriend(id: $0.gamePlayerID, displayName: $0.displayName) }
+                .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+            return friends
         } catch {
-            return []
+            if requestingAccess, friendsAccess != .authorized { friendsAccess = .denied }
+            return friends
         }
     }
 }
@@ -273,6 +428,15 @@ struct LeaderboardRow: Identifiable, Hashable, Sendable {
         self.formattedScore = "\(score) XP"
         self.isLocalPlayer = isLocalPlayer
     }
+}
+
+/// One achievement as configured in App Store Connect, trimmed to what
+/// the badge row shows.
+struct GameCenterAchievementInfo: Hashable, Sendable {
+    let title: String
+    let unachievedDescription: String
+    let achievedDescription: String
+    let maximumPoints: Int
 }
 
 /// A Game Center friend, trimmed down to just what `CarrierDirectoryView`

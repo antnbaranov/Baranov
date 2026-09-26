@@ -4,27 +4,42 @@
 //
 //  App-level preferences as their own screen, pushed from Pasture. An
 //  inset-grouped list — the same look as Pasture and Satchel. "Expand the
-//  Pasture" has exactly one entry point in the app, and it is here.
+//  Pasture" moved up to the Pasture screen itself (right under the ram
+//  selector, where the locked pens already live) — this screen no longer
+//  carries a subscription entry point at all.
+//
+//  Debug builds only: a hidden "Developer" section at the bottom lets a
+//  tester punch in a code to flip the mock pasture-expansion entitlement
+//  without RevenueCat. Compiled out of every release build via #if DEBUG,
+//  so it never ships and never reaches App Review.
 //
 
-import RevenueCatUI
 import SwiftUI
 import UIKit
 import UserNotifications
 
 struct SettingsView: View {
     @Environment(FlockViewModel.self) private var flockViewModel
+    #if DEBUG
     @Environment(EntitlementService.self) private var entitlementService
+    #endif
 
     @AppStorage(AppAppearance.storageKey) private var appAppearanceRawValue = AppAppearance.system.rawValue
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
     @AppStorage("com.baranov.notificationsEnabled") private var notificationsEnabled = false
-    @AppStorage(SealStyle.storageKey) private var sealStyleRaw = SealStyle.wax.rawValue
+    @AppStorage(RamNotificationService.morningEnabledKey) private var morningNoteEnabled = true
+    @AppStorage(RamNotificationService.morningMinutesKey) private var morningMinutes = RamNotificationService.defaultMorningMinutes
+    @AppStorage(CarrierPresenceService.shareKey) private var sharesPresence = false
+    @AppStorage("com.baranov.nearbyRadar") private var nearbyRadar = false
     @AppStorage(DistanceFormatter.unitStorageKey) private var distanceUnit = Locale.current.measurementSystem == .metric ? "km" : "mi"
 
-    @State private var isPaywallPresented = false
-    @State private var isCustomerCenterPresented = false
+    @State private var isSendLogsPresented = false
+    @AppStorage(Analytics.consentKey) private var sharesUsageStats = true
     @State private var notificationsDeniedAlertPresented = false
+
+    #if DEBUG
+    @State private var debugCode = ""
+    #endif
 
     private var appAppearance: AppAppearance {
         AppAppearance(rawValue: appAppearanceRawValue) ?? .system
@@ -64,6 +79,24 @@ struct SettingsView: View {
         return "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity)"
     }
 
+    /// The morning note's chosen time as a `Date` for the picker.
+    private var morningTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                Calendar.current.date(bySettingHour: morningMinutes / 60, minute: morningMinutes % 60, second: 0, of: Date()) ?? Date()
+            },
+            set: { newValue in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+                morningMinutes = (parts.hour ?? 9) * 60 + (parts.minute ?? 0)
+            }
+        )
+    }
+
+    private var previewTime: String {
+        (Calendar.current.date(bySettingHour: morningMinutes / 60, minute: morningMinutes % 60, second: 0, of: Date()) ?? Date())
+            .formatted(date: .omitted, time: .shortened)
+    }
+
     private var previewMessage: String {
         let name = previewRam?.name ?? "Your ram"
         return "\(name) walks when you do. Every step today counts."
@@ -100,79 +133,113 @@ struct SettingsView: View {
                     Text("Miles (mi)").tag("mi")
                 }
 
-                Picker("Seal", selection: $sealStyleRaw) {
-                    ForEach(SealStyle.allCases) { style in
-                        Text(style.title).tag(style.rawValue)
-                    }
-                }
-                Text("How you close and open letters. Wax Seal: press and hold the wax until it presses shut or cracks open. Tap Prompt: a simple tap does the same, if holding is awkward for you.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            }
 
+            Section {
                 Toggle("Notifications", isOn: notificationsToggleBinding)
-                    .tint(.accentColor)
-            }
+                    .tint(Color.accentColor)
 
-            Section {
-                NotificationPreviewCard(title: previewTitle, message: previewMessage, time: "8:30 AM")
-                    .opacity(notificationsEnabled ? 1 : 0.55)
-                    .animation(.easeOut(duration: 0.2), value: notificationsEnabled)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-            } header: {
-                Text("What you'll get")
-            } footer: {
-                Text("A morning note at 8:30 while a ram is walking, plus a nudge when one goes quiet or arrives.")
-            }
-
-            Section {
-                if entitlementService.hasPastureExpansion || entitlementService.hasAdoptedRam {
-                    Button {
-                        if entitlementService.isLive {
-                            isCustomerCenterPresented = true
-                        } else {
-                            isPaywallPresented = true
-                        }
-                    } label: {
-                        HStack {
-                            Text("Manage Subscription")
-                            Spacer()
-                            Text(entitlementService.hasPastureExpansion ? "Expanded" : "Adopted Ram")
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
+                if notificationsEnabled {
+                    Toggle("Morning note", isOn: $morningNoteEnabled)
+                        .tint(Color.accentColor)
+                    if morningNoteEnabled {
+                        DatePicker("Time", selection: morningTimeBinding, displayedComponents: .hourAndMinute)
                     }
-                    .foregroundStyle(.primary)
-                } else {
-                    Button {
-                        isPaywallPresented = true
-                    } label: {
-                        HStack {
-                            Label("Expand the Pasture", systemImage: "plus.circle.fill")
-                            Spacer()
-                            Text(flockViewModel.hasFreeRamSlot ? "1 ram, free forever" : "Pasture full")
-                                .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .foregroundStyle(.primary)
                 }
+
+                NotificationPreviewCard(title: previewTitle, message: previewMessage, time: previewTime, fill: AnyShapeStyle(Color(.tertiarySystemFill)))
+                    .opacity(notificationsEnabled && morningNoteEnabled ? 1 : 0.55)
+                    .animation(.easeOut(duration: 0.2), value: notificationsEnabled)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                    .listRowSeparator(.hidden)
+
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("A note when a ram arrives or goes quiet. The morning note comes once a day, at the time you choose, and only while a ram is walking.")
             }
+
+            Section {
+                Toggle("Share my location with senders", isOn: $sharesPresence)
+                    .tint(Color.accentColor)
+                PresencePreviewCard(
+                    symbol: "location.circle",
+                    title: "Your ram is near Burnaby",
+                    detail: "About 1 km · updated 2 min ago",
+                    showsApproximateArea: true
+                )
+                .opacity(sharesPresence ? 1 : 0.55)
+                .animation(.easeOut(duration: 0.2), value: sharesPresence)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                    .listRowSeparator(.hidden)
+
+
+                Toggle("Show nearby senders on the map", isOn: $nearbyRadar)
+                    .tint(Color.accentColor)
+                PresencePreviewCard(
+                    symbol: "envelope.badge",
+                    title: "Someone nearby has a letter for you",
+                    detail: "Tap the marker to enter their code"
+                )
+                .opacity(nearbyRadar ? 1 : 0.55)
+                .animation(.easeOut(duration: 0.2), value: nearbyRadar)
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 12, trailing: 16))
+                    .listRowSeparator(.hidden)
+
+            } header: {
+                Text("Privacy & Nearby")
+            } footer: {
+                Text("Both are off until you turn them on. Sharing happens only while you carry someone's ram, and stops the moment you switch it off.")
+            }
+
+            Section {
+                Toggle("Share anonymous usage stats", isOn: $sharesUsageStats)
+                    .tint(Color.accentColor)
+                    .onChange(of: sharesUsageStats) { _, on in
+                        Task { await Analytics.shared.setEnabled(on) }
+                    }
+                Button { isSendLogsPresented = true } label: {
+                    Label("Send logs to developer", systemImage: "envelope")
+                }
+                .foregroundStyle(.primary)
+            } header: {
+                Text("Privacy & support")
+            } footer: {
+                Text("Stats are counts tied to a random ID, never letter text, names or exact location. Logs stay on your phone until you send them.")
+            }
+
+            #if DEBUG
+            Section {
+                HStack(spacing: 12) {
+                    TextField("Code", text: $debugCode)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .onSubmit { redeemDebugCode() }
+
+                    Button("Redeem") { redeemDebugCode() }
+                        .compactGlassButton()
+                        .disabled(debugCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } header: {
+                Text("Developer")
+            } footer: {
+                Text("Debug builds only — never shows in a release build. Redeeming NY2026 unlocks the mock pasture expansion locally, with no RevenueCat purchase.")
+            }
+            #endif
         }
         .listStyle(.insetGrouped)
+        .sheet(isPresented: $isSendLogsPresented) { SendLogsSheet() }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $isPaywallPresented) {
-            PasturePaywallView()
-                .environment(flockViewModel)
-                .environment(entitlementService)
-                .preferredColorScheme(appAppearance.colorScheme)
+        .onChange(of: morningNoteEnabled) { _, _ in
+            NotificationCenter.default.post(name: RamNotificationService.preferencesChanged, object: nil)
         }
-        .presentCustomerCenter(isPresented: $isCustomerCenterPresented)
+        .onChange(of: morningMinutes) { _, _ in
+            NotificationCenter.default.post(name: RamNotificationService.preferencesChanged, object: nil)
+        }
+        .onChange(of: notificationsEnabled) { _, _ in
+            NotificationCenter.default.post(name: RamNotificationService.preferencesChanged, object: nil)
+        }
         .alert("Notifications Off", isPresented: $notificationsDeniedAlertPresented) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -196,4 +263,16 @@ struct SettingsView: View {
             notificationsDeniedAlertPresented = true
         }
     }
+
+    #if DEBUG
+    /// Debug-only cheat code. Never compiled into a release build, so it
+    /// can't be reached — let alone abused — in a shipped app.
+    private func redeemDebugCode() {
+        let trimmed = debugCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard trimmed == "NY2026" else { return }
+        MockEntitlementStore.hasPastureExpansion = true
+        Task { await entitlementService.refresh() }
+        debugCode = ""
+    }
+    #endif
 }

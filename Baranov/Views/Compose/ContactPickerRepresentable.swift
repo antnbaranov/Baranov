@@ -83,11 +83,21 @@ struct ContactPickerRepresentable: UIViewControllerRepresentable {
 
         if isPresented {
             // Already presenting (e.g. a redundant state update while the
-            // picker is on screen) — don't double-present.
-            guard topMost.presentedViewController == nil else { return }
+            // picker is on screen) — don't double-present. The real bug
+            // this used to miss: once the picker itself IS topmost (it has
+            // nothing presented on top of IT), `topMost.presentedViewController
+            // == nil` is true again, so the old guard let every unrelated
+            // SwiftUI re-render (typing a message, any state change
+            // elsewhere in the compose form) call `present` a second,
+            // third, fourth... time, stacking a fresh picker on top of the
+            // one already on screen. Checking whether `topMost` itself
+            // already IS the picker closes that hole.
+            guard topMost.presentedViewController == nil, !(topMost is CNContactPickerViewController) else { return }
             let picker = CNContactPickerViewController()
             picker.delegate = context.coordinator
             topMost.present(picker, animated: true)
+        } else if topMost is CNContactPickerViewController {
+            topMost.dismiss(animated: true)
         } else if topMost.presentedViewController is CNContactPickerViewController {
             topMost.dismiss(animated: true)
         }

@@ -33,6 +33,23 @@
 //
 
 import SwiftUI
+import UIKit
+
+/// The window's real safe-area insets (status bar / Dynamic Island on top,
+/// home indicator at the bottom), read from UIKit. Public API, and a
+/// stable number — unlike an overlay's own `safeAreaInsets`, or the
+/// difference of two SwiftUI frames measured at different moments, either
+/// of which can be zero for a frame or two and let Look Around's chrome
+/// slip under the status bar.
+@MainActor
+enum WindowSafeArea {
+    static var insets: UIEdgeInsets {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
+        let window = scene?.keyWindow ?? scene?.windows.first
+        return window?.safeAreaInsets ?? .zero
+    }
+}
 
 /// Everything needed to lay out the panel for a given `LookAroundLayout`.
 struct LookAroundLayoutMetrics: Equatable {
@@ -109,11 +126,18 @@ struct LookAroundLayoutMetrics: Equatable {
                 topTrailing: Self.previewCornerRadius
             )
         case .split:
+            // All four corners round, not just the bottom two — the
+            // panel's *frame* still extends up under the status bar
+            // (`frame(for:)` below), so even though the top corners sit
+            // off-screen on most devices, a device where the measured
+            // `topInset` under-reports (or the panel simply isn't flush
+            // with the physical top edge) no longer shows a hard square
+            // corner peeking out.
             return RectangleCornerRadii(
-                topLeading: 0,
+                topLeading: Self.splitBottomCornerRadius,
                 bottomLeading: Self.splitBottomCornerRadius,
                 bottomTrailing: Self.splitBottomCornerRadius,
-                topTrailing: 0
+                topTrailing: Self.splitBottomCornerRadius
             )
         case .fullscreen:
             return RectangleCornerRadii(topLeading: 0, bottomLeading: 0, bottomTrailing: 0, topTrailing: 0)

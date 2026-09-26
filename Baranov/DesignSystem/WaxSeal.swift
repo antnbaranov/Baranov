@@ -108,6 +108,8 @@ struct WaxSealView: View {
             SealMonogram(monogram: monogram, diameter: diameter)
         }
         .frame(width: diameter, height: diameter)
+        .clipShape(WaxBlobShape())
+        .metallicShimmer(isActive: wax.isRare)
         .accessibilityLabel("\(wax.displayName) wax seal, monogram \(monogram)")
     }
 }

@@ -60,7 +60,7 @@ struct LetterPaperCard: View {
         .background {
             ZStack {
                 paper.color
-                PaperGrain()
+                PaperGrain(isHeavy: paper.hasHeavyGrain)
             }
             .clipShape(shape)
         }
