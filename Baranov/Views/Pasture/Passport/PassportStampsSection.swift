@@ -108,6 +108,6 @@ struct PassportStampsSection: View {
         .labelStyle(.titleAndIcon)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

@@ -31,7 +31,7 @@ The letter itself is ciphertext the entire way. Nobody who carries it can read i
 |---|---|
 | **Walk it there** | `CMPedometer` steps (with HealthKit / Apple Watch steps merged in) advance the ram along a real MapKit driving route, one metre per step. Map follows the ram with a sprite that walks, gallops and rears; Look Around at its current position; a live "next landmark" so you know what it's about to pass. |
 | **Hand it across water** | Reaching an ocean/border leg ends in `.waitingForHandoff`. A `.ram` transit package is a `Transferable` you AirDrop; or two people shake their phones (`Hoofbeat` relay over local network, no internet) and the ram jumps across. The receiving phone resolves the next road leg itself. |
-| **Sealed for real** | Sealing is a ritual, not a switch: pick a wax, hold the seal until the wax pools, and a signet stamps your monogram into it — then the envelope closes over the message. A sealed letter's body is ChaCha20-Poly1305 ciphertext, keyed from a human-typeable receiving code via HKDF, bound to the letter's id. The code never travels with the ram — it lives in the sender's Keychain and is shared out of band. The recipient types it at the gate; a wrong code shakes and leaves the seal intact. Or skip the wax and send an **open postcard**: plain text, readable by whoever carries it, no code at the gate — the sender's choice, made explicit every time. |
+| **Sealed for real** | Sealing is a ritual, not a switch: pick a wax, hold the seal until the wax pools, and a signet stamps your monogram into it — then the envelope closes over the message. A sealed letter's body is ChaCha20-Poly1305 ciphertext, keyed from one human-typeable letter code via HKDF, bound to the letter's id. The same code, run through a different one-way derivation, is how the relay finds the letter — so a recipient enters it once, and the seal opens on arrival with nothing more to type. The code never travels with the ram — it lives in the sender's Keychain and is shared out of band, or wrapped to the recipient's profile code so the letter simply appears in their mailbag. a wrong code shakes and leaves the seal intact. Or skip the wax and send an **open postcard**: plain text, readable by whoever carries it, no code at the gate — the sender's choice, made explicit every time. |
 | **The gate** | Opening requires being the addressee *and* standing in the destination city (CoreLocation), then a 1.5 s long-press with heavy haptics while the wax cracks. The revealed letter comes with its stamped passport: every place the ram walked past, and who carried each leg. |
 | **Shepherds' Board** | Game Center, shown rather than buried: lifetime XP, your rank with the top three around you, and six badges (First Letter, Seal Broken, 10 km, 100 km, Ocean Crossing, Full Pasture (five out at once)) decided locally and reported to Game Center with the system banner. Game Center friends appear in the carriers card as one-tap carriers. |
 | **A ram that grows up** | Your companion ram has a name and a birthday; its lifetime ledger (letters delivered, steps, distinct places) survives every journey. Game Center leaderboards for the walker; a "flock pulse" of how many rams are out in the world right now. |
@@ -45,15 +45,15 @@ The letter itself is ciphertext the entire way. Nobody who carries it can read i
 
 | Entitlement | What it unlocks | Products | Shape |
 |---|---|---|---|
-| `pasture_expansion` | 5 rams at once + every wax colour | `baranov.pasture.monthly` ($1.99), `baranov.pasture.annual` ($12.99, 7-day trial) | subscription |
-| `adopted_ram` | a permanent 2nd ram slot | `baranov.ram.adopt` ($3.99) | non-consumable, one-time |
+| `pasture_expansion` | 5 rams at once + every wax colour | `com.baranov.sub.monthly` ($2.99), `com.baranov.sub.quarterly` ($5.99/3 mo), `com.baranov.sub.annual` ($19.99, 7-day trial) | subscription |
+| `adopted_ram` | a permanent 2nd ram slot | `com.baranov.iap.ram.merino` ($2.99) | non-consumable, one-time |
 
 Two shapes on purpose: some people want to rent a bigger pasture, some just want to own one more ram and never think about it again. `EntitlementService` folds both into a single `allowedRamSlots` that `FlockViewModel` enforces on every admission path (compose, AirDrop, shake).
 
 What the integration actually does:
 
 - **`Purchases` configured with StoreKit 2**, entitlement state observed live via `PurchasesDelegate` (renewals, lapses, Family Sharing, restores on another device all flow in without polling).
-- **Package picker built from the live offering** — every price on screen is the App Store's; the "Best value · save 46%" badge is computed from real prices normalised per week, never typed in.
+- **Package picker built from the live offering** — every price on screen is the App Store's; the "Best value · save 45%" badge is computed from real prices normalised per week, never typed in.
 - **Trial-aware CTA** ("Start Free Trial" / "Then $19.99 per year") driven by `introductoryDiscount` on the fetched product.
 - **Customer Center** (`RevenueCatUI`) for cancel / refund / plan changes / restore — from Pasture › Settings › Manage Subscription — so none of that is hand-built.
 - **Subscriber attributes** (`carrier_name`, `letters_delivered`, `steps_walked`, `active_rams`) synced on every change, so the RevenueCat dashboard shows usage next to revenue — the same numbers the course telemetry reports.
@@ -71,7 +71,7 @@ You need **Xcode 26** and an iPhone on **iOS 18.6+** (a Simulator works for ever
 3. **To exercise real purchases without App Store Connect**, create a free RevenueCat project, add a *Test Store* app, and paste its `test_…` public SDK key into `RevenueCatConfiguration.apiKey`. Create the two entitlements and three products from the table above and attach them to the `default` offering. The shared `Baranov` scheme already points at [`Config/Baranov.storekit`](Config/Baranov.storekit), which declares the same products for StoreKit testing.
 4. **Tests:** `⌘U`, or `xcodebuild test -scheme Baranov -destination 'platform=iOS Simulator,name=iPhone 17'`. CI runs the same on every push.
 
-To try a whole journey on one phone: write a letter to yourself with a nearby destination, walk, and when the ram reaches the gate open Pasture › the ram › *At the Gate* and type the receiving code from the ram's history.
+To try a whole journey on one phone: write a letter to yourself with a nearby destination, walk, and when the ram reaches the gate open Pasture › the ram › *At the Gate* and hold the seal — the letter code is already on the phone that wrote it.
 
 ## Architecture
 
@@ -98,7 +98,7 @@ Principles, in the order they were argued about: strict Apple HIG (system materi
 
 ## Honest limits
 
-- The receiving code is ~40 bits of entropy — enough to keep a letter private from whoever relays it, not a state secret. Keeping it typeable off one phone screen onto another was the trade.
+- The letter code is ~59 bits of entropy (12 characters) — enough to keep a letter private from whoever relays it, not a state secret. The relay stores only a one-way lookup id derived from it. Keeping it typeable off one phone screen onto another was the trade.
 - Ocean legs need a human on the other side. There is no server, so there is no "someone will pick it up eventually".
 - Live Activity / Dynamic Island progress is next on the list (needs a widget extension target).
 

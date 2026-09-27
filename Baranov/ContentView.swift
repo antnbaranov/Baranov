@@ -22,7 +22,8 @@ struct ContentView: View {
     }
 
     private var currentLocale: Locale {
-        Locale(identifier: selectedLanguageCode)
+        let code = selectedLanguageCode == "no" ? "nb" : selectedLanguageCode
+        return Locale(identifier: code)
     }
 
     private var needsOnboarding: Bool {

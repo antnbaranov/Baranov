@@ -1,0 +1,110 @@
+{
+  "identifier": "B4A1A0F0-0000-4000-8000-000000000001",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "B4A1A0F0-0000-4000-8000-000000000010",
+      "localizations": [
+        {
+          "description": "A collectible Merino ram, owned outright.",
+          "displayName": "Pedigree Merino",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.baranov.iap.ram.merino",
+      "referenceName": "Pedigree Ram Merino",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "0",
+    "_developerTeamID": "7H96U9338J",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 780000000,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "B4A1A0F0-0000-4000-8000-000000000020",
+      "localizations": [],
+      "name": "Pasture Expansion",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "19.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "B4A1A0F0-0000-4000-8000-000000000022",
+          "introductoryOffer": {
+            "internalID": "B4A1A0F0-0000-4000-8000-000000000023",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
+          },
+          "localizations": [
+            {
+              "description": "All roads open, for a year. 7 days free.",
+              "displayName": "Pasture Expansion Annual",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.baranov.sub.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Pasture Expansion Annual",
+          "subscriptionGroupID": "B4A1A0F0-0000-4000-8000-000000000020",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "B4A1A0F0-0000-4000-8000-000000000024",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "For true pen pals. Save 33%.",
+              "displayName": "Pasture Expansion 3 Months",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.baranov.sub.quarterly",
+          "recurringSubscriptionPeriod": "P3M",
+          "referenceName": "Pasture Expansion 3 Months",
+          "subscriptionGroupID": "B4A1A0F0-0000-4000-8000-000000000020",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "2.99",
+          "familyShareable": false,
+          "groupNumber": 3,
+          "internalID": "B4A1A0F0-0000-4000-8000-000000000021",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "A flexible start.",
+              "displayName": "Pasture Expansion Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.baranov.sub.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Pasture Expansion Monthly",
+          "subscriptionGroupID": "B4A1A0F0-0000-4000-8000-000000000020",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

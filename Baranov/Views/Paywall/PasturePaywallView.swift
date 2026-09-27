@@ -93,6 +93,7 @@ struct PasturePaywallView: View {
                     featureList
                     walkedSoFar
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 20)
                 .padding(.top, 4)
                 .padding(.bottom, 210)
@@ -320,29 +321,31 @@ struct PasturePaywallView: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 12) {
-                ForEach(SealColor.allCases) { wax in
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { demoWax = wax }
-                        waxTick += 1
-                    } label: {
-                        ZStack {
-                            Circle().fill(wax.color).frame(width: 26, height: 26)
-                            if demoWax == wax {
-                                Circle().strokeBorder(.primary, lineWidth: 2).frame(width: 34, height: 34)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(SealColor.allCases) { wax in
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { demoWax = wax }
+                            waxTick += 1
+                        } label: {
+                            ZStack {
+                                Circle().fill(wax.color).frame(width: 26, height: 26)
+                                if demoWax == wax {
+                                    Circle().strokeBorder(.primary, lineWidth: 2).frame(width: 34, height: 34)
+                                }
+                                if !wax.isIncludedFree, !entitlementService.hasPastureExpansion {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white.opacity(0.9))
+                                }
                             }
-                            if !wax.isIncludedFree, !entitlementService.hasPastureExpansion {
-                                Image(systemName: "lock.fill")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.9))
-                            }
+                            .frame(width: 34, height: 34)
                         }
-                        .frame(width: 34, height: 34)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(wax.displayName) wax")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(wax.displayName) wax")
                 }
-                Spacer()
+                .frame(minWidth: 0, maxWidth: .infinity)
             }
         }
         .padding(14)

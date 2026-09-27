@@ -23,8 +23,8 @@ struct AppLanguagePickerView: View {
         "zh-Hans", "zh-Hant", "zh-HK", "hr", "cs",
         "da", "nl", "et", "fi", "fr", "fr-CA",
         "gl", "de", "el", "he", "hi", "hu",
-        "is", "id", "ga", "it", "ja", "ko",
-        "lv", "lt", "mk", "ms", "mt", "no",
+        "is", "id", "ga", "it", "ja", "ka", "kk", "ko",
+        "lv", "lt", "mk", "ms", "mt", "nb",
         "pl", "pt-BR", "pt-PT", "ro", "ru", "sr",
         "sk", "sl", "es", "es-419", "sv", "th",
         "tr", "uk", "vi"
