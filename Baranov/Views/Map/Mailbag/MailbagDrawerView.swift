@@ -45,8 +45,8 @@ struct MailbagDrawerView: View {
     @Binding var path: [MailbagRoute]
     /// Starts the shake handoff from inside an opened letter.
     var onShakeHandoff: (() -> Void)? = nil
-    /// Letters this person published by code (waiting to be claimed, or claimed).
-    let publishedLetters: [PublishedLetter]
+    /// Letters sent by Shepherd ID or ear tag, held until the recipient's gate is known.
+    private var heldLetters: [LetterTracker.Record] { LetterTracker.shared.heldRecords }
     /// Name of the person's own ram, shown while nothing is out.
     let idleName: String
     let onExpand: () -> Void
@@ -57,6 +57,16 @@ struct MailbagDrawerView: View {
     let onCancelJourney: (Ram) -> Void
 
     @AppStorage("com.baranov.carrierDisplayName") private var carrierName = ""
+    /// Letters the person was told are coming (a shared link), until the
+    /// ram itself lands here.
+    private let expectedStore = ExpectedLetterStore.shared
+
+    private var expectedLetters: [ExpectedLetter] {
+        let arrived = Set(flockViewModel.activeRams.flatMap { ram in
+            [ram.letter?.id].compactMap { $0 } + ram.passengerLetters.map(\.id)
+        })
+        return expectedStore.pending(excluding: arrived)
+    }
     /// Owned by `JourneyView`, whose bottom strip changes with the tab:
     /// the code field under Incoming, search under Archive.
     @Binding var section: MailbagSection
@@ -70,16 +80,30 @@ struct MailbagDrawerView: View {
         // empty name must match that too — otherwise the person's own
         // letters would show up under Incoming.
         let mine = carrierName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let effective = mine.isEmpty ? "A Shepherd" : mine
+        let effective = mine.isEmpty ? String(localized: "A Shepherd", bundle: .appLanguage, locale: .appLanguage) : mine
         return sender.trimmingCharacters(in: .whitespacesAndNewlines)
             .caseInsensitiveCompare(effective) == .orderedSame
     }
 
-    /// Everything that still has somewhere to go.
+    /// A sent letter that has reached the recipient's gate is finished as
+    /// far as the sender is concerned: it belongs in the archive.
+    private func isFinished(_ ram: Ram) -> Bool {
+        ram.status == .delivered || ram.wasDeliveredInPerson
+            || (ram.status == .arrivedAtGate && isOutgoing(ram))
+    }
+
+    /// Everything that still has somewhere to go. A letter this person
+    /// sent and handed on stays under Outgoing — that's where "Take it
+    /// back" lives — while someone else's handed-on letter is gone.
     private var inTransit: [Ram] {
         flockViewModel.activeRams.filter {
-            $0.letter != nil && $0.status != .delivered && $0.status != .handedOff
+            $0.letter != nil && ($0.status != .handedOff || isOutgoing($0)) && !isFinished($0)
         }
+    }
+
+    /// What this phone is actually walking or waiting on.
+    private var carriedHere: [Ram] {
+        inTransit.filter { $0.status != .handedOff }
     }
 
     private var rams: [Ram] {
@@ -88,9 +112,9 @@ struct MailbagDrawerView: View {
         case .incoming: source = inTransit.filter { !isOutgoing($0) }
         case .outgoing: source = inTransit.filter { isOutgoing($0) }
         case .archive:
-            source = flockViewModel.activeRams.filter { $0.letter != nil && $0.status == .delivered }
+            source = flockViewModel.activeRams.filter { $0.letter != nil && isFinished($0) }
         }
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = activeQuery
         let matching = query.isEmpty ? source : source.filter { ram in
             let haystack = [ram.name, ram.currentCity, ram.targetCity,
                             ram.routeHistory.first?.cityName ?? "",
@@ -103,11 +127,27 @@ struct MailbagDrawerView: View {
         }
     }
 
+    /// Search lives under Incoming and Archive only; Outgoing is never filtered.
+    private var showsSearch: Bool { section != .outgoing }
+
+    private var activeQuery: String {
+        showsSearch ? searchText.trimmingCharacters(in: .whitespacesAndNewlines) : ""
+    }
+
     /// The most urgent courier: a letter at my gate, else the closest walker, else anything in transit.
     private var featured: Ram? {
-        inTransit.first { $0.status == .arrivedAtGate && !isOutgoing($0) }
-            ?? inTransit.filter { $0.status == .walking }.min { $0.remainingSteps < $1.remainingSteps }
-            ?? inTransit.first
+        carriedHere.first { $0.status == .arrivedAtGate && !isOutgoing($0) }
+            ?? carriedHere.filter { $0.status == .walking }.min { $0.remainingSteps < $1.remainingSteps }
+            ?? carriedHere.first
+    }
+
+    /// Whatever is out on the road, in any tab: the featured courier, or a
+    /// ram without a letter record. "Ready for a letter" is only true when
+    /// this is nil.
+    private var onTheRoad: Ram? {
+        featured ?? flockViewModel.activeRams.first {
+            $0.status != .delivered && $0.status != .handedOff && $0.status != .grazing
+        }
     }
 
     // MARK: - Body
@@ -135,6 +175,7 @@ struct MailbagDrawerView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MailbagRoute.self) { route in
+                Group {
                 switch route {
                 case .bag(let id):
                     RamBagView(ramId: id, onShakeHandoff: onShakeHandoff, isEmbedded: true)
@@ -147,6 +188,9 @@ struct MailbagDrawerView: View {
                         ContentUnavailableView("This ram is no longer in the pasture", systemImage: "bag")
                     }
                 }
+                }
+                // Let the sheet's own glass show through pushed screens.
+                .containerBackground(.clear, for: .navigation)
             }
         }
     }
@@ -184,11 +228,11 @@ struct MailbagDrawerView: View {
             Text("Mailbag")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
-            if let ram = collapsedRam {
+            if let ram = collapsedRam ?? onTheRoad {
                 Button { openLetter(ram) } label: {
-                    MailbagRamRow(ram: ram, isOutgoing: isOutgoing(ram))
+                    MailbagRamRow(ram: ram, isOutgoing: isOutgoing(ram), isSlim: true)
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
@@ -246,7 +290,12 @@ struct MailbagDrawerView: View {
                     onExpand: { openLetter(ram) },
                     onBreakSeal: { openLetter(ram) }
                 )
-            } else if section == .outgoing {
+            } else if section == .incoming, let expected = expectedLetters.first {
+                ExpectedLetterRow(letter: expected)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            } else if section == .outgoing, onTheRoad == nil {
                 // Only Outgoing has a resting ram to show as the row
                 // itself; Incoming has the code field below, Archive has
                 // its search — both still get the plain "nothing yet"
@@ -289,27 +338,23 @@ struct MailbagDrawerView: View {
     // MARK: Expanded
 
     private var expandedContent: some View {
-        let showsPublished = section == .outgoing && !publishedLetters.isEmpty
-        let isSearching = !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let showsPublished = section == .outgoing && !heldLetters.isEmpty
+        let showsExpected = section == .incoming && !expectedLetters.isEmpty
+        let isSearching = !activeQuery.isEmpty
         return Group {
-            if rams.isEmpty, !showsPublished, !isSearching {
+            if rams.isEmpty, !showsPublished, !showsExpected, !isSearching {
                 // An empty tab still shows the ram below the note: the
                 // courier out on the road, or the one at rest.
                 ScrollView {
                   VStack(spacing: 12) {
                     emptyState
-                    Group {
-                        if let ram = featured {
-                            MailbagRamRow(ram: ram, isOutgoing: isOutgoing(ram), isSlim: true)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        } else {
-                            idleBarButton
-                        }
+                    // Only the courier that belongs to this tab; never
+                    // an outgoing ram under Incoming or vice versa.
+                    if section == .outgoing, onTheRoad == nil {
+                        idleBarButton
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
                   }
                   // Clear of the code field / dots strip along the bottom.
                   .padding(.bottom, 56)
@@ -323,47 +368,72 @@ struct MailbagDrawerView: View {
                             MailbagSwipeDeck(
                                 rams: rams,
                                 isOutgoing: { isOutgoing($0) },
-                                onOpen: { openLetter($0) }
+                                carrierName: carrierName,
+                                onOpen: { openLetter($0) },
+                                onOpenBag: { openBag($0) },
+                                onCancel: { onCancelJourney($0) }
                             )
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .listRowBackground(Color.clear)
                         }
                     }
 
-                    // Below it: every letter in the tab, with search.
+                    // Search is offered
+                    // under Incoming and Archive, not Outgoing.
                     Section {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search Letters", text: $searchText)
-                                .submitLabel(.search)
-                            if isSearching {
-                                Button { searchText = "" } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
+                        if showsSearch {
+                            HStack(spacing: 8) {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundStyle(.secondary)
+                                TextField("Search Letters", text: $searchText)
+                                    .submitLabel(.search)
+                                if isSearching {
+                                    Button { searchText = "" } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Clear")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Clear")
                             }
                         }
                         if rams.isEmpty, isSearching {
                             ContentUnavailableView.search(text: searchText)
                         }
-                        ForEach(rams) { ram in
-                            MailbagCourierRow(
-                                ram: ram,
-                                isOutgoing: isOutgoing(ram),
-                                carrierName: carrierName,
-                                onOpenBag: { openBag(ram) },
-                                onOpenLetter: { openLetter(ram) },
-                                onCancel: { onCancelJourney(ram) }
-                            )
+                    }
+
+                    if showsExpected {
+                        Section("On the way to you") {
+                            ForEach(expectedLetters) { letter in
+                                ExpectedLetterRow(letter: letter)
+                                    .swipeActions {
+                                        // A letter the post office is following
+                                        // arrives on its own; only a link-only
+                                        // card can be put away.
+                                        if !letter.isTracked {
+                                            Button(role: .destructive) {
+                                                expectedStore.remove(letterID: letter.letterID)
+                                            } label: {
+                                                Label("Remove", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                            }
                         }
                     }
 
                     if showsPublished {
-                        Section("Sent by Ear Tag") {
-                            ForEach(publishedLetters.prefix(5)) { MailbagPublishedRow(published: $0) }
+                        Section("Waiting for their gate") {
+                            ForEach(heldLetters) { record in
+                                MailbagHeldRow(record: record)
+                                    .swipeActions {
+                                        Button(role: .destructive) {
+                                            LetterTracker.shared.cancelHeld(record.letterID)
+                                        } label: {
+                                            Label("Take it back", systemImage: "arrow.uturn.backward")
+                                        }
+                                    }
+                            }
                         }
                     }
                 }
@@ -383,7 +453,7 @@ struct MailbagDrawerView: View {
             ContentUnavailableView("Nothing on the road", systemImage: "paperplane",
                                    description: Text("Swipe to New Letter and a ram sets off with it."))
         case .archive:
-            if searchText.isEmpty {
+            if activeQuery.isEmpty {
                 ContentUnavailableView("Nothing here yet", systemImage: "archivebox",
                                        description: Text("Letters you have read rest here."))
             } else {

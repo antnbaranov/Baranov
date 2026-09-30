@@ -24,8 +24,8 @@ struct RamJourney: Identifiable, Hashable {
     let number: Int
     let stamps: [JourneyStamp]
 
-    var origin: String { stamps.first?.placeName ?? "" }
-    var destination: String { stamps.last?.placeName ?? "" }
+    var origin: String { stamps.first?.displayPlaceName ?? "" }
+    var destination: String { stamps.last?.displayPlaceName ?? "" }
     var isFinished: Bool { stamps.last?.kind == .arrival }
     var date: Date? { stamps.first?.timestamp }
     var coordinates: [CLLocationCoordinate2D] {
@@ -113,7 +113,7 @@ struct RamJourneysMap: View {
     private var chips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                chip(title: String(localized: "All journeys"), tint: .primary, isSelected: selectedId == nil) {
+                chip(title: String(localized: "All journeys", bundle: .appLanguage, locale: .appLanguage), tint: .primary, isSelected: selectedId == nil) {
                     selectedId = nil
                 }
                 ForEach(journeys) { journey in
@@ -171,7 +171,7 @@ struct RamJourneysMap: View {
                 .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
         }
         ForEach(journey.stamps) { stamp in
-            Annotation(stamp.placeName,
+            Annotation(stamp.displayPlaceName,
                        coordinate: CLLocationCoordinate2D(latitude: stamp.latitude, longitude: stamp.longitude),
                        anchor: .center) {
                 stampGlyph(stamp, tint: tint)
@@ -199,7 +199,7 @@ struct RamJourneysMap: View {
             stat(value: DistanceFormatter.string(forMeters: totalMeters), label: "walked")
         }
         .padding(.vertical, 10)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func stat(value: String, label: LocalizedStringKey) -> some View {

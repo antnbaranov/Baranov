@@ -88,6 +88,22 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     /// set — `hasScratchedSecret` (view-local, not persisted) is what
     /// actually reveals it on screen.
     private(set) var revealedScratchSecret: String?
+    /// SHA-256 of the sender's recall token (see `RecallTokenVault`). Set
+    /// at dispatch; a carrier gives the letter back only to a recall whose
+    /// hash matches this. `nil` on letters from older builds — those
+    /// simply can't be recalled once handed on.
+    var recallTokenHash: String?
+    /// The letter's place at the post office (see `LetterTracker`): the
+    /// relay lookup id and the progress token that lets whichever phone is
+    /// carrying the ram report how far it has come, and hand the letter to
+    /// the relay when it reaches the gate. `nil` when no server is
+    /// configured, and never part of what the relay itself stores.
+    var relayTicket: RelayTicket?
+    /// The letter code, sealed to the recipient's profile key (see
+    /// `RecipientKeyring`). Travels inside the `.ram` so the recipient's
+    /// phone — and only theirs — opens the seal with nothing to type, even
+    /// when the letter reaches them by AirDrop with no network at all.
+    var recipientKeys: [RecipientKey]?
 
     // MARK: - Writing a letter
 
@@ -234,6 +250,25 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         return SealKeyVault.code(for: id)
     }
 
+    /// The copy that goes back to the sender as a delivery receipt: the
+    /// journey travels, but nothing this phone decrypted does.
+    func receiptCopy() -> Letter {
+        var copy = self
+        copy.revealedBody = nil
+        copy.revealedAttachment = nil
+        copy.revealedScratchSecret = nil
+        copy.relayTicket = nil
+        return copy
+    }
+
+    /// The copy the relay stores as the letter's payload: the progress
+    /// token stays with whoever carries the ram, never on the server.
+    func relayPayload() -> Letter {
+        var copy = self
+        copy.relayTicket = nil
+        return copy
+    }
+
     /// Whether this letter carries any paid lock beyond the receiving
     /// code itself — used by the arrival screen to decide whether it
     /// needs to show a countdown, a "get closer" prompt, or neither.
@@ -323,6 +358,8 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, senderName, recipientName, sealedBody, revealedBody, isSealed, createdAt, sealColor, attachment, revealedAttachment, paper, paperCustomHex
         case unlockAt, geofence, sealedScratchSecret, revealedScratchSecret
+        case recallTokenHash
+        case relayTicket, recipientKeys
         // Legacy keys from builds before letters were actually encrypted.
         case messageBody, receivingCode
     }
@@ -347,6 +384,9 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         paperCustomHex = try container.decodeIfPresent(String.self, forKey: .paperCustomHex)
         unlockAt = try container.decodeIfPresent(Date.self, forKey: .unlockAt)
         geofence = try container.decodeIfPresent(LetterGeofence.self, forKey: .geofence)
+        recallTokenHash = try container.decodeIfPresent(String.self, forKey: .recallTokenHash)
+        relayTicket = try? container.decodeIfPresent(RelayTicket.self, forKey: .relayTicket)
+        recipientKeys = try? container.decodeIfPresent([RecipientKey].self, forKey: .recipientKeys)
         sealedScratchSecret = try container.decodeIfPresent(Data.self, forKey: .sealedScratchSecret)
         revealedScratchSecret = try container.decodeIfPresent(String.self, forKey: .revealedScratchSecret)
 
@@ -381,6 +421,9 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         try container.encodeIfPresent(geofence, forKey: .geofence)
         try container.encodeIfPresent(sealedScratchSecret, forKey: .sealedScratchSecret)
         try container.encodeIfPresent(revealedScratchSecret, forKey: .revealedScratchSecret)
+        try container.encodeIfPresent(recallTokenHash, forKey: .recallTokenHash)
+        try container.encodeIfPresent(relayTicket, forKey: .relayTicket)
+        try container.encodeIfPresent(recipientKeys, forKey: .recipientKeys)
     }
 
     // MARK: - Receiving codes
@@ -398,6 +441,6 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     /// the ram.
     func shareMessage(carrierName: String) -> String? {
         guard let receivingCode else { return nil }
-        return "\(carrierName) is carrying a letter to you from \(senderName). When it arrives, hold the seal and use this code to open it: \(receivingCode)"
+        return String(localized: "\(carrierName) is carrying a letter to you from \(senderName). When it arrives, hold the seal and use this code to open it: \(receivingCode)", bundle: .appLanguage, locale: .appLanguage)
     }
 }

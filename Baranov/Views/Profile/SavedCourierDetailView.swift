@@ -41,7 +41,7 @@ struct SavedCourierDetailView: View {
                     }
 
                     Section("First met") {
-                        LabeledContent("When", value: courier.savedAt.formatted(date: .abbreviated, time: .shortened))
+                        LabeledContent("When", value: courier.savedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: .appLanguage)))
                         if let place = courier.metPlace {
                             LabeledContent("Where", value: place)
                         }

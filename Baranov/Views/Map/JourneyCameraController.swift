@@ -217,6 +217,16 @@ final class JourneyCameraController {
         }
     }
 
+    /// Frames a whole trip flat for the route preview in Compose. Leaves
+    /// following off, so step updates don't pull the camera back to a ram
+    /// while the sender is looking at the plan.
+    func showRoutePreview(_ route: [CLLocationCoordinate2D], reduceMotion: Bool) {
+        guard route.count > 1 else { return }
+        cancelFlyover()
+        focus = .free
+        move(to: establishingCamera(framing: route), animation: reduceMotion ? nil : .easeInOut(duration: 0.9))
+    }
+
     private func cancelFlyover() {
         flyoverTask?.cancel()
         flyoverTask = nil

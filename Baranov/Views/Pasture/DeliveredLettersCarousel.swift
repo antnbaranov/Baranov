@@ -72,7 +72,7 @@ private struct DeliveredLetterCard: View {
         }
         .padding(14)
         .frame(width: 220, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 

@@ -25,6 +25,7 @@ struct RamBagView: View {
     var isEmbedded = false
 
     @Environment(FlockViewModel.self) private var flockViewModel
+    @Environment(RecallService.self) private var recallService: RecallService?
     @Environment(\.dismiss) private var dismiss
 
     private var ram: Ram? {
@@ -55,7 +56,7 @@ struct RamBagView: View {
                     CloseToolbarButton { dismiss() }
                 }
             }
-            if let message = ram?.letter?.shareMessage(carrierName: ram?.name ?? "") {
+            if let message = ram?.letterShareMessage {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: message) {
                         Image(systemName: "square.and.arrow.up")
@@ -99,6 +100,12 @@ struct RamBagView: View {
                 LabeledContent("To", value: ram.targetCity.mailbagShortName)
             }
 
+            if ram.isGuest {
+                guestSection(for: ram)
+            } else if ram.status == .handedOff, !ram.wasDeliveredInPerson {
+                takeBackSection(for: ram)
+            }
+
             if let letter = ram.letter {
                 Section("Letter") {
                     NavigationLink {
@@ -125,6 +132,82 @@ struct RamBagView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(isEmbedded ? .hidden : .automatic)
+    }
+
+    // MARK: - Someone else's letter
+
+    /// A letter this phone is only carrying: it rides with the person's own
+    /// ram and its sender can ask for it back.
+    private func guestSection(for ram: Ram) -> some View {
+        let sender = ram.letter?.senderName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return Section {
+            Label {
+                Text(sender.isEmpty
+                     ? String(localized: "Carrying it for someone else", bundle: .appLanguage, locale: .appLanguage)
+                     : String(localized: "Carrying it for \(sender)", bundle: .appLanguage, locale: .appLanguage))
+            } icon: {
+                Image(systemName: "envelope.badge.person.crop")
+                    .foregroundStyle(.secondary)
+            }
+        } footer: {
+            Text("It rides in your mailbag and moves with your steps, without taking a pen in your pasture. The sender can ask for it back at any time.")
+        }
+    }
+
+    // MARK: - Taking it back
+
+    /// The sender's side of a letter handed on to someone else.
+    @ViewBuilder
+    private func takeBackSection(for ram: Ram) -> some View {
+        let isRequesting = recallService?.requesting.contains(ram.id) ?? false
+        if ram.recallRequestedAt != nil {
+            Section {
+                Label {
+                    Text("Asking for it back")
+                } icon: {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                        .foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text("\(ram.name) comes home the next time the carrier's phone is online.")
+            }
+        } else if flockViewModel.canTakeBack(ram), let recallService, TelemetryService.isServerConfigured {
+            Section {
+                Button {
+                    Task { await recallService.takeBack(ram, flock: flockViewModel) }
+                } label: {
+                    HStack {
+                        Label("Take it back", systemImage: "arrow.uturn.backward")
+                        Spacer()
+                        if isRequesting {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isRequesting)
+            } footer: {
+                if recallService.failedRamID == ram.id {
+                    Text("Couldn't reach the post office. Check your connection and try again.")
+                } else {
+                    Text("Not going the right way? Ask for the letter back. \(ram.name) returns to where you handed it on. You can also meet the carrier and have them hand it back.")
+                }
+            }
+        } else {
+            // Works with no server at all: the carrier hands it back the
+            // same way it left — a shake, Hand over, or AirDrop. It comes
+            // home as the sender's own ram, not a guest.
+            Section {
+                Label {
+                    Text("Want it back? Meet the carrier and ask them to hand it over.")
+                } icon: {
+                    Image(systemName: "hand.wave")
+                        .foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text("It comes back to you as your own letter, and \(ram.name) walks on from where it is.")
+            }
+        }
     }
 }
 
@@ -180,6 +263,7 @@ struct IdleRamBagView: View {
             .padding(.vertical, 12)
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
     }

@@ -10,12 +10,12 @@
 //  on this phone — it arrived by AirDrop or a nearby handoff — the code is
 //  tried against every sealed letter here, and a match at the gate offers the
 //  wax-seal ritual. Otherwise the phone derives the relay lookup id from the
-//  code, shows who the letter is from, and lets the recipient choose where
-//  the ram arrives (`ClaimRelayLetterView`, in a sheet). The same code is then
-//  kept on the phone, so the seal opens with no second entry.
+//  code and follows the letter: it becomes an incoming card, the sender's
+//  ram walks it to this person's gate, and it lands in the mailbag there.
+//  The same code is kept on the phone, so the seal opens with no second entry.
 //
-//  Letters other people addressed to this person's profile code show up above
-//  the field on their own (`LetterInbox`); those need no typing at all.
+//  Letters sent to this person's Shepherd ID become incoming cards on their
+//  own (`LetterInbox`); those need no typing at all.
 //
 //  Results appear as one compact card just above the field. System
 //  materials and semantic styles only.
@@ -26,7 +26,6 @@ import SwiftUI
 struct CodeEntryBar: View {
     @Environment(FlockViewModel.self) private var flockViewModel
     @Environment(LocationService.self) private var locationService
-    @Environment(LetterInbox.self) private var inbox
 
     /// The letter relay, when a receiver is configured. `nil` disables lookups.
     var relay: LetterRelayService?
@@ -38,7 +37,6 @@ struct CodeEntryBar: View {
     var onNeedsRoom: () -> Void = {}
 
     @State private var relayLookup: RelayLookup = .idle
-    @State private var claimTarget: ClaimTarget?
     @State private var failTick = 0
     @FocusState private var isFocused: Bool
 
@@ -51,18 +49,9 @@ struct CodeEntryBar: View {
     private enum RelayLookup {
         case idle
         case looking
-        case found(RelayLetterPreview)
+        /// A tracked letter: now an incoming card under Incoming.
+        case following(senderName: String, arrived: Bool)
         case failed(String)
-    }
-
-    /// A letter about to have its arrival spot chosen.
-    private struct ClaimTarget: Identifiable {
-        /// The relay lookup id.
-        let id: String
-        /// What the person typed, kept so it opens the seal later. `nil` for a
-        /// mailbag letter, whose code the phone already holds.
-        let code: String?
-        let preview: RelayLetterPreview
     }
 
     private var normalized: String { LetterCode.normalize(code) }
@@ -79,10 +68,8 @@ struct CodeEntryBar: View {
         return .none
     }
 
-    private var showsInbox: Bool { normalized.isEmpty && !inbox.items.isEmpty }
-
     private var hasResult: Bool {
-        if outcome != .none || showsInbox { return true }
+        if outcome != .none { return true }
         if case .idle = relayLookup { return false }
         return true
     }
@@ -97,29 +84,6 @@ struct CodeEntryBar: View {
         .onChange(of: hasResult) { _, has in if has { onNeedsRoom() } }
         .task(id: normalized) { await lookUpLetterCode() }
         .sensoryFeedback(.error, trigger: failTick)
-        .sheet(item: $claimTarget) { target in
-            if let relay {
-                NavigationStack {
-                    ClaimRelayLetterView(relayID: target.id, code: target.code, preview: target.preview, relay: relay) {
-                        inbox.remove(id: target.id)
-                        claimTarget = nil
-                        code = ""
-                    }
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            if #available(iOS 26.0, *) {
-                                Button(role: .close) { claimTarget = nil }
-                            } else {
-                                Button { claimTarget = nil } label: { Image(systemName: "xmark") }
-                                    .accessibilityLabel("Close")
-                            }
-                        }
-                    }
-                }
-                .environment(flockViewModel)
-                .environment(locationService)
-            }
-        }
     }
 
     // MARK: - Field
@@ -144,11 +108,7 @@ struct CodeEntryBar: View {
     @ViewBuilder private var resultCard: some View {
         switch outcome {
         case .none:
-            if showsInbox {
-                inboxCards
-            } else {
-                claimCard
-            }
+            claimCard
 
         case .onTheWay(let ram):
             VStack(alignment: .leading, spacing: 6) {
@@ -179,33 +139,6 @@ struct CodeEntryBar: View {
         }
     }
 
-    /// Letters addressed to this person's profile code: no typing needed.
-    private var inboxCards: some View {
-        VStack(spacing: 8) {
-            ForEach(inbox.items.prefix(3)) { item in
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Letter from \(item.preview.senderName) (\(item.preview.originName))", systemImage: "envelope.fill")
-                        .font(.subheadline.weight(.semibold))
-                    Button {
-                        claimTarget = ClaimTarget(id: item.id, code: nil, preview: item.preview)
-                    } label: {
-                        Label("Choose Where It Arrives", systemImage: "mappin.and.ellipse")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-                    .tint(Color.wax)
-                }
-                .card()
-            }
-            if inbox.items.count > 3 {
-                Text("\(inbox.items.count - 3) more waiting")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
     @ViewBuilder private var claimCard: some View {
         switch relayLookup {
         case .idle:
@@ -216,19 +149,20 @@ struct CodeEntryBar: View {
                 .card()
         case .failed(let message):
             note(LocalizedStringKey(message), symbol: "exclamationmark.triangle")
-        case .found(let preview):
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Letter from \(preview.senderName) (\(preview.originName))", systemImage: "envelope.fill")
-                    .font(.subheadline.weight(.semibold))
-                Button {
-                    claimTarget = ClaimTarget(id: LetterCode.lookupID(for: normalized), code: normalized, preview: preview)
-                } label: {
-                    Label("Choose Where It Arrives", systemImage: "mappin.and.ellipse")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .tint(Color.wax)
+        case .following(let senderName, let arrived):
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    arrived
+                        ? String(localized: "\(senderName)'s letter has arrived", bundle: .appLanguage, locale: .appLanguage)
+                        : String(localized: "A letter from \(senderName) is on the way", bundle: .appLanguage, locale: .appLanguage),
+                    systemImage: arrived ? "envelope.fill" : "envelope.badge.clock"
+                )
+                .font(.subheadline.weight(.semibold))
+                Text(arrived
+                     ? "It's coming into your mailbag now. The seal opens with a long press."
+                     : "It's under Incoming. It lands in your mailbag when the ram reaches the gate.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .card()
         }
@@ -246,7 +180,7 @@ struct CodeEntryBar: View {
         HStack(spacing: 10) {
             RamPortraitView(name: ram.name, diameter: 32)
             VStack(alignment: .leading, spacing: 1) {
-                Text(ram.letter.map { "Letter from \($0.senderName)" } ?? ram.name)
+                Text(ram.letter.map { String(localized: "Letter from \($0.senderName)", bundle: .appLanguage, locale: .appLanguage) } ?? ram.name)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                 Text("\(ram.currentCity) → \(ram.targetCity)")
@@ -266,17 +200,22 @@ struct CodeEntryBar: View {
             return
         }
         guard let relay else {
-            relayLookup = .failed(String(localized: "Ear tags aren't available right now."))
+            relayLookup = .failed(String(localized: "Ear tags aren't available right now.", bundle: .appLanguage, locale: .appLanguage))
             return
         }
         relayLookup = .looking
+        let lookupID = LetterCode.lookupID(for: normalized)
+        // Every letter is tracked: the sender's ram walks it here, so a
+        // found ear tag becomes an incoming card.
         do {
-            let preview = try await relay.preview(id: LetterCode.lookupID(for: normalized))
+            let tracking = try await relay.tracking(id: lookupID)
+            guard let expected = ExpectedLetter(code: normalized, tracking: tracking) else { throw RelayError.rejected }
             guard !Task.isCancelled else { return }
-            relayLookup = .found(preview)
+            ExpectedLetterStore.shared.add(expected)
+            relayLookup = .following(senderName: tracking.senderName, arrived: tracking.isDelivered)
         } catch {
             guard !Task.isCancelled else { return }
-            relayLookup = .failed((error as? LocalizedError)?.errorDescription ?? String(localized: "Something went wrong."))
+            relayLookup = .failed((error as? LocalizedError)?.errorDescription ?? String(localized: "Something went wrong.", bundle: .appLanguage, locale: .appLanguage))
             failTick += 1
         }
     }

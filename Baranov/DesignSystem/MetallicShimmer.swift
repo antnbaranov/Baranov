@@ -65,16 +65,26 @@ struct MetallicShimmerModifier: ViewModifier {
             .overlay {
                 if isRendering {
                     GeometryReader { proxy in
-                        LinearGradient(
-                            colors: [.clear, .white.opacity(0.5), .clear],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .frame(width: proxy.size.width * 0.7)
-                        .offset(x: CGFloat(motion.roll) * 140)
-                        .blendMode(.plusLighter)
-                        .animation(.easeOut(duration: 0.12), value: motion.roll)
+                        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+                            // A slow glint crosses every few seconds on its own,
+                            // so the finish reads even with the phone flat;
+                            // tilting moves it further.
+                            let cycle = 3.6
+                            let t = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
+                            let idle = t < 0.45 ? (t / 0.45) * 2 - 1 : 1.5
+                            let tilt = max(-0.6, min(0.6, motion.roll))
+                            let x = (CGFloat(idle) * 0.7 + CGFloat(tilt)) * proxy.size.width
+                            LinearGradient(
+                                colors: [.clear, .white.opacity(0.5), .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .frame(width: proxy.size.width * 0.7)
+                            .offset(x: x - proxy.size.width * 0.15)
+                            .blendMode(.plusLighter)
+                        }
                     }
+                    .clipped()
                     .allowsHitTesting(false)
                     .task { motion.subscribe() }
                     .onDisappear { motion.unsubscribe() }

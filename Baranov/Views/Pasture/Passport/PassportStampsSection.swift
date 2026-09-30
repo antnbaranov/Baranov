@@ -48,7 +48,7 @@ struct PassportStampsSection: View {
                     detailSlip(for: selected)
                         .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                 } else {
-                    Text("\(placeCount) \(placeCount == 1 ? "place" : "places") stamped. Tap a stamp to look closer.")
+                    Text("Places stamped: \(placeCount). Tap a stamp to look closer.")
                         .font(.footnote)
                         .foregroundStyle(PassportInk.inkSoft)
                 }
@@ -89,11 +89,11 @@ struct PassportStampsSection: View {
             Text("\(Text(stamp.kind.journalVerb)) \(stamp.shortPlaceName)")
                 .font(.system(.subheadline).weight(.bold))
                 .foregroundStyle(PassportInk.ink)
-            Label(stamp.timestamp.formatted(date: .long, time: .shortened), systemImage: "calendar")
+            Label(stamp.timestamp.formatted(Date.FormatStyle(date: .long, time: .shortened, locale: .appLanguage)), systemImage: "calendar")
             Label("\(DistanceFormatter.string(forMeters: stamp.stepsAtStamp)) into the journey", systemImage: "figure.walk")
             if let weather = stamp.weather {
                 Label(
-                    "\(weather.condition), \(Measurement(value: weather.temperatureCelsius, unit: UnitTemperature.celsius).formatted(.measurement(width: .abbreviated, usage: .weather, numberFormatStyle: .number.precision(.fractionLength(0)))))",
+                    "\(weather.condition), \(Measurement(value: weather.temperatureCelsius, unit: UnitTemperature.celsius).formatted(.measurement(width: .abbreviated, usage: .weather, numberFormatStyle: .number.precision(.fractionLength(0))).locale(.appLanguage)))",
                     systemImage: weather.symbolName
                 )
                 WeatherAttributionView()
@@ -108,6 +108,6 @@ struct PassportStampsSection: View {
         .labelStyle(.titleAndIcon)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

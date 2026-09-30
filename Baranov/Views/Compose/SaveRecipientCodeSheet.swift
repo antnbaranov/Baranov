@@ -12,6 +12,10 @@ import SwiftUI
 
 struct SaveRecipientCodeSheet: View {
     let code: String
+    /// A name to start from (say, what is already in "Who is this for?"). Editable.
+    var suggestedName = ""
+    /// A saved code being edited: every field starts from it.
+    var existing: SavedRecipientCode?
     let onSave: (_ name: String, _ locationName: String?, _ locationCoordinate: CLLocationCoordinate2D?, _ notes: String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -67,7 +71,7 @@ struct SaveRecipientCodeSheet: View {
                     Text("Notes (optional)")
                 }
             }
-            .navigationTitle("Save this code")
+            .navigationTitle(existing == nil ? LocalizedStringKey("Save this code") : LocalizedStringKey("Edit saved code"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -92,7 +96,17 @@ struct SaveRecipientCodeSheet: View {
                     .disabled(!canSave)
                 }
             }
-            .onAppear { isNameFocused = true }
+            .onAppear {
+                if let existing {
+                    name = existing.name
+                    locationName = existing.locationName ?? ""
+                    locationCoordinate = existing.locationCoordinate?.clLocationCoordinate
+                    notes = existing.notes ?? ""
+                } else if name.isEmpty {
+                    name = suggestedName
+                }
+                isNameFocused = existing == nil && name.isEmpty
+            }
         }
         .presentationDetents([.medium, .large])
     }

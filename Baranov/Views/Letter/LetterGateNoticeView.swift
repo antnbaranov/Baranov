@@ -40,11 +40,11 @@ struct LetterGateNoticeView: View {
     private var isVerified: Bool { recipientNameMatches && isAtPickupSpot == true }
 
     private var walkRowText: String {
-        if isAtPickupSpot == true { return String(localized: "You're at the pick-up spot") }
+        if isAtPickupSpot == true { return String(localized: "You're at the pick-up spot", bundle: .appLanguage, locale: .appLanguage) }
         if let distance = distanceToGate {
-            return String(localized: "Walk to \(ram.targetCity) — \(DistanceFormatter.string(forMeters: Int(distance))) to go")
+            return String(localized: "Walk to \(ram.targetCity) — \(DistanceFormatter.string(forMeters: Int(distance))) to go", bundle: .appLanguage, locale: .appLanguage)
         }
-        return String(localized: "Walk to \(ram.targetCity)")
+        return String(localized: "Walk to \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage)
     }
 
     var body: some View {
@@ -62,7 +62,7 @@ struct LetterGateNoticeView: View {
                     .font(.subheadline.weight(.semibold))
 
                 row(recipientNameMatches,
-                    recipientNameMatches ? "Addressed to you" : "Addressed to \(recipientName.isEmpty ? "someone else" : recipientName)")
+                    recipientNameMatches ? String(localized: "Addressed to you", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Addressed to \(recipientName.isEmpty ? String(localized: "someone else", bundle: .appLanguage, locale: .appLanguage) : recipientName)", bundle: .appLanguage, locale: .appLanguage))
                 row(isAtPickupSpot == true, walkRowText)
 
                 Text("The letter was left at the gate. Only the recipient can collect it — by really walking there.")

@@ -139,7 +139,7 @@ struct InkStampView: View {
         .scaleEffect(isSelected ? 1.07 : 1)
         .animation(.spring(duration: 0.35, bounce: 0.45), value: isSelected)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("\(stamp.placeName), \(stamp.timestamp.formatted(date: .abbreviated, time: .omitted))"))
+        .accessibilityLabel(Text("\(stamp.displayPlaceName), \(stamp.timestamp.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: .appLanguage)))"))
         .accessibilityHint("Shows the stamp's details")
     }
 
@@ -159,7 +159,7 @@ struct InkStampView: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.center)
-                Text(stamp.timestamp.formatted(.dateTime.day().month(.abbreviated).year(.twoDigits)).uppercased())
+                Text(stamp.timestamp.formatted(.dateTime.day().month(.abbreviated).year(.twoDigits).locale(.appLanguage)).uppercased())
                     .font(.system(size: 8, weight: .semibold, design: .monospaced))
             }
             .foregroundStyle(ink)

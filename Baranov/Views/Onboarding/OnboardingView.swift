@@ -79,7 +79,7 @@ struct OnboardingView: View {
     private var missedPerson: MissedPerson? { MissedPerson(rawValue: missedRaw) }
 
     /// Who the copy talks about from page 2 on ("walks it to Grandma").
-    private var missedLabel: String { missedPerson?.label ?? String(localized: "them") }
+    private var missedLabel: String { missedPerson?.label ?? String(localized: "them", bundle: .appLanguage, locale: .appLanguage) }
 
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
     @State private var isLanguagePickerPresented = false
@@ -669,9 +669,9 @@ private struct AlertsPage: View {
             demoLift: 36
         ) {
             NotificationPreviewCard(
-                title: String(localized: "Your ram is at \(person?.possessive ?? String(localized: "their")) gate"),
-                message: String(localized: "The seal is waiting. Hold it to break it."),
-                time: String(localized: "now"),
+                title: String(localized: "Your ram is at \(person?.possessive ?? String(localized: "their", bundle: .appLanguage, locale: .appLanguage)) gate", bundle: .appLanguage, locale: .appLanguage),
+                message: String(localized: "The seal is waiting. Hold it to break it.", bundle: .appLanguage, locale: .appLanguage),
+                time: String(localized: "now", bundle: .appLanguage, locale: .appLanguage),
                 fill: AnyShapeStyle(Color(.secondarySystemGroupedBackground))
             )
             .opacity(shown ? 1 : 0)
@@ -862,9 +862,9 @@ private struct OceanPage: View {
                 // What it would look like for real: the hand-off arriving
                 // on the other phone.
                 NotificationPreviewCard(
-                    title: String(localized: "A ram just hopped onto your phone"),
-                    message: String(localized: "It's carrying a letter for \(recipientLabel). Take it across the water."),
-                    time: String(localized: "now"),
+                    title: String(localized: "A ram just hopped onto your phone", bundle: .appLanguage, locale: .appLanguage),
+                    message: String(localized: "It's carrying a letter for \(recipientLabel). Take it across the water.", bundle: .appLanguage, locale: .appLanguage),
+                    time: String(localized: "now", bundle: .appLanguage, locale: .appLanguage),
                     fill: AnyShapeStyle(Color(.secondarySystemGroupedBackground))
                 )
                 .opacity(showsHandover ? 1 : 0)
@@ -957,7 +957,7 @@ private struct SealPage: View {
         ) {
             VStack(spacing: 16) {
                 ZStack(alignment: .top) {
-                    SealedEnvelopeView(wax: .crimson, monogram: "B", addressee: "You", isOpen: isOpen, width: 220, showsSeal: false)
+                    SealedEnvelopeView(wax: .crimson, monogram: "B", addressee: String(localized: "You", bundle: .appLanguage, locale: .appLanguage), isOpen: isOpen, width: 220, showsSeal: false)
 
                     ZStack {
                         Circle()

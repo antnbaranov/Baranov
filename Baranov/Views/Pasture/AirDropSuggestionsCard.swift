@@ -157,8 +157,10 @@ struct AirDropSuggestionsCard: View {
                     Text("Next stop: \(ram.legDestinationCity)")
                         .font(.subheadline.weight(.medium))
                     Text(matchedCarriers.isEmpty
-                         ? "\(ram.name) boards a packet there — or goes with anyone crossing sooner."
-                         : "\(matchedCarriers.count) known \(matchedCarriers.count == 1 ? "carrier is" : "carriers are") headed toward \(ram.targetCity).")
+                         ? String(localized: "\(ram.name) boards a packet there — or goes with anyone crossing sooner.", bundle: .appLanguage, locale: .appLanguage)
+                         : (matchedCarriers.count == 1
+                            ? String(localized: "1 known carrier is headed toward \(ram.targetCity).", bundle: .appLanguage, locale: .appLanguage)
+                            : String(localized: "\(matchedCarriers.count) known carriers are headed toward \(ram.targetCity).", bundle: .appLanguage, locale: .appLanguage)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -220,11 +222,11 @@ struct AirDropSuggestionsCard: View {
     private func askMessage(for ram: Ram) -> String? {
         guard ram.requiresHandoffAtLegEnd || ram.status == .waitingForHandoff else { return nil }
         let who = senderName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let intro = who.isEmpty ? "Hi —" : "Hi, it's \(who) —"
+        let intro = who.isEmpty ? String(localized: "Hi —", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Hi, it's \(who) —", bundle: .appLanguage, locale: .appLanguage)
         let when = ram.status == .waitingForHandoff
-            ? "\(ram.name) is waiting at \(ram.legDestinationCity) right now"
-            : "\(ram.name) will reach \(ram.legDestinationCity) in about \(DistanceFormatter.string(forMeters: ram.remainingSteps)) of walking"
-        return "\(intro) are you heading toward \(ram.targetCity) soon? I'm sending a letter the slow way with Baranov: \(when), and it's waiting on a boat to cross. If you're passing through, shake phones with me or AirDrop and it rides with you instead — much faster. https://github.com/antnbaranov/Baranov"
+            ? String(localized: "\(ram.name) is waiting at \(ram.legDestinationCity) right now", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "\(ram.name) will reach \(ram.legDestinationCity) in about \(DistanceFormatter.string(forMeters: ram.remainingSteps)) of walking", bundle: .appLanguage, locale: .appLanguage)
+        return String(localized: "\(intro) are you heading toward \(ram.targetCity) soon? I'm sending a letter the slow way with Baranov: \(when), and it's waiting on a boat to cross. If you're passing through, shake phones with me or AirDrop and it rides with you instead — much faster. https://github.com/antnbaranov/Baranov", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private func askSomeoneRow(ram: Ram, message: String) -> some View {

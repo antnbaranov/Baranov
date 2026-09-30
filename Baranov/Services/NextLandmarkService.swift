@@ -144,7 +144,7 @@ final class NextLandmarkService {
     private func namedPlace(at coordinate: CLLocationCoordinate2D) async -> (name: String, kind: JourneyStampKind)? {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
 
-        guard let placemark = try? await geocoder.reverseGeocodeLocation(location).first else { return nil }
+        guard let placemark = try? await geocoder.reverseGeocodeLocation(location, preferredLocale: .appLanguage).first else { return nil }
 
         if let water = placemark.inlandWater, !water.isEmpty {
             return (water, .water)

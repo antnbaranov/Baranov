@@ -102,6 +102,21 @@ final class EntitlementService: NSObject {
         }
     }
 
+    #if DEBUG
+    /// Debug-only override for Settings' hidden cheat code. Once a real
+    /// (or sandbox) RevenueCat API key is configured, `Purchases.isConfigured`
+    /// is true and `refresh()` only ever reflects RevenueCat's
+    /// `customerInfo()` — it no longer looks at `MockEntitlementStore` at
+    /// all, so flipping that flag alone silently did nothing. This sets
+    /// the published property directly (and keeps the mock store in sync
+    /// for anything else that reads it), bypassing RevenueCat entirely.
+    /// Compiled out of every release build.
+    func debugSetPastureExpansion(_ value: Bool) {
+        MockEntitlementStore.hasPastureExpansion = value
+        hasPastureExpansion = value
+    }
+    #endif
+
     /// Mirrors what the carrier has actually done in the app onto their
     /// RevenueCat customer record, as subscriber attributes — the same
     /// figures the ACIT3855 flock-metric telemetry reports. Fire-and-
@@ -122,8 +137,20 @@ final class EntitlementService: NSObject {
 
     private func apply(_ customerInfo: CustomerInfo) {
         let active = customerInfo.entitlements.active
-        hasPastureExpansion = active[RevenueCatConfiguration.Entitlement.pastureExpansion] != nil
+        // The dashboard may attach a product to an entitlement with a different
+        // identifier (or none at all, e.g. a Test Store product). Being subscribed
+        // is what matters, so an active subscription unlocks the pasture even if
+        // its entitlement isn't literally named `pasture_expansion`.
+        let namedExpansion = active[RevenueCatConfiguration.Entitlement.pastureExpansion] != nil
+        let otherEntitlement = active.keys.contains { $0 != RevenueCatConfiguration.Entitlement.adoptedRam }
+        let anySubscription = !customerInfo.activeSubscriptions.isEmpty
+        hasPastureExpansion = namedExpansion || otherEntitlement || anySubscription
         hasAdoptedRam = active[RevenueCatConfiguration.Entitlement.adoptedRam] != nil
+            || !customerInfo.nonSubscriptions.isEmpty
+
+        #if DEBUG
+        print("[Entitlements] active entitlements: \(active.keys.sorted()), activeSubscriptions: \(customerInfo.activeSubscriptions.sorted()), nonSubscriptions: \(customerInfo.nonSubscriptions.map(\.productIdentifier)) → expansion=\(hasPastureExpansion) adopted=\(hasAdoptedRam)")
+        #endif
     }
 }
 

@@ -40,15 +40,15 @@ enum SealColor: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .crimson: return "Crimson"
-        case .gold: return "Gold"
-        case .forest: return "Forest"
-        case .navy: return "Navy"
-        case .plum: return "Plum"
-        case .ink: return "Ink"
-        case .obsidian: return "Obsidian Black"
-        case .oldGold: return "Old Gold"
-        case .emerald: return "Emerald"
+        case .crimson: return String(localized: "Crimson", bundle: .appLanguage, locale: .appLanguage)
+        case .gold: return String(localized: "Gold", bundle: .appLanguage, locale: .appLanguage)
+        case .forest: return String(localized: "Forest", bundle: .appLanguage, locale: .appLanguage)
+        case .navy: return String(localized: "Navy", bundle: .appLanguage, locale: .appLanguage)
+        case .plum: return String(localized: "Plum", bundle: .appLanguage, locale: .appLanguage)
+        case .ink: return String(localized: "Ink", bundle: .appLanguage, locale: .appLanguage)
+        case .obsidian: return String(localized: "Obsidian Black", bundle: .appLanguage, locale: .appLanguage)
+        case .oldGold: return String(localized: "Old Gold", bundle: .appLanguage, locale: .appLanguage)
+        case .emerald: return String(localized: "Emerald", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
@@ -66,9 +66,14 @@ enum SealColor: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Whether this wax comes free with the app or with the pasture
-    /// expansion: crimson is free, every other colour is a subscription perk.
+    /// Crimson is the only free wax. Every other colour comes with
+    /// "Expand the Pasture". Sending is never blocked either way.
     var isIncludedFree: Bool { self == .crimson }
+
+    /// Every paid wax catches the light on its own, so the difference
+    /// between free and paid is visible at a glance. Plain crimson stays
+    /// matte.
+    var hasShimmer: Bool { self != .crimson }
 
     /// The three rare finishes — behind the same entitlement as every
     /// other paid colour, just called out as the top of the set.

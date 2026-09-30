@@ -29,11 +29,21 @@ struct PassageNoticeView: View {
                 showProgress: ram.status == .atSea,
                 progress: voyage.progress()
             )
+        } else if ram.status == .grazing || ram.status == .walking {
+            // Still on land, heading for a port: say so now, while a friend
+            // flying that way can still help, not once the ram is at the quay.
+            noticeCard(
+                icon: "water.waves",
+                title: String(localized: "Water ahead at \(ram.legDestinationCity)", bundle: .appLanguage, locale: .appLanguage),
+                detail: String(localized: "Walks to the port, then a packet carries the letter across. Flying that way sooner? Take \(ram.name) with you — once you land, the ram goes ashore too.", bundle: .appLanguage, locale: .appLanguage),
+                showProgress: false,
+                progress: 0
+            )
         } else {
             noticeCard(
                 icon: "ferry.fill",
-                title: "At the quay in \(ram.legDestinationCity)",
-                detail: "No road goes further. Baranov is arranging the next packet — until it does, a carrier heading across can take \(ram.name) instead.",
+                title: String(localized: "At the quay in \(ram.legDestinationCity)", bundle: .appLanguage, locale: .appLanguage),
+                detail: String(localized: "No road goes further. Baranov is arranging the next packet — until it does, a carrier heading across can take \(ram.name) instead.", bundle: .appLanguage, locale: .appLanguage),
                 showProgress: false,
                 progress: 0
             )
@@ -72,16 +82,16 @@ struct PassageNoticeView: View {
 
     private func headline(for voyage: SeaVoyage) -> String {
         if ram.status == .atSea {
-            return "At sea — \(voyage.departurePortName) to \(voyage.arrivalPortName)"
+            return String(localized: "At sea — \(voyage.departurePortName) to \(voyage.arrivalPortName)", bundle: .appLanguage, locale: .appLanguage)
         }
-        return "Packet to \(voyage.arrivalPortName)"
+        return String(localized: "Packet to \(voyage.arrivalPortName)", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private func detail(for voyage: SeaVoyage) -> String {
         if ram.status == .atSea {
-            return "Due ashore \(voyage.arrivesAt.formatted(.relative(presentation: .named))). Nothing to walk until it lands."
+            return String(localized: "Due ashore \(voyage.arrivesAt.formatted(.relative(presentation: .named).locale(.appLanguage))). Nothing to walk until it lands.", bundle: .appLanguage, locale: .appLanguage)
         }
-        return "Sails \(voyage.departsAt.formatted(.relative(presentation: .named))) and lands \(voyage.arrivesAt.formatted(.relative(presentation: .named))). Hand \(ram.name) to someone crossing sooner and it skips the wait entirely."
+        return String(localized: "Sails \(voyage.departsAt.formatted(.relative(presentation: .named).locale(.appLanguage))) and lands \(voyage.arrivesAt.formatted(.relative(presentation: .named).locale(.appLanguage))). Hand \(ram.name) to someone crossing sooner and it skips the wait entirely.", bundle: .appLanguage, locale: .appLanguage)
     }
 }
 

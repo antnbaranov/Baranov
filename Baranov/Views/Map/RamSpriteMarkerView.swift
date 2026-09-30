@@ -184,17 +184,17 @@ struct RamSpriteMarkerView: View {
     }
 
     private var accessibilityDescription: String {
-        let compass = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
+        let compass = [String(localized: "north", bundle: .appLanguage, locale: .appLanguage), String(localized: "northeast", bundle: .appLanguage, locale: .appLanguage), String(localized: "east", bundle: .appLanguage, locale: .appLanguage), String(localized: "southeast", bundle: .appLanguage, locale: .appLanguage), String(localized: "south", bundle: .appLanguage, locale: .appLanguage), String(localized: "southwest", bundle: .appLanguage, locale: .appLanguage), String(localized: "west", bundle: .appLanguage, locale: .appLanguage), String(localized: "northwest", bundle: .appLanguage, locale: .appLanguage)]
         let safeBearing = bearingDegrees.isFinite ? bearingDegrees : 0
         let normalized = (safeBearing.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         let direction = compass[Int(normalized / 45 + 0.5) % 8]
         switch phase {
         case .idle:
-            return "Ram resting, facing \(direction)"
+            return String(localized: "Ram resting, facing \(direction)", bundle: .appLanguage, locale: .appLanguage)
         case .running:
-            return "Ram traveling \(direction)"
+            return String(localized: "Ram traveling \(direction)", bundle: .appLanguage, locale: .appLanguage)
         case .arriving, .arrivedHold:
-            return "Ram arrived, rearing up"
+            return String(localized: "Ram arrived, rearing up", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 }

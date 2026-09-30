@@ -46,6 +46,9 @@ enum AddressKeychain {
     }
 
     /// Forgets both secrets, so the next launch registers a fresh pair.
+    /// Whether a key pair already exists, without making one.
+    static var hasPrivateKey: Bool { read(.privateKey) != nil }
+
     static func reset() {
         delete(.privateKey)
         delete(.inboxToken)

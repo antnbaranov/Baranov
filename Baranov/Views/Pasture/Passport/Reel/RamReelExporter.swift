@@ -74,7 +74,7 @@ enum RamReelExporter {
                 }
 
                 let time = Double(frame) / Double(framesPerSecond)
-                let renderer = ImageRenderer(content: RamReelScene(data: data, time: time))
+                let renderer = ImageRenderer(content: RamReelScene(data: data, time: time).environment(\.locale, .appLanguage))
                 renderer.scale = pixelSize.width / RamReelSpec.size.width
                 guard let image = renderer.cgImage,
                       let pool = adaptor.pixelBufferPool,

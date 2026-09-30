@@ -51,21 +51,21 @@ struct RamGoalSuggestion: Identifiable, Hashable, Sendable {
 
     static var all: [RamGoalSuggestion] {
         [
-            .init(title: String(localized: "Deliver a letter to someone who misses me"), kilometers: nil),
-            .init(title: String(localized: "Walk to the nearest bakery. For the letter, obviously."), kilometers: 2),
-            .init(title: String(localized: "Cross a bridge without looking down"), kilometers: nil),
-            .init(title: String(localized: "Get a stamp in the rain and refuse to complain"), kilometers: nil),
-            .init(title: String(localized: "Reach the next city before my coffee gets cold"), kilometers: 10),
-            .init(title: String(localized: "Visit three places I can't pronounce"), kilometers: nil),
-            .init(title: String(localized: "Walk 5 km before breakfast"), kilometers: 5),
-            .init(title: String(localized: "Make one stranger say “aww”"), kilometers: nil),
-            .init(title: String(localized: "Arrive at my mum's door, on hoof"), kilometers: nil),
-            .init(title: String(localized: "Outwalk a very confident goose"), kilometers: 3),
-            .init(title: String(localized: "Get chased by a dog and win"), kilometers: nil),
-            .init(title: String(localized: "Deliver a letter that makes someone cry (happy tears only)"), kilometers: nil),
-            .init(title: String(localized: "Find a hill dramatic enough for a photo"), kilometers: 4),
-            .init(title: String(localized: "Beat my own record out of sheer spite"), kilometers: 8),
-            .init(title: String(localized: "Nap heroically halfway through"), kilometers: nil),
+            .init(title: String(localized: "Deliver a letter to someone who misses me", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Walk to the nearest bakery. For the letter, obviously.", bundle: .appLanguage, locale: .appLanguage), kilometers: 2),
+            .init(title: String(localized: "Cross a bridge without looking down", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Get a stamp in the rain and refuse to complain", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Reach the next city before my coffee gets cold", bundle: .appLanguage, locale: .appLanguage), kilometers: 10),
+            .init(title: String(localized: "Visit three places I can't pronounce", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Walk 5 km before breakfast", bundle: .appLanguage, locale: .appLanguage), kilometers: 5),
+            .init(title: String(localized: "Make one stranger say “aww”", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Arrive at my mum's door, on hoof", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Outwalk a very confident goose", bundle: .appLanguage, locale: .appLanguage), kilometers: 3),
+            .init(title: String(localized: "Get chased by a dog and win", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Deliver a letter that makes someone cry (happy tears only)", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+            .init(title: String(localized: "Find a hill dramatic enough for a photo", bundle: .appLanguage, locale: .appLanguage), kilometers: 4),
+            .init(title: String(localized: "Beat my own record out of sheer spite", bundle: .appLanguage, locale: .appLanguage), kilometers: 8),
+            .init(title: String(localized: "Nap heroically halfway through", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
         ]
     }
 }

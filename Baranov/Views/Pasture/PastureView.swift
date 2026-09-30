@@ -34,7 +34,6 @@ struct PastureView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(EntitlementService.self) private var entitlementService
     @State private var isPaywallPresented = false
-    @State private var isCustomerCenterPresented = false
     @State private var legalDocument: LegalDocument?
     @State private var socialURL: IdentifiableURL?
 
@@ -65,8 +64,8 @@ struct PastureView: View {
     /// focus on — falls back to the first ram in the flock so both cards
     /// still show something useful before any explicit selection is made.
     private var selectedRam: Ram? {
-        flockViewModel.activeRams.first { $0.id == flockViewModel.selectedRamId }
-            ?? flockViewModel.activeRams.first
+        flockViewModel.ownRams.first { $0.id == flockViewModel.selectedRamId }
+            ?? flockViewModel.ownRams.first
     }
 
     /// Read locally too (not just in `RootView`) and applied again below —
@@ -83,7 +82,9 @@ struct PastureView: View {
         List {
             Section {
                 RamSelectorCard(
-                    rams: flockViewModel.activeRams,
+                    // Pens are for the person's own rams; other people's
+                    // letters ride in the mailbag instead.
+                    rams: flockViewModel.ownRams,
                     capacity: FlockViewModel.pastureCapacity,
                     unlockedSlots: flockViewModel.maxAllowedRams,
                     selectedRamId: Binding(
@@ -105,16 +106,17 @@ struct PastureView: View {
             Section {
                 if entitlementService.hasPastureExpansion || entitlementService.hasAdoptedRam {
                     Button {
-                        if entitlementService.isLive {
-                            isCustomerCenterPresented = true
-                        } else {
-                            isPaywallPresented = true
-                        }
+                        // Same page as "Expand the Pasture" in a letter;
+                        // its own Manage Subscription button opens the
+                        // Customer Center from there.
+                        isPaywallPresented = true
                     } label: {
                         HStack {
                             Text("Manage Subscription")
                             Spacer()
-                            Text(entitlementService.hasPastureExpansion ? "Expanded" : "Adopted Ram")
+                            Text(entitlementService.hasPastureExpansion
+                                ? String(localized: "Expanded", bundle: .appLanguage, locale: .appLanguage)
+                                : String(localized: "Adopted Ram", bundle: .appLanguage, locale: .appLanguage))
                                 .foregroundStyle(.secondary)
                             Image(systemName: "chevron.right")
                                 .font(.footnote.weight(.semibold))
@@ -129,7 +131,9 @@ struct PastureView: View {
                         HStack {
                             Label("Expand the Pasture", systemImage: "plus.circle.fill")
                             Spacer()
-                            Text(flockViewModel.hasFreeRamSlot ? "1 ram, free forever" : "Pasture full")
+                            Text(flockViewModel.hasFreeRamSlot
+                                ? String(localized: "1 ram, free forever", bundle: .appLanguage, locale: .appLanguage)
+                                : String(localized: "Pasture full", bundle: .appLanguage, locale: .appLanguage))
                                 .foregroundStyle(.secondary)
                             Image(systemName: "chevron.right")
                                 .font(.footnote.weight(.semibold))
@@ -206,7 +210,15 @@ struct PastureView: View {
             }
             gameCenterService.authenticateIfNeeded()
             locationService.resolveCurrentLocation()
-            mostRamsAtOnce = max(mostRamsAtOnce, flockViewModel.activeRams.filter { $0.status != .delivered }.count)
+            mostRamsAtOnce = max(mostRamsAtOnce, flockViewModel.ownRams.filter { $0.status != .delivered }.count)
+            #if DEBUG
+            if CommandLine.arguments.contains("-demoMode") {
+                _ = ramCompanionStore.createIfNeeded(name: "Klaus")
+            }
+            if CommandLine.arguments.contains("-screenshotPassport") {
+                passportRam = selectedRam
+            }
+            #endif
             if gameCenterService.isAuthenticated {
                 await refreshGameCenter()
             }
@@ -268,7 +280,6 @@ struct PastureView: View {
                 .environment(entitlementService)
                 .preferredColorScheme(appAppearance.colorScheme)
         }
-        .presentCustomerCenter(isPresented: $isCustomerCenterPresented)
         .environment(\.locale, Locale(identifier: selectedLanguageCode))
     }
 

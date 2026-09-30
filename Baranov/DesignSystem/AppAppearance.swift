@@ -23,9 +23,9 @@ enum AppAppearance: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .system: return "System"
-        case .light: return "Light"
-        case .dark: return "Dark"
+        case .system: return String(localized: "System", bundle: .appLanguage, locale: .appLanguage)
+        case .light: return String(localized: "Light", bundle: .appLanguage, locale: .appLanguage)
+        case .dark: return String(localized: "Dark", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 

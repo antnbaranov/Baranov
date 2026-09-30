@@ -200,14 +200,14 @@ struct LetterArrivalView: View {
                 mismatchRow(
                     isMatch: recipientNameMatches,
                     label: recipientNameMatches
-                        ? "Addressed to you"
-                        : "Addressed to \(letter?.recipientName ?? "someone else")"
+                        ? String(localized: "Addressed to you", bundle: .appLanguage, locale: .appLanguage)
+                        : String(localized: "Addressed to \(letter?.recipientName ?? String(localized: "someone else", bundle: .appLanguage, locale: .appLanguage))", bundle: .appLanguage, locale: .appLanguage)
                 )
                 mismatchRow(
                     isMatch: cityMatches == true,
                     label: cityMatches == true
-                        ? "You're at the right gate"
-                        : "This gate is in \(ram.targetCity)"
+                        ? String(localized: "You're at the right gate", bundle: .appLanguage, locale: .appLanguage)
+                        : String(localized: "This gate is in \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage)
                 )
             }
             .padding(16)
@@ -334,13 +334,17 @@ struct LetterArrivalView: View {
         }
     }
 
-    private static let countdownFormatter: DateComponentsFormatter = {
+    /// Built per use so the units read in the app's language ("2 д 3 ч").
+    private static var countdownFormatter: DateComponentsFormatter {
         let formatter = DateComponentsFormatter()
+        var calendar = Calendar.current
+        calendar.locale = .appLanguage
+        formatter.calendar = calendar
         formatter.allowedUnits = [.day, .hour, .minute, .second]
         formatter.unitsStyle = .abbreviated
         formatter.maximumUnitCount = 2
         return formatter
-    }()
+    }
 
     private var usesPrompt: Bool {
         SealStyle.resolved(voiceOver: voiceOverEnabled, switchControl: switchControlEnabled) == .prompt
@@ -348,17 +352,17 @@ struct LetterArrivalView: View {
 
     private var holdInstruction: String {
         if usesPrompt {
-            if !isEncrypted { return String(localized: "Tap to lift the postcard out") }
-            if !hasCompleteCode { return String(localized: "Enter your ear tag to unlock the seal") }
-            if isTimeLocked { return String(localized: "This letter is still time-locked") }
-            if isGeoLocked { return String(localized: "Walk closer to open this letter") }
-            return String(localized: "Tap the seal!")
+            if !isEncrypted { return String(localized: "Tap to lift the postcard out", bundle: .appLanguage, locale: .appLanguage) }
+            if !hasCompleteCode { return String(localized: "Enter your ear tag to unlock the seal", bundle: .appLanguage, locale: .appLanguage) }
+            if isTimeLocked { return String(localized: "This letter is still time-locked", bundle: .appLanguage, locale: .appLanguage) }
+            if isGeoLocked { return String(localized: "Walk closer to open this letter", bundle: .appLanguage, locale: .appLanguage) }
+            return String(localized: "Tap the seal!", bundle: .appLanguage, locale: .appLanguage)
         }
-        if !isEncrypted { return "Hold to lift the postcard out" }
-        if !hasCompleteCode { return "Enter your ear tag to unlock the seal" }
-        if isTimeLocked { return "This letter is still time-locked" }
-        if isGeoLocked { return "Walk closer to open this letter" }
-        return "Hold the seal to break it"
+        if !isEncrypted { return String(localized: "Hold to lift the postcard out", bundle: .appLanguage, locale: .appLanguage) }
+        if !hasCompleteCode { return String(localized: "Enter your ear tag to unlock the seal", bundle: .appLanguage, locale: .appLanguage) }
+        if isTimeLocked { return String(localized: "This letter is still time-locked", bundle: .appLanguage, locale: .appLanguage) }
+        if isGeoLocked { return String(localized: "Walk closer to open this letter", bundle: .appLanguage, locale: .appLanguage) }
+        return String(localized: "Hold the seal to break it", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private var monogram: String { (letter?.senderName ?? "").sealMonogram }
@@ -506,15 +510,15 @@ struct LetterArrivalView: View {
                 sealProgress = 0
                 switch error {
                 case .timeLocked(let until):
-                    wrongCodeMessage = "Not yet — this letter unlocks \(until.formatted(date: .abbreviated, time: .shortened))."
+                    wrongCodeMessage = String(localized: "Not yet — this letter unlocks \(until.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: .appLanguage))).", bundle: .appLanguage, locale: .appLanguage)
                 case .outsideGeofence(let metersAway):
                     if let metersAway {
-                        wrongCodeMessage = "Not quite there yet — about \(Int(metersAway.rounded()))m to go."
+                        wrongCodeMessage = String(localized: "Not quite there yet — about \(Int(metersAway.rounded()))m to go.", bundle: .appLanguage, locale: .appLanguage)
                     } else {
-                        wrongCodeMessage = "This letter needs your exact location to open. Check Location Services and try again."
+                        wrongCodeMessage = String(localized: "This letter needs your exact location to open. Check Location Services and try again.", bundle: .appLanguage, locale: .appLanguage)
                     }
                 case .wrongCode, .malformed:
-                    wrongCodeMessage = "That code doesn't fit this seal. Check the message from \(letter?.senderName ?? "the sender")."
+                    wrongCodeMessage = String(localized: "That code doesn't fit this seal. Check the message from \(letter?.senderName ?? String(localized: "the sender", bundle: .appLanguage, locale: .appLanguage)).", bundle: .appLanguage, locale: .appLanguage)
                 }
             }
         } catch {
@@ -522,7 +526,7 @@ struct LetterArrivalView: View {
             isPressing = false
             withAnimation(.easeOut(duration: 0.2)) {
                 sealProgress = 0
-                wrongCodeMessage = "That code doesn't fit this seal. Check the message from \(letter?.senderName ?? "the sender")."
+                wrongCodeMessage = String(localized: "That code doesn't fit this seal. Check the message from \(letter?.senderName ?? String(localized: "the sender", bundle: .appLanguage, locale: .appLanguage)).", bundle: .appLanguage, locale: .appLanguage)
             }
         }
     }
@@ -656,12 +660,60 @@ struct LetterArrivalView: View {
                 }
             }
 
+            receiptSection(letter: letter)
+
             certificateSection(letter: letter)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .sheet(isPresented: $isPaywallPresented) {
             PasturePaywallView()
         }
+    }
+
+    // MARK: - Delivery receipt
+
+    /// The ram as it goes back to the sender: the journey, none of what
+    /// this phone decrypted, no other letters.
+    private var receiptPackage: RamTransitPackage {
+        var receipt = liveRam
+        receipt.letter = receipt.letter?.receiptCopy()
+        receipt.passengerLetters = []
+        receipt.isGuest = false
+        return RamTransitPackage(ram: receipt)
+    }
+
+    /// Closes the loop with no server: the recipient sends the journey back
+    /// by Messages or AirDrop, and the sender's phone marks the letter
+    /// delivered with every stamp and carrier along the way.
+    @ViewBuilder
+    private func receiptSection(letter: Letter) -> some View {
+        let sender = letter.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if liveRam.status == .delivered, !sender.isEmpty, !recipientIsSender(letter) {
+            VStack(alignment: .leading, spacing: 8) {
+                ShareLink(
+                    item: receiptPackage,
+                    preview: SharePreview(
+                        String(localized: "\(liveRam.name)'s journey", bundle: .appLanguage, locale: .appLanguage),
+                        image: Image(systemName: "checkmark.seal.fill")
+                    )
+                ) {
+                    Label(String(localized: "Tell \(sender) it arrived", bundle: .appLanguage, locale: .appLanguage),
+                          systemImage: "arrowshape.turn.up.left.fill")
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 4)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("Send it by Messages or AirDrop. \(sender) sees the whole journey, not what you read.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func recipientIsSender(_ letter: Letter) -> Bool {
+        letter.senderName.normalizedForMatching == storedDisplayName.normalizedForMatching
     }
 
     // MARK: - Journey Certificate (paid)

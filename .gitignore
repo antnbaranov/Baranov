@@ -16,3 +16,21 @@ build/
 
 # Local secrets (the RevenueCat key in Config/RevenueCatConfiguration.swift is a *public* SDK key and is fine to commit)
 *.secrets.xcconfig
+
+# Backups, caches, local scratch
+*.bak
+*.orig
+_bak/
+__pycache__/
+*.pyc
+.venv/
+*.log
+.env
+scripts/one-off/
+
+# Local-only debug values (never commit)
+Baranov/Config/Secrets.swift
+
+# Assistant working backups
+.claude-backup/
+screenshots/test_scenario*.png

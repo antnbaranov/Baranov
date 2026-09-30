@@ -109,7 +109,7 @@ final class SavedCourierStore {
     /// Off the main actor so the non-`Sendable` placemark never crosses an isolation boundary.
     private nonisolated static func placeName(at coordinate: CLLocationCoordinate2D) async -> String? {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first else { return nil }
+        guard let placemark = try? await CLGeocoder().reverseGeocodeLocation(location, preferredLocale: .appLanguage).first else { return nil }
         var seen = Set<String>()
         let parts = [placemark.name ?? placemark.thoroughfare, placemark.locality]
             .compactMap { $0 }

@@ -263,7 +263,7 @@ struct LookAroundPanel: View {
                     systemImage: layout == .fullscreen
                         ? "arrow.down.right.and.arrow.up.left"
                         : "arrow.up.left.and.arrow.down.right",
-                    label: layout == .fullscreen ? "Exit Full Screen" : "Full Screen",
+                    label: layout == .fullscreen ? String(localized: "Exit Full Screen", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Full Screen", bundle: .appLanguage, locale: .appLanguage),
                     action: onToggleFullscreen
                 )
             }

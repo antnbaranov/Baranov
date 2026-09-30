@@ -41,6 +41,30 @@ final class ProximityCodeDiscovery: NSObject {
 
     // MARK: Receiver — listen passively
 
+    /// Listening has two independent reasons: the Settings radar toggle (passive map marker) and a code
+    /// field being on screen (Enter Code, Send by Code). Either keeps the browser running; it stops only
+    /// when neither wants it, so opening and closing a code field never switches the radar off (or on).
+    @ObservationIgnored private var radarWantsListening = false
+    @ObservationIgnored private var entryWantsListening = false
+
+    func setRadarListening(_ on: Bool) {
+        radarWantsListening = on
+        reconcileListening()
+    }
+
+    func setEntryListening(_ on: Bool) {
+        entryWantsListening = on
+        reconcileListening()
+    }
+
+    private func reconcileListening() {
+        if radarWantsListening || entryWantsListening {
+            startListening()
+        } else {
+            stopListening()
+        }
+    }
+
     func startListening() {
         guard browser == nil else { return }
         let b = MCNearbyServiceBrowser(peer: peerID, serviceType: Self.serviceType)

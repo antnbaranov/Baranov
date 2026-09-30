@@ -39,6 +39,12 @@ struct SettingsView: View {
 
     #if DEBUG
     @State private var debugCode = ""
+    @State private var debugRedeemResult: DebugRedeemResult?
+    @State private var debugRedeemTick = 0
+
+    private enum DebugRedeemResult {
+        case unlocked, invalid
+    }
     #endif
 
     private var appAppearance: AppAppearance {
@@ -75,7 +81,7 @@ struct SettingsView: View {
     }
 
     private var previewTitle: String {
-        guard let ram = previewRam else { return "12 km to Lisbon" }
+        guard let ram = previewRam else { return String(localized: "12 km to Lisbon", bundle: .appLanguage, locale: .appLanguage) }
         return "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity)"
     }
 
@@ -94,12 +100,12 @@ struct SettingsView: View {
 
     private var previewTime: String {
         (Calendar.current.date(bySettingHour: morningMinutes / 60, minute: morningMinutes % 60, second: 0, of: Date()) ?? Date())
-            .formatted(date: .omitted, time: .shortened)
+            .formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: .appLanguage))
     }
 
     private var previewMessage: String {
-        let name = previewRam?.name ?? "Your ram"
-        return "\(name) walks when you do. Every step today counts."
+        let name = previewRam?.name ?? String(localized: "Your ram", bundle: .appLanguage, locale: .appLanguage)
+        return String(localized: "\(name) walks when you do. Every step today counts.", bundle: .appLanguage, locale: .appLanguage)
     }
 
     var body: some View {
@@ -214,16 +220,32 @@ struct SettingsView: View {
                     TextField("Code", text: $debugCode)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
+                        .submitLabel(.done)
                         .onSubmit { redeemDebugCode() }
+                        .onChange(of: debugCode) { _, new in
+                            if !new.isEmpty { debugRedeemResult = nil }
+                        }
 
                     Button("Redeem") { redeemDebugCode() }
                         .compactGlassButton()
                         .disabled(debugCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                .sensoryFeedback(trigger: debugRedeemTick) { _, _ in
+                    debugRedeemResult == .unlocked ? .success : .error
+                }
             } header: {
                 Text("Developer")
             } footer: {
-                Text("Debug builds only — never shows in a release build. Redeeming NY2026 unlocks the mock pasture expansion locally, with no RevenueCat purchase.")
+                switch debugRedeemResult {
+                case .unlocked:
+                    Label("Code accepted. Pasture expanded, all three ram slots are unlocked.", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .invalid:
+                    Label("That code isn't valid.", systemImage: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                case nil:
+                    Text("Debug builds only, never shows in a release build.")
+                }
             }
             #endif
         }
@@ -269,10 +291,14 @@ struct SettingsView: View {
     /// can't be reached — let alone abused — in a shipped app.
     private func redeemDebugCode() {
         let trimmed = debugCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard trimmed == "NY2026" else { return }
-        MockEntitlementStore.hasPastureExpansion = true
-        Task { await entitlementService.refresh() }
+        debugRedeemTick += 1
+        guard trimmed == "NY2026" || trimmed == Secrets.debugCode.uppercased() else {
+            debugRedeemResult = .invalid
+            return
+        }
+        entitlementService.debugSetPastureExpansion(true)
         debugCode = ""
+        debugRedeemResult = .unlocked
     }
     #endif
 }

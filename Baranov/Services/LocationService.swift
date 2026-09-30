@@ -189,6 +189,8 @@ final class LocationService: NSObject {
         wantsLiveTracking = false
         guard isLiveTracking else { return }
         isLiveTracking = false
+        manager.allowsBackgroundLocationUpdates = false
+        manager.showsBackgroundLocationIndicator = false
         manager.stopUpdatingHeading()
         // Only stop location updates if no one-shot resolve is mid-flight;
         // `endFix` will stop them itself when that finishes.
@@ -203,16 +205,34 @@ final class LocationService: NSObject {
         currentSpeedMetersPerSecond = 0
     }
 
+    /// Whether the location radio may keep the app alive in the background.
+    /// Only true while a ram is walking, so steps keep counting and the Live
+    /// Activity keeps updating with the phone locked. When nothing is walking,
+    /// location stops the moment the app leaves the screen.
+    @ObservationIgnored private var keepsAliveForWalk = false
+
+    /// Called by the map whenever "a ram is walking" changes.
+    func setWalkKeepAlive(_ walking: Bool) {
+        keepsAliveForWalk = walking
+        if isLiveTracking { applyBackgroundKeepAlive() }
+    }
+
+    private func applyBackgroundKeepAlive() {
+        manager.allowsBackgroundLocationUpdates = keepsAliveForWalk
+        manager.showsBackgroundLocationIndicator = keepsAliveForWalk
+    }
+
     private func beginLiveUpdates() {
         guard !isLiveTracking else { return }
         isLiveTracking = true
 
-        // Best accuracy and no distance filter: a walking person moves
-        // ~1 m per step, and the marker should track every fix rather
-        // than jumping 50 m at a time.
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
-        manager.headingFilter = 2
+        // Ten-metre accuracy with a 5 m filter is plenty for a map marker and
+        // draws far less power than best accuracy with no filter.
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 5
+        manager.headingFilter = 5
+        manager.pausesLocationUpdatesAutomatically = false
+        applyBackgroundKeepAlive()
 
         if let cached = manager.location {
             publish(cached)
@@ -294,7 +314,7 @@ final class LocationService: NSObject {
         currentCoordinate = location.coordinate
 
         if currentCityName == nil {
-            currentCityName = "Current Location"
+            currentCityName = String(localized: "Current Location", bundle: .appLanguage, locale: .appLanguage)
         }
         if shouldReverseGeocode(location) {
             reverseGeocode(location)
@@ -383,7 +403,7 @@ final class LocationService: NSObject {
         geocodeTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let placemarks = try await self.geocoder.reverseGeocodeLocation(location)
+                let placemarks = try await self.geocoder.reverseGeocodeLocation(location, preferredLocale: .appLanguage)
                 guard !Task.isCancelled else { return }
                 if let name = placemarks.first?.locality ?? placemarks.first?.name {
                     self.currentCityName = name

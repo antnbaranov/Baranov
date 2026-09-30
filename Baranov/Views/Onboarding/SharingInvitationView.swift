@@ -34,7 +34,7 @@ struct SharingInvitationView: View {
                 row("dot.radiowaves.left.and.right", "Nearby on the map", "You see when someone close has a letter for you.")
             }
             .padding(14)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             VStack(spacing: 10) {
                 Button(action: onTurnOn) {
@@ -58,6 +58,7 @@ struct SharingInvitationView: View {
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }

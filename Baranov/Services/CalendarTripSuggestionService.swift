@@ -132,7 +132,20 @@ final class CalendarTripSuggestionService {
         guard let end = Calendar.current.date(byAdding: .day, value: withinDays, to: now) else { return }
 
         let predicate = store.predicateForEvents(withStart: now, end: end, calendars: nil)
-        let events = store.events(matching: predicate)
+        // `events(matching:)` is a synchronous database walk that Apple's
+        // own docs warn can take a while, and it was running right here on
+        // the main actor — exactly the call that was freezing the very
+        // first Pasture open after granting Calendar access, on anyone
+        // with a large synced calendar (Exchange, Google). Same bridging
+        // pattern `OnboardingPermissions.requestMotion()` already uses for
+        // CMPedometer: hop to a background queue for the blocking call,
+        // then resume back here with its result.
+        let store = self.store
+        let events: [EKEvent] = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: store.events(matching: predicate))
+            }
+        }
         let referenceLocation = CLLocation(latitude: referenceCoordinate.latitude, longitude: referenceCoordinate.longitude)
 
         var seenLocations = Set<String>()
@@ -155,7 +168,7 @@ final class CalendarTripSuggestionService {
             guard distanceMeters >= minimumDistanceMeters else { continue }
 
             let suggestion = TripSuggestion(
-                title: event.title ?? "Trip",
+                title: event.title ?? String(localized: "Trip", bundle: .appLanguage, locale: .appLanguage),
                 displayName: Self.displayName(for: placemark, fallback: location),
                 coordinate: RamCoordinate(eventCoordinate),
                 date: event.startDate

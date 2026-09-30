@@ -309,10 +309,17 @@ struct RamReelScene: View {
     private var intro: some View {
         let pop = easeOutBack(phase(t, 0.3, 1.1))
         let fade = 1 - phase(t, 2.0, 2.6)
+        let headerText: String = {
+            if data.goal != nil {
+                return data.goalDone
+                    ? String(localized: "Mission complete", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "On a mission", bundle: .appLanguage, locale: .appLanguage)
+            } else {
+                return data.voice?.name ?? String(localized: "Meet", bundle: .appLanguage, locale: .appLanguage)
+            }
+        }()
         return VStack(spacing: 6) {
-            Text(verbatim: data.goal != nil
-                 ? (data.goalDone ? "Mission complete" : "On a mission")
-                 : (data.voice?.name ?? "Meet"))
+            Text(headerText)
                 .scaledFont(size: 15, weight: .semibold, design: .rounded)
                 .foregroundStyle(ReelPalette.ink.opacity(0.6))
             Text(data.ramName)
@@ -348,7 +355,7 @@ struct RamReelScene: View {
                 .foregroundStyle(ReelPalette.ink)
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
-            Text("walked on four hooves")
+            Text(String(localized: "walked on four hooves", bundle: .appLanguage, locale: .appLanguage))
                 .scaledFont(size: 16, weight: .semibold, design: .rounded)
                 .foregroundStyle(ReelPalette.ink.opacity(0.7))
             Text(String(data.comparison.prefix(factChars)))
@@ -385,7 +392,7 @@ struct RamReelScene: View {
             }
 
             VStack(spacing: 8) {
-                Text("This ram is")
+                Text(String(localized: "This ram is", bundle: .appLanguage, locale: .appLanguage))
                     .scaledFont(size: 15, weight: .semibold, design: .rounded)
                     .foregroundStyle(ReelPalette.ink.opacity(0.6))
                     .opacity(eyebrow)
@@ -445,7 +452,10 @@ struct RamReelScene: View {
         let detail = easeOut(phase(t, 11.2, 12.0))
         let mark = easeOut(phase(t, 11.8, 12.6))
         let places = Set(data.places.map { $0.lowercased() }).count
-        let stats = "\(places == 1 ? "1 place" : "\(places) places") · \(data.personality.title)"
+        let placesText = places == 1
+            ? String(localized: "1 place", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "\(places) places", bundle: .appLanguage, locale: .appLanguage)
+        let stats = String(localized: "\(placesText) · \(data.personality.title)", bundle: .appLanguage, locale: .appLanguage)
         return ZStack {
             VStack(spacing: 6) {
                 Text(data.ramName)
@@ -458,7 +468,7 @@ struct RamReelScene: View {
                     .foregroundStyle(ReelPalette.ink)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                Text("on foot, one step at a time")
+                Text(String(localized: "on foot, one step at a time", bundle: .appLanguage, locale: .appLanguage))
                     .scaledFont(size: 17, weight: .semibold, design: .serif)
                     .italic()
                     .foregroundStyle(ReelPalette.ink.opacity(0.75))

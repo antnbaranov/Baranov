@@ -23,6 +23,10 @@ struct HoofbeatOverlay: View {
     let successTick: Int
     /// Who the person tapped to hand a ram to, while we wait for them to shake back.
     var partnerName: String? = nil
+    /// Asked from Profile or the map: waiting for them to tap Accept, not to shake.
+    var awaitingAcceptance: Bool = false
+    /// The person tapped Accept on someone's request: connecting, not waiting for a shake.
+    var answeringRequest: Bool = false
     /// Cancels the current exchange and resets to idle.
     var onDismiss: (() -> Void)? = nil
     /// Re-triggers the hoofbeat after a failure.
@@ -134,18 +138,26 @@ struct HoofbeatOverlay: View {
         case .idle:
             return ""
         case .searching:
+            if awaitingAcceptance, let partnerName, !partnerName.isEmpty {
+                return String(localized: "Waiting for \(partnerName) to accept…",
+                              bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — the person asked a nearby courier to take a ram and is waiting for them to tap Accept on their phone. The argument is the courier's name.")
+            }
+            if answeringRequest, let partnerName, !partnerName.isEmpty {
+                return String(localized: "Connecting with \(partnerName)…",
+                              bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — the person tapped Accept on a handover request and their phone is now connecting to the sender's phone. The argument is the sender's name.")
+            }
             if let partnerName, !partnerName.isEmpty {
                 return String(localized: "Waiting for \(partnerName) to shake…",
-                              comment: "Hoofbeat handoff overlay — the person tapped a nearby courier to hand them a ram and is waiting for that courier to shake their phone too. The argument is the courier's name.")
+                              bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — the person tapped a nearby courier to hand them a ram and is waiting for that courier to shake their phone too. The argument is the courier's name.")
             }
             return String(localized: "Listening for hoofbeats nearby…",
-                          comment: "Hoofbeat handoff overlay — status shown while searching for a nearby phone to exchange a letter with in person.")
+                          bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — status shown while searching for a nearby phone to exchange a letter with in person.")
         case .connecting(let peerName):
             return String(localized: "Meeting \(peerName)…",
-                          comment: "Hoofbeat handoff overlay — a nearby phone was found and the in-person exchange is about to begin. The argument is the other person's name.")
+                          bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — a nearby phone was found and the in-person exchange is about to begin. The argument is the other person's name.")
         case .exchanging(let peerName):
             return String(localized: "Passing the satchel to \(peerName)…",
-                          comment: "Hoofbeat handoff overlay — the letter is being exchanged with the nearby phone, in person. The argument is the other person's name.")
+                          bundle: .appLanguage, locale: .appLanguage, comment: "Hoofbeat handoff overlay — the letter is being exchanged with the nearby phone, in person. The argument is the other person's name.")
         case .finished(let summary):
             return summary
         case .failed(let reason):

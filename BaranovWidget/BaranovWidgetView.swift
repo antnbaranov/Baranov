@@ -44,7 +44,7 @@ private struct HeroDistance: View {
     var body: some View {
         VStack(alignment: alignment, spacing: 0) {
             Text(text)
-                .font(.system(.title, design: .rounded, weight: .bold))
+                .font(.system(.title, weight: .bold))
                 .monospacedDigit()
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -61,7 +61,7 @@ private struct EmptyPastureView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            RamSprite(pose: .idle, height: 56)
+            RamSprite(pose: .idle, stride: 0, height: 56)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pasture")
@@ -93,13 +93,13 @@ struct SmallBaranovWidgetView: View {
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     HeroDistance(text: remaining)
-                    JourneyTrack(progress: entry.progress, pose: entry.pose, spriteHeight: 26)
+                    RamRidingTrack(progress: entry.progress, pose: entry.pose, spriteHeight: 26)
                         .padding(.top, 6)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Spacer(minLength: 0)
-                    RamSprite(pose: .idle, height: 52)
+                    RamSprite(pose: .idle, stride: 0, height: 52)
                         .accessibilityHidden(true)
                     Text("Pasture")
                         .font(.headline)
@@ -139,7 +139,7 @@ struct MediumBaranovWidgetView: View {
                         HeroDistance(text: remaining, alignment: .trailing)
                     }
                     Spacer(minLength: 0)
-                    JourneyTrack(progress: entry.progress, pose: entry.pose, spriteHeight: 32)
+                    RamRidingTrack(progress: entry.progress, pose: entry.pose, spriteHeight: 32)
                     RouteRow(from: entry.fromCity ?? "", to: entry.toCity ?? "", progress: entry.progress)
                 }
             } else {
@@ -164,4 +164,38 @@ struct MediumBaranovWidgetView: View {
 } timeline: {
     BaranovWidgetEntry.placeholder
     BaranovWidgetEntry.empty
+}
+
+/// Home-screen widget only: the ram rides along the bar, because the widget
+/// has no other ram on it. The Live Activity uses the plain `JourneyTrack`.
+struct RamRidingTrack: View {
+    let progress: Double
+    let pose: RamActivityPose
+    let spriteHeight: CGFloat
+
+    private let trackHeight: CGFloat = 8
+
+    var body: some View {
+        GeometryReader { geo in
+            let spriteWidth = spriteHeight * pose.aspectRatio
+            let travel = max(0, geo.size.width - spriteWidth)
+            let x = travel * min(max(progress, 0), 1)
+
+            ZStack(alignment: .bottomLeading) {
+                Capsule(style: .continuous)
+                    .fill(.quaternary)
+                    .frame(height: trackHeight)
+
+                Capsule(style: .continuous)
+                    .fill(.tint)
+                    .frame(width: max(trackHeight, x + spriteWidth / 2), height: trackHeight)
+
+                RamSprite(pose: pose, stride: 0, height: spriteHeight)
+                    .offset(x: x, y: -(trackHeight - 2))
+            }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .frame(height: spriteHeight + trackHeight - 2)
+        .accessibilityHidden(true)
+    }
 }

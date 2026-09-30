@@ -43,6 +43,15 @@ struct SeaVoyage: Codable, Hashable, Sendable {
         max(1, arrivesAt.timeIntervalSince(departsAt))
     }
 
+    /// Port to port, in metres.
+    var distanceMeters: Double {
+        CLLocation(latitude: departurePort.clLocationCoordinate.latitude, longitude: departurePort.clLocationCoordinate.longitude)
+            .distance(from: CLLocation(latitude: arrivalPort.clLocationCoordinate.latitude, longitude: arrivalPort.clLocationCoordinate.longitude))
+    }
+
+    /// Across an ocean the ram flies; over a strait or a sea it sails.
+    var usesAirplane: Bool { distanceMeters > 2_000_000 }
+
     func hasDeparted(by date: Date = Date()) -> Bool { date >= departsAt }
     func hasLanded(by date: Date = Date()) -> Bool { date >= arrivesAt }
 

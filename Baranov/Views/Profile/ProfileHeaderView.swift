@@ -18,6 +18,10 @@ struct ProfileHeaderView: View {
     /// Today's Foundation Models saying (empty until generated / when unavailable).
     @AppStorage("com.baranov.aiQuote") private var aiQuote = ""
     @AppStorage("com.baranov.aiQuoteDay") private var aiQuoteDay = ""
+    /// The app language the saved saying was written in, so switching
+    /// language never leaves yesterday's saying in the old one.
+    @AppStorage("com.baranov.aiQuoteLanguage") private var aiQuoteLanguage = ""
+    @AppStorage(AppLanguage.storageKey) private var selectedLanguageCode = ""
     @State private var isGenerating = false
 
     private var todayKey: String { Date.now.formatted(.iso8601.year().month().day()) }
@@ -40,8 +44,10 @@ struct ProfileHeaderView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16)
         .sensoryFeedback(.impact(weight: .light), trigger: tapTick)
         .sheet(isPresented: $showPicker) {
             ShepherdPickerSheet(selection: $avatarSelection, customFileName: $avatarFile, motto: $motto)
@@ -57,13 +63,18 @@ struct ProfileHeaderView: View {
         }
         .task {
             // One fresh on-device saying per day; offline / unsupported devices keep the classic ones.
+            if aiQuoteLanguage != AppLanguage.code { aiQuote = "" }
             if aiQuoteDay != todayKey || aiQuote.isEmpty { await refreshAIQuote() }
+        }
+        .onChange(of: selectedLanguageCode) {
+            aiQuote = ""
+            Task { await refreshAIQuote() }
         }
     }
 
     private var nameRow: some View {
         HStack(spacing: 6) {
-            Text(name.isEmpty ? String(localized: "Courier") : name)
+            Text(name.isEmpty ? String(localized: "Courier", bundle: .appLanguage, locale: .appLanguage) : name)
                 .font(.system(.title2, design: .serif).weight(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
@@ -85,8 +96,9 @@ struct ProfileHeaderView: View {
     /// Falls back to the classic proverbs when the model isn't available.
     private var quoteView: some View {
         let fallback = CourierQuotes.quote(offset: quoteOffset)
-        let text = aiQuote.isEmpty ? fallback.text : aiQuote
-        let source = aiQuote.isEmpty ? fallback.source : String(localized: "Apple Intelligence")
+        let showsAI = !aiQuote.isEmpty && aiQuoteLanguage == AppLanguage.code
+        let text = showsAI ? aiQuote : fallback.text
+        let source = !showsAI ? fallback.source : String(localized: "Apple Intelligence", bundle: .appLanguage, locale: .appLanguage)
         return Button {
             tapTick += 1
             quoteOffset += 1
@@ -114,10 +126,11 @@ struct ProfileHeaderView: View {
     private func refreshAIQuote() async {
         isGenerating = true
         defer { isGenerating = false }
-        let code = locale.language.languageCode?.identifier ?? "en"
+        let code = AppLanguage.code
         if let fresh = await ShepherdQuoteService.generate(languageCode: code) {
             aiQuote = fresh
             aiQuoteDay = todayKey
+            aiQuoteLanguage = code
         }
     }
 }

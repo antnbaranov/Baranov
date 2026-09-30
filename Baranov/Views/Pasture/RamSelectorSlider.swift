@@ -57,6 +57,14 @@ struct RamSelectorSlider: View {
     let onRentTapped: () -> Void
     let onNameTapped: (Ram) -> Void
 
+    /// Names of the unlocked slots that don't have a journey yet, by
+    /// absolute slot index — each is a ram of its own waiting in the
+    /// pasture. `namedOpenSlots` are the ones the person already named
+    /// (a slot can be named once).
+    var openSlotNames: [Int: String] = [:]
+    var namedOpenSlots: Set<Int> = []
+    var onOpenSlotNameTapped: (Int) -> Void = { _ in }
+
     /// The person's own default ram — shown resting in the big card
     /// instead of an empty placeholder whenever `rams` is empty, since
     /// onboarding guarantees this exists before any letter is ever sent.
@@ -96,6 +104,9 @@ struct RamSelectorSlider: View {
                 unlockedSlots: unlockedSlots,
                 companion: companion,
                 slotIndex: displayedSlotIndex,
+                openSlotNames: openSlotNames,
+                namedOpenSlots: namedOpenSlots,
+                onOpenSlotNameTapped: onOpenSlotNameTapped,
                 onNameTapped: onNameTapped,
                 onCompanionNameTapped: onCompanionNameTapped,
                 onRentTapped: onRentTapped
@@ -183,6 +194,9 @@ private struct RamSelectorStage: View {
     let unlockedSlots: Int
     let companion: RamCompanion?
     let slotIndex: Int
+    let openSlotNames: [Int: String]
+    let namedOpenSlots: Set<Int>
+    let onOpenSlotNameTapped: (Int) -> Void
     let onNameTapped: (Ram) -> Void
     let onCompanionNameTapped: () -> Void
     let onRentTapped: () -> Void
@@ -190,11 +204,10 @@ private struct RamSelectorStage: View {
     private enum Content {
         case ram(Ram)
         case companion(RamCompanion)
-        /// A slot within `unlockedSlots` that just doesn't have a ram in
-        /// it yet — rare in practice (a new ram is dispatched from
-        /// Journey, not created empty here), kept mainly so an unlocked-
-        /// but-unused slot never accidentally reads as locked.
-        case openEmpty
+        /// A slot within `unlockedSlots` that doesn't have a journey yet:
+        /// a ram of its own is waiting there, under a suggested name the
+        /// person can replace once.
+        case openRam(slot: Int)
         case locked
     }
 
@@ -232,7 +245,7 @@ private struct RamSelectorStage: View {
         if index == 0, rams.isEmpty, let companion {
             return (.companion(companion), "companion")
         }
-        return (.openEmpty, "open-\(index)")
+        return (.openRam(slot: index), "open-\(index)")
     }
 
     private var targetKey: String { resolveContent(at: slotIndex).key }
@@ -247,6 +260,13 @@ private struct RamSelectorStage: View {
         content
             .offset(x: offsetX)
             .onAppear {
+                #if DEBUG
+                if CommandLine.arguments.contains("-demoMode") {
+                    hasAppeared = true
+                    settleImmediately()
+                    return
+                }
+                #endif
                 if !hasAppeared {
                     hasAppeared = true
                     displayed = targetContent
@@ -283,6 +303,10 @@ private struct RamSelectorStage: View {
                 guard hasAppeared, targetKey == displayedKey else { return }
                 displayed = targetContent
             }
+            .onChange(of: openSlotNames) { _, _ in
+                guard hasAppeared, targetKey == displayedKey else { return }
+                displayed = targetContent
+            }
             .onChange(of: companion?.name) { _, _ in
                 guard hasAppeared, targetKey == displayedKey else { return }
                 displayed = targetContent
@@ -305,14 +329,12 @@ private struct RamSelectorStage: View {
         displayed = targetContent
         displayedKey = targetKey
         switch displayed {
-        case .ram, .companion, .locked:
+        case .ram, .companion, .openRam, .locked:
             frameImageName = RamSpriteFrameSets.faceCameraFrame
             walkTask = Task {
                 await idleLoop()
                 walkTask = nil
             }
-        case .openEmpty:
-            frameImageName = nil
         }
     }
 
@@ -329,12 +351,21 @@ private struct RamSelectorStage: View {
         case .companion(let companion):
             bigCard(
                 name: companion.name,
-                subtitle: "Resting in the pasture — \(companion.ageDescription)",
+                subtitle: String(localized: "Resting in the pasture — \(companion.ageDescription)", bundle: .appLanguage, locale: .appLanguage),
                 statusSymbolName: nil,
                 onNameTapped: onCompanionNameTapped
             )
-        case .openEmpty:
-            EmptyPastureBigSlotCard()
+        case .openRam(let slot):
+            let isNamed = namedOpenSlots.contains(slot)
+            bigCard(
+                name: openSlotNames[slot] ?? String(localized: "New ram", bundle: .appLanguage, locale: .appLanguage),
+                subtitle: isNamed
+                    ? String(localized: "Waiting in the pasture", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "Waiting in the pasture — name it once", bundle: .appLanguage, locale: .appLanguage),
+                statusSymbolName: nil,
+                showsRenameHint: !isNamed,
+                onNameTapped: { if !isNamed { onOpenSlotNameTapped(slot) } }
+            )
         case .locked:
             LockedBigSlotCard(frameImageName: frameImageName, onRentTapped: onRentTapped)
         }
@@ -344,6 +375,7 @@ private struct RamSelectorStage: View {
         name: String,
         subtitle: String,
         statusSymbolName: String?,
+        showsRenameHint: Bool = true,
         onNameTapped: @escaping () -> Void
     ) -> some View {
         VStack(spacing: 8) {
@@ -376,9 +408,11 @@ private struct RamSelectorStage: View {
                         Text(name)
                             .font(.headline)
                             .foregroundStyle(.primary)
-                        Image(systemName: "pencil")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        if showsRenameHint {
+                            Image(systemName: "pencil")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
@@ -465,11 +499,9 @@ private struct RamSelectorStage: View {
         offsetX = 0
 
         switch displayed {
-        case .ram, .companion, .locked:
+        case .ram, .companion, .openRam, .locked:
             frameImageName = RamSpriteFrameSets.faceCameraFrame
             await idleLoop()
-        case .openEmpty:
-            break
         }
     }
 
@@ -484,33 +516,23 @@ private struct RamSelectorStage: View {
             try? await Task.sleep(for: .seconds(Double.random(in: 4...7)))
             guard !Task.isCancelled else { return }
             isRearingUp = true
-            for frame in RamSpriteFrameSets.rearUpWithEnvelope.indices {
+            let frames = Array(RamSpriteFrameSets.rearUpWithEnvelope.indices)
+            // Rise slowly, hold at the top, then lower back down in
+            // reverse — a deliberate rear rather than a flicker.
+            for frame in frames {
                 guard !Task.isCancelled else { return }
                 rearFrame = frame
-                try? await Task.sleep(for: .milliseconds(90))
+                try? await Task.sleep(for: .milliseconds(260))
+            }
+            try? await Task.sleep(for: .milliseconds(800))
+            for frame in frames.dropLast().reversed() {
+                guard !Task.isCancelled else { return }
+                rearFrame = frame
+                try? await Task.sleep(for: .milliseconds(240))
             }
             guard !Task.isCancelled else { return }
             isRearingUp = false
         }
-    }
-}
-
-private struct EmptyPastureBigSlotCard: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "pawprint")
-                .font(.largeTitle)
-                .foregroundStyle(.tertiary)
-                .frame(width: 112, height: 112)
-                .background(
-                    Circle().strokeBorder(.tertiary.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [5]))
-                )
-
-            Text("No Ram Yet")
-                .font(.subheadline)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
 

@@ -33,6 +33,8 @@ enum DistanceFormatter {
 
     private static func formatter(for unit: UnitLength) -> MeasurementFormatter {
         let formatter = MeasurementFormatter()
+        // The app's language, not the phone's: "3,2 км", not "3.2 km".
+        formatter.locale = .appLanguage
         // `.providedUnit` is what makes this respect the person's chosen
         // unit — without it, `MeasurementFormatter` is free to convert
         // back to whatever its own locale-driven "natural" unit is,

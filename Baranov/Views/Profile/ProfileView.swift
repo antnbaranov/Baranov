@@ -23,6 +23,10 @@ import UIKit
 struct ProfileView: View {
     @Environment(LocationService.self) private var locationService
     @Environment(\.dismiss) private var dismiss
+    @State private var gateMovedTick = 0
+    /// Set when the button was tapped before the phone had a fix; the gate moves as soon as one arrives.
+    @State private var gateAwaitingFix = false
+    @State private var isPickingGate = false
 
     @AppStorage("com.baranov.carrierDisplayName") private var carrierDisplayName = ""
 
@@ -54,7 +58,7 @@ struct ProfileView: View {
 
     private var displayName: String {
         let trimmed = carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? String(localized: "Courier") : trimmed
+        return trimmed.isEmpty ? String(localized: "Courier", bundle: .appLanguage, locale: .appLanguage) : trimmed
     }
 
     // MARK: - Trips
@@ -82,6 +86,7 @@ struct ProfileView: View {
                 VStack(spacing: 20) {
                     ProfileHeaderView()
                     courierCodeCard
+                    gateCard
                     nearbyCouriersCard
                     savedCouriersCard
                     tripsCard
@@ -217,7 +222,7 @@ struct ProfileView: View {
                 .lineLimit(2)
 
             HStack(spacing: 10) {
-                ShareLink(item: String(localized: "Send me a letter on Baranov. My Shepherd ID: \(code)")) {
+                ShareLink(item: String(localized: "Send me a letter on Baranov. My Shepherd ID: \(code)", bundle: .appLanguage, locale: .appLanguage)) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
@@ -237,9 +242,81 @@ struct ProfileView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .padding(.horizontal, 16)
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: - Gate
+
+    /// Where letters to this Shepherd ID walk. Town-level, set from where
+    /// the phone first was; movable to where it is now.
+    private var gateCard: some View {
+        let gate = GateStore.shared.gate
+        return VStack(alignment: .leading, spacing: 10) {
+            Label("Your gate", systemImage: "signpost.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(gate?.city ?? String(localized: "Not set yet", bundle: .appLanguage, locale: .appLanguage))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            Text("Letters sent to your Shepherd ID walk here, on the sender's steps. Only the town is shared.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: moveGateHere) {
+                Label(gate == nil ? "Set my gate here" : "Move my gate here", systemImage: "location")
+            }
+            .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+
+            Button { isPickingGate = true } label: {
+                Label("Choose another town", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            .sensoryFeedback(.success, trigger: gateMovedTick)
+            .sheet(isPresented: $isPickingGate) {
+                GatePickerSheet { name, coordinate in
+                    gateAwaitingFix = false
+                    GateStore.shared.move(to: coordinate, city: name)
+                    gateMovedTick += 1
+                }
+            }
+            .onChange(of: locationService.currentCoordinate?.latitude) { _, _ in applyGateIfAwaiting() }
+            .onChange(of: locationService.currentCityName) { _, _ in applyGateIfAwaiting() }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Moves the gate to where the phone is. With no fix yet it asks for one
+    /// and finishes by itself when it lands; with location off it opens Settings.
+    private func moveGateHere() {
+        if locationService.authorizationDenied, locationService.currentCoordinate == nil {
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(url)
+            }
+            return
+        }
+        gateAwaitingFix = true
+        locationService.resolveCurrentLocation()
+        applyGateIfAwaiting()
+    }
+
+    private func applyGateIfAwaiting() {
+        guard gateAwaitingFix, let here = locationService.currentCoordinate else { return }
+        GateStore.shared.move(to: here, city: locationService.currentCityName)
+        gateMovedTick += 1
+        // Keep listening until the town name resolves, then stop.
+        if let name = locationService.currentCityName, !name.isEmpty,
+           name != String(localized: "Current Location", bundle: .appLanguage, locale: .appLanguage) {
+            gateAwaitingFix = false
+        }
     }
 
     // MARK: - Nearby couriers
@@ -307,7 +384,7 @@ struct ProfileView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .padding(.horizontal, 16)
         .sensoryFeedback(.selection, trigger: nearby.couriers.count)
     }
@@ -406,7 +483,7 @@ struct ProfileView: View {
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .padding(.horizontal, 16)
         }
     }
@@ -417,7 +494,7 @@ struct ProfileView: View {
         let note = saved.note.trimmingCharacters(in: .whitespacesAndNewlines)
         if !note.isEmpty { return Text(verbatim: note) }
         if let place = saved.metPlace { return Text("Met in \(place)") }
-        return Text("Met \(saved.savedAt.formatted(date: .abbreviated, time: .omitted))")
+        return Text("Met \(saved.savedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: .appLanguage)))")
     }
 
     // MARK: - Trips card
@@ -497,7 +574,7 @@ struct ProfileView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .padding(.horizontal, 16)
         .sensoryFeedback(.success, trigger: registeredTrips.count)
     }

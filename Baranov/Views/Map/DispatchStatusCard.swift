@@ -43,15 +43,15 @@ struct DispatchStatusCard: View {
     private var stateCaption: LocalizedStringKey {
         switch ram.status {
         case .walking: return isMoving ? "Walking" : "Resting"
-        case .grazing: return "Ready to set out"
+        case .grazing: return "Waiting for your first steps"
         case .waitingForHandoff:
             guard let voyage = ram.voyage else {
                 return "At the quay in \(ram.legDestinationCity)"
             }
-            return "Sails \(voyage.departsAt.formatted(.relative(presentation: .named)))"
+            return "Sails \(voyage.departsAt.formatted(.relative(presentation: .named).locale(.appLanguage)))"
         case .atSea:
             guard let voyage = ram.voyage else { return "At Sea" }
-            return "At sea — \(voyage.arrivalPortName) by \(voyage.arrivesAt.formatted(.relative(presentation: .named)))"
+            return "At sea — \(voyage.arrivalPortName) by \(voyage.arrivesAt.formatted(.relative(presentation: .named).locale(.appLanguage)))"
         case .handedOff: return "Carried by someone else"
         case .arrivedAtGate: return "At the gate"
         case .delivered: return "Delivered"
@@ -97,7 +97,7 @@ struct DispatchStatusCard: View {
 
                     if ram.status != .delivered && ram.status != .arrivedAtGate {
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(ram.remainingSteps.formatted(.number.grouping(.automatic)))
+                            Text(ram.remainingSteps.formatted(.number.grouping(.automatic).locale(.appLanguage)))
                                 .font(.system(.subheadline, design: .rounded).weight(.semibold))
                                 .monospacedDigit()
                                 .contentTransition(.numericText(value: Double(ram.remainingSteps)))

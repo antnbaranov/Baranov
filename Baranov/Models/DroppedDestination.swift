@@ -24,13 +24,13 @@ struct DroppedDestination: Equatable, Sendable {
     /// plain "Dropped Pin" when the geocoder has nothing — offline included.
     static func resolve(_ coordinate: CLLocationCoordinate2D) async -> DroppedDestination {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
+        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location, preferredLocale: .appLanguage).first
         let parts = [placemark?.name ?? placemark?.thoroughfare, placemark?.locality]
             .compactMap { $0 }
             .filter { !$0.isEmpty }
         var seen = Set<String>()
         let unique = parts.filter { seen.insert($0).inserted }
-        let name = unique.isEmpty ? String(localized: "Dropped Pin") : unique.joined(separator: ", ")
+        let name = unique.isEmpty ? String(localized: "Dropped Pin", bundle: .appLanguage, locale: .appLanguage) : unique.joined(separator: ", ")
         return DroppedDestination(latitude: coordinate.latitude, longitude: coordinate.longitude, name: name)
     }
 }

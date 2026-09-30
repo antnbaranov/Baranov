@@ -22,14 +22,17 @@ extension RamGoal {
 
 struct NewGoalCard: View {
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            // The same Liquid Glass as every other button in the app.
+            // Same glass as the reel's play button: accent tint, white glyph.
             Image(systemName: "plus")
-                .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(PassportInk.accent)
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.white)
                 .frame(width: 72, height: 72)
-                .background(PassportInk.accent.opacity(0.15), in: Circle())
+                .liquidGlass(in: Circle(), tint: Color.accentColor,
+                             interactive: false, fallbackMaterial: .regularMaterial)
             Text("Write a Milestone")
-                .scaledFont(size: 16, weight: .heavy, design: .rounded)
+                .font(.headline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.primary)
             Text("Say what has to happen")
@@ -38,10 +41,7 @@ struct NewGoalCard: View {
         }
         .padding(14)
         .frame(width: 156, height: 212)
-        .background(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(Color.secondary.opacity(0.5), style: StrokeStyle(lineWidth: 2, dash: [7, 6]))
-        )
+        .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
@@ -148,10 +148,12 @@ struct GoalCardFace: View {
     private var back: some View {
         VStack(alignment: .leading, spacing: 10) {
             if isDone {
-                Text(goal.completedAt == nil ? "Walked it out." : "It happened!")
+                Text(goal.completedAt == nil
+                    ? String(localized: "Walked it out.", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "It happened!", bundle: .appLanguage, locale: .appLanguage))
                     .scaledFont(size: 15, weight: .heavy, design: .rounded)
-                Text(goal.completedAt.map { "Ticked off \($0.formatted(.dateTime.day().month(.abbreviated)))." }
-                     ?? String(localized: "The steps added up on their own."))
+                Text(goal.completedAt.map { String(localized: "Ticked off \($0.formatted(.dateTime.day().month(.abbreviated).locale(.appLanguage))).", bundle: .appLanguage, locale: .appLanguage) }
+                     ?? String(localized: "The steps added up on their own.", bundle: .appLanguage, locale: .appLanguage))
                     .scaledFont(size: 14, weight: .semibold, design: .serif)
                     .italic()
                 Spacer(minLength: 0)

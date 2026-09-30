@@ -80,9 +80,13 @@ struct PaperCard: ViewModifier {
     var cornerRadius: CGFloat = 24
 
     func body(content: Content) -> some View {
-        // The Profile card: a regular material on the grouped background.
+        // The same solid card surface Pasture's own cards use
+        // (`RamSelectorCard`, `ShepherdsBoardCard`) — a translucent
+        // material here used to read as a different, washed-out colour
+        // in Light Mode and let the grey grouped background show through
+        // less than it should.
         content.background(
-            .regularMaterial,
+            PassportInk.paper,
             in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
     }
@@ -98,9 +102,9 @@ extension JourneyStamp {
     /// "British Columbia Institute of Technology, Burnaby" → the part
     /// before the first comma, which is what a person would say aloud.
     var shortPlaceName: String {
-        let first = placeName.split(separator: ",").first.map(String.init) ?? placeName
+        let first = displayPlaceName.split(separator: ",").first.map(String.init) ?? displayPlaceName
         let trimmed = first.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? placeName : trimmed
+        return trimmed.isEmpty ? displayPlaceName : trimmed
     }
 }
 

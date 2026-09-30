@@ -95,8 +95,30 @@ final class HoofbeatRelay: NSObject {
     /// How long we keep looking before giving up on finding a partner.
     static let searchTimeout: TimeInterval = 8
 
+    /// How long a found partner may take to actually connect. Without this
+    /// a connection that never completes (an invite that times out, a
+    /// peer that refused, a Wi-Fi hiccup) left the HUD on "Meeting …"
+    /// forever, because the search timeout only ever fired while still
+    /// searching.
+    static let connectTimeout: TimeInterval = 15
+
+    /// How many times a failed connection to the same partner is retried
+    /// before giving up. MultipeerConnectivity often fails the first
+    /// attempt and succeeds on the second.
+    static let maxConnectAttempts = 2
+
     /// How long a connected exchange may take before it is abandoned.
     static let transferTimeout: TimeInterval = 20
+
+    /// The absolute limit for one shake, whatever phase it is in. Set once
+    /// in `begin` and never re-armed, so no combination of retries,
+    /// repeated invitations or missed callbacks can leave the HUD up.
+    static let overallTimeout: TimeInterval = 40
+
+    /// The same two limits when the exchange was asked for from Profile or
+    /// the map: the other person has to notice the request and tap Accept.
+    static let requestSearchTimeout: TimeInterval = 50
+    static let requestOverallTimeout: TimeInterval = 75
 
     /// Grace period after finishing, so the last packet (the confirmation)
     /// is delivered before the session is torn down.
@@ -108,6 +130,18 @@ final class HoofbeatRelay: NSObject {
     /// Set when the exchange was started by tapping a specific nearby courier, so the HUD can say who
     /// we're waiting for. The pairing itself is still the mutual shake.
     private(set) var partnerName: String?
+    /// True while this phone asked a nearby courier to accept a handover
+    /// and is waiting for their answer, rather than for a shake.
+    private(set) var isAwaitingAcceptance = false
+
+    /// True when this exchange was agreed by request and Accept, on either
+    /// side. On the accepting phone it lets the HUD say "Connecting…"
+    /// rather than "Waiting for … to shake".
+    var isByRequest: Bool { pairingToken != nil }
+
+    /// Pairs two phones by a shared token (from a `HandoverRequest`)
+    /// instead of by the time of their shakes.
+    private var pairingToken: String?
 
     /// Invoked on the main actor with each package received from a peer.
     /// Returns the name to show in the HUD, or `nil` if it was refused
@@ -129,6 +163,10 @@ final class HoofbeatRelay: NSObject {
     private var myShakeAt: Date = .distantPast
     private var outgoingPackage: RamTransitPackage?
     private var invitedPeers: Set<String> = []
+    /// Peers the browser has reported, kept so a failed connection can be
+    /// retried — the browser won't report the same peer a second time.
+    private var discoveredPeers: [String: MCPeerID] = [:]
+    private var connectAttempts: [String: Int] = [:]
     private var activePeer: MCPeerID?
     private var peerName = ""
 
@@ -144,6 +182,7 @@ final class HoofbeatRelay: NSObject {
     private var didConclude = false
 
     private var timeoutTask: Task<Void, Never>?
+    private var watchdogTask: Task<Void, Never>?
     private var stallTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
     private var closeTask: Task<Void, Never>?
@@ -172,26 +211,48 @@ final class HoofbeatRelay: NSObject {
     /// - Parameters:
     ///   - shakenAt: the instant the local shake was registered.
     ///   - package: the ram to offer, or `nil` to only receive.
-    func begin(shakenAt: Date, offering package: RamTransitPackage?, partnerName: String? = nil) {
+    /// - Parameters:
+    ///   - pairingToken: set when the exchange was agreed by request and
+    ///     accept rather than by a shake; only a peer armed with the same
+    ///     token is paired, and the waits are long enough for a person to
+    ///     read the request and tap Accept.
+    ///   - awaitingAcceptance: the sender of such a request, so the HUD
+    ///     says "Waiting for X to accept…".
+    func begin(shakenAt: Date, offering package: RamTransitPackage?, partnerName: String? = nil,
+               pairingToken: String? = nil, awaitingAcceptance: Bool = false) {
+        // A new shake while the last result is still on screen starts a
+        // fresh exchange instead of being swallowed by the old HUD.
+        switch phase {
+        case .finished, .failed: reset()
+        default: break
+        }
         guard !phase.isActive else { return }
         self.partnerName = partnerName
+        self.pairingToken = pairingToken
+        self.isAwaitingAcceptance = awaitingAcceptance
 
         myShakeAt = shakenAt
         outgoingPackage = package
         invitedPeers = []
         resetTransferState()
 
+        // No transport encryption: `.required` with no identity is the
+        // classic cause of MultipeerConnectivity sessions that sit in
+        // "connecting" and never finish. The letter inside the package is
+        // already sealed by `LetterCipher`, so the link carries ciphertext.
         let session = MCSession(
             peer: localPeerID,
             securityIdentity: nil,
-            encryptionPreference: .required
+            encryptionPreference: .none
         )
         session.delegate = self
         self.session = session
 
+        var discoveryInfo = ["s": String(shakenAt.timeIntervalSince1970)]
+        if let pairingToken { discoveryInfo["t"] = pairingToken }
         let advertiser = MCNearbyServiceAdvertiser(
             peer: localPeerID,
-            discoveryInfo: ["s": String(shakenAt.timeIntervalSince1970)],
+            discoveryInfo: discoveryInfo,
             serviceType: Self.serviceType
         )
         advertiser.delegate = self
@@ -205,9 +266,38 @@ final class HoofbeatRelay: NSObject {
 
         phase = .searching
 
+        let byRequest = pairingToken != nil
+        armTimeout(byRequest ? Self.requestSearchTimeout : Self.searchTimeout)
+
+        watchdogTask?.cancel()
+        watchdogTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(byRequest ? HoofbeatRelay.requestOverallTimeout : HoofbeatRelay.overallTimeout))
+            guard !Task.isCancelled else { return }
+            self?.watchdogFired()
+        }
+        trace("begin, offering \(package?.ram.name ?? "nothing")")
+    }
+
+    private func watchdogFired() {
+        switch phase {
+        case .searching, .connecting, .exchanging:
+            trace("watchdog fired in \(phase)")
+            fail(String(localized: "The handoff was interrupted — nothing changed.", bundle: .appLanguage, locale: .appLanguage))
+        case .idle, .finished, .failed:
+            break
+        }
+    }
+
+    private func trace(_ message: String) {
+        DiagnosticsLog.shared.log(message, category: "hoofbeat")
+    }
+
+    /// (Re)starts the pairing deadline. Covers both searching and
+    /// connecting, so no pre-transfer phase can outlive it.
+    private func armTimeout(_ seconds: TimeInterval) {
         timeoutTask?.cancel()
         timeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(HoofbeatRelay.searchTimeout))
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             self?.timeOut()
         }
@@ -217,6 +307,8 @@ final class HoofbeatRelay: NSObject {
     func reset() {
         timeoutTask?.cancel()
         timeoutTask = nil
+        watchdogTask?.cancel()
+        watchdogTask = nil
         stallTask?.cancel()
         stallTask = nil
         settleTask?.cancel()
@@ -225,6 +317,8 @@ final class HoofbeatRelay: NSObject {
         closeTask = nil
         teardownTransport()
         partnerName = nil
+        pairingToken = nil
+        isAwaitingAcceptance = false
         phase = .idle
     }
 
@@ -257,14 +351,31 @@ final class HoofbeatRelay: NSObject {
 
         outgoingPackage = nil
         invitedPeers = []
+        discoveredPeers = [:]
+        connectAttempts = [:]
         activePeer = nil
     }
 
     private func timeOut() {
-        guard case .searching = phase else { return }
+        trace("timeout in \(phase)")
+        let reason: String
+        switch phase {
+        case .searching where isAwaitingAcceptance:
+            if let partnerName, !partnerName.isEmpty {
+                reason = String(localized: "\(partnerName) didn't accept. Nothing changed.", bundle: .appLanguage, locale: .appLanguage)
+            } else {
+                reason = String(localized: "No one accepted. Nothing changed.", bundle: .appLanguage, locale: .appLanguage)
+            }
+        case .searching:
+            reason = String(localized: "No one shook back nearby.", bundle: .appLanguage, locale: .appLanguage)
+        case let .connecting(name):
+            reason = String(localized: "Couldn't reach \(name). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage)
+        default:
+            return
+        }
         teardownTransport()
-        phase = .failed(reason: "No one shook back nearby.")
-        autoDismiss(after: 2.5)
+        phase = .failed(reason: reason)
+        autoDismiss(after: 3.0)
     }
 
     private func autoDismiss(after seconds: TimeInterval) {
@@ -278,7 +389,9 @@ final class HoofbeatRelay: NSObject {
 
     private func fail(_ reason: String) {
         guard phase.isActive, !didConclude else { return }
+        trace("failed in \(phase): \(reason)")
         timeoutTask?.cancel()
+        watchdogTask?.cancel()
         stallTask?.cancel()
         teardownTransport()
         phase = .failed(reason: reason)
@@ -292,17 +405,54 @@ final class HoofbeatRelay: NSObject {
         guard peerID.displayName != localPeerID.displayName else { return }
         guard !invitedPeers.contains(peerID.displayName) else { return }
 
-        guard let stamp = info?["s"], let seconds = TimeInterval(stamp) else { return }
-        let theirShake = Date(timeIntervalSince1970: seconds)
-        guard abs(theirShake.timeIntervalSince(myShakeAt)) <= Self.matchWindow else { return }
+        // A requested handover pairs only with the phone holding the same
+        // token; a shake pairs only with another shake inside the window.
+        guard info?["t"] == pairingToken else { return }
+        if pairingToken == nil {
+            guard let stamp = info?["s"], let seconds = TimeInterval(stamp) else { return }
+            let theirShake = Date(timeIntervalSince1970: seconds)
+            guard abs(theirShake.timeIntervalSince(myShakeAt)) <= Self.matchWindow else { return }
+        }
 
         // Deterministic tie-break: exactly one of the two devices invites,
         // so they don't collide into two half-open sessions.
         guard localPeerID.displayName < peerID.displayName else { return }
 
+        discoveredPeers[peerID.displayName] = peerID
+        invite(peerID, session: session, browser: browser)
+    }
+
+    private func invite(_ peerID: MCPeerID, session: MCSession, browser: MCNearbyServiceBrowser) {
+        trace("inviting \(peerID.displayName), attempt \(connectAttempts[peerID.displayName, default: 0] + 1)")
         invitedPeers.insert(peerID.displayName)
+        connectAttempts[peerID.displayName, default: 0] += 1
         phase = .connecting(peerName: Self.friendlyName(peerID.displayName))
+        armTimeout(Self.connectTimeout)
         browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
+    }
+
+    /// A connection that dropped before the exchange began. The inviter
+    /// retries once; the invitee goes back to waiting for that retry. The
+    /// pairing deadline still bounds the whole thing.
+    private func handleConnectFailed(peerID: MCPeerID) {
+        guard activePeer == nil, !didConclude, case .connecting = phase else { return }
+        trace("connection to \(peerID.displayName) dropped before the exchange")
+        let name = peerID.displayName
+        if discoveredPeers[name] != nil,
+           connectAttempts[name, default: 0] < Self.maxConnectAttempts {
+            Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, self.activePeer == nil, case .connecting = self.phase,
+                      let session = self.session, let browser = self.browser,
+                      let peer = self.discoveredPeers[name] else { return }
+                self.invite(peer, session: session, browser: browser)
+            }
+        } else if discoveredPeers[name] == nil {
+            // We were the invitee: wait for the inviter's retry.
+            phase = .searching
+        } else {
+            fail(String(localized: "Couldn't reach \(Self.friendlyName(name)). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage))
+        }
     }
 
     // MARK: - Transfer state machine
@@ -311,6 +461,8 @@ final class HoofbeatRelay: NSObject {
         guard activePeer == nil, phase.isActive, !didConclude else { return }
         activePeer = peerID
         peerName = Self.friendlyName(peerID.displayName)
+        isAwaitingAcceptance = false
+        trace("connected to \(peerID.displayName)")
 
         timeoutTask?.cancel()
         timeoutTask = nil
@@ -322,7 +474,7 @@ final class HoofbeatRelay: NSObject {
         stallTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(HoofbeatRelay.transferTimeout))
             guard !Task.isCancelled else { return }
-            self?.fail("The handoff was interrupted — nothing changed.")
+            self?.fail(String(localized: "The handoff was interrupted — nothing changed.", bundle: .appLanguage, locale: .appLanguage))
         }
 
         send(.handshake(senderName: localCarrierName, hasLetterToSend: outgoingPackage != nil))
@@ -387,6 +539,7 @@ final class HoofbeatRelay: NSObject {
 
     private func conclude() {
         didConclude = true
+        watchdogTask?.cancel()
         stallTask?.cancel()
         stallTask = nil
 
@@ -397,16 +550,16 @@ final class HoofbeatRelay: NSObject {
         let summary: String
         switch (handed?.name, receivedRamName) {
         case let (given?, taken?):
-            summary = "Traded \(given) for \(taken) with \(peer)."
+            summary = String(localized: "Traded \(given) for \(taken) with \(peer).", bundle: .appLanguage, locale: .appLanguage)
         case let (given?, nil):
-            summary = "\(given) went with \(peer)."
+            summary = String(localized: "\(given) went with \(peer).", bundle: .appLanguage, locale: .appLanguage)
         case let (nil, taken?):
-            summary = "\(peer) handed you \(taken)."
+            summary = String(localized: "\(peer) handed you \(taken).", bundle: .appLanguage, locale: .appLanguage)
         case (nil, nil):
             if let declined {
-                summary = "\(peer)'s pasture is full — \(declined) stays with you."
+                summary = String(localized: "\(peer)'s pasture is full — \(declined) stays with you.", bundle: .appLanguage, locale: .appLanguage)
             } else {
-                summary = "Met \(peer) — neither of you had a ram to pass."
+                summary = String(localized: "Met \(peer) — neither of you had a ram to pass.", bundle: .appLanguage, locale: .appLanguage)
             }
         }
 
@@ -435,16 +588,26 @@ final class HoofbeatRelay: NSObject {
         do {
             try session.send(data, toPeers: [peer], with: .reliable)
         } catch {
-            fail("Couldn't send — the link dropped.")
+            fail(String(localized: "Couldn't send — the link dropped.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 
     private func handleDisconnected(peerID: MCPeerID) {
+        if activePeer == nil {
+            handleConnectFailed(peerID: peerID)
+            return
+        }
         guard peerID == activePeer, !didConclude else { return }
-        fail("The link dropped — nothing changed.")
+        fail(String(localized: "The link dropped — nothing changed.", bundle: .appLanguage, locale: .appLanguage))
     }
 
     private func handleData(_ data: Data, from peerID: MCPeerID) {
+        // Data can overtake the `.connected` callback on its way to the main
+        // actor. Dropping that first handshake used to stall the exchange
+        // until the transfer timeout; treat it as the connection instead.
+        if activePeer == nil, session?.connectedPeers.contains(peerID) == true {
+            handleConnected(peerID: peerID)
+        }
         guard peerID == activePeer,
               let packet = try? JSONDecoder().decode(TransferPacket.self, from: data) else { return }
         handle(packet)
@@ -475,7 +638,7 @@ extension HoofbeatRelay: MCNearbyServiceBrowserDelegate {
         didNotStartBrowsingForPeers error: any Error
     ) {
         Task { @MainActor [weak self] in
-            self?.fail("Local network access is off for Baranov.")
+            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 }
@@ -501,6 +664,7 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
             switch self.phase {
             case .searching, .connecting:
                 self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxedPeer.value.displayName))
+                self.armTimeout(HoofbeatRelay.connectTimeout)
                 boxedHandler.value(true, session)
             default:
                 boxedHandler.value(false, nil)
@@ -513,7 +677,7 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
         didNotStartAdvertisingPeer error: any Error
     ) {
         Task { @MainActor [weak self] in
-            self?.fail("Local network access is off for Baranov.")
+            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 }
@@ -545,6 +709,19 @@ extension HoofbeatRelay: MCSessionDelegate {
                 break
             }
         }
+    }
+
+    /// Accepts the peer's certificate. With `encryptionPreference: .required`
+    /// and no identity, leaving this unimplemented makes some devices stall
+    /// in "connecting" and then drop — the pairing proof is the shake, not
+    /// the certificate.
+    nonisolated func session(
+        _ session: MCSession,
+        didReceiveCertificate certificate: [Any]?,
+        fromPeer peerID: MCPeerID,
+        certificateHandler: @escaping (Bool) -> Void
+    ) {
+        certificateHandler(true)
     }
 
     nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {

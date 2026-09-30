@@ -39,6 +39,26 @@ struct RamSelectorCard: View {
     @State private var isRenamePresented = false
     @State private var renameDraft = ""
 
+    /// Names of the ram waiting in each unlocked-but-unused slot.
+    @State private var slotNames = PastureSlotNames()
+    @State private var namingSlot: Int?
+    @State private var slotNameDraft = ""
+
+    /// Absolute indices of the unlocked slots with no journey yet — the
+    /// resting companion, when there are no rams, holds the first one.
+    private var openSlotIndices: [Int] {
+        let first = max(rams.count, (rams.isEmpty && companion != nil) ? 1 : 0)
+        guard first < unlockedSlots else { return [] }
+        return Array(first..<unlockedSlots)
+    }
+
+    private var openSlotNames: [Int: String] {
+        slotNames.names(
+            forOpenSlots: openSlotIndices,
+            excluding: rams.map(\.name) + [companion?.name].compactMap { $0 }
+        )
+    }
+
     private var selectedRam: Ram? {
         rams.first { $0.id == selectedRamId } ?? rams.first
     }
@@ -54,6 +74,12 @@ struct RamSelectorCard: View {
                 onNameTapped: { ram in
                     renameDraft = ram.name
                     isRenamePresented = true
+                },
+                openSlotNames: openSlotNames,
+                namedOpenSlots: Set(openSlotIndices.filter { slotNames.isNamed(slot: $0) }),
+                onOpenSlotNameTapped: { slot in
+                    slotNameDraft = openSlotNames[slot] ?? ""
+                    namingSlot = slot
                 },
                 companion: companion,
                 onCompanionNameTapped: {
@@ -129,7 +155,7 @@ struct RamSelectorCard: View {
                         }
                         .buttonStyle(.plain)
 
-                        Text("\(companion.ageStage.displayName) · \(companion.ageDescription) · ready for a first letter")
+                        Text(String(localized: "\(companion.ageStage.displayName) · \(companion.ageDescription) · ready for a first letter", bundle: .appLanguage, locale: .appLanguage))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -154,6 +180,20 @@ struct RamSelectorCard: View {
         }
         .padding(14)
         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .alert("Name this ram", isPresented: Binding(
+            get: { namingSlot != nil },
+            set: { if !$0 { namingSlot = nil } }
+        )) {
+            TextField("Ram's name", text: $slotNameDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                if let slot = namingSlot {
+                    slotNames.nameOnce(slot: slot, to: slotNameDraft)
+                }
+            }
+        } message: {
+            Text("You can name it once, before it sets out.")
+        }
         .alert("Rename Ram", isPresented: $isRenamePresented) {
             TextField("Ram's name", text: $renameDraft)
             Button("Cancel", role: .cancel) {}
@@ -170,7 +210,7 @@ struct RamSelectorCard: View {
     }
 
     private func deliveredCountLabel(for count: Int) -> String {
-        count == 1 ? "1 letter delivered" : "\(count) letters delivered"
+        count == 1 ? String(localized: "1 letter delivered", bundle: .appLanguage, locale: .appLanguage) : String(localized: "\(count) letters delivered", bundle: .appLanguage, locale: .appLanguage)
     }
 }
 

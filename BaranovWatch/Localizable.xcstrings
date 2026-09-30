@@ -1310,7 +1310,7 @@
         "sr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%ллд %%"
+            "value": "%lld%%"
           }
         },
         "sv": {
@@ -1658,7 +1658,7 @@
         "sr": {
           "stringUnit": {
             "state": "translated",
-            "value": "%ллд %% · %@"
+            "value": "%lld%% · %@"
           }
         },
         "sv": {
@@ -2746,31 +2746,31 @@
         "bg": {
           "stringUnit": {
             "state": "translated",
-            "value": "Баранов Рам"
+            "value": "Овен Баранов"
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov ovan"
           }
         },
         "ca": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Carner Baranov"
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov-vær"
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov beran"
           }
         },
         "en-AU": {
@@ -2794,13 +2794,13 @@
         "es-419": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Carnero Baranov"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Carnero Baranov"
           }
         },
         "el": {
@@ -2812,37 +2812,37 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov-Widder"
           }
         },
         "et": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Jäär Baranov"
           }
         },
         "eu": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Aharia Baranov"
           }
         },
         "fi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Pässi Baranov"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Bélier Baranov"
           }
         },
         "fr-CA": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Bélier Baranov"
           }
         },
         "gl": {
@@ -2872,31 +2872,31 @@
         "hr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov ovan"
           }
         },
         "hu": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Kos Baranov"
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Ariete Baranov"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Domba Baranov"
           }
         },
         "is": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov-hrútur"
           }
         },
         "ja": {
@@ -2944,37 +2944,37 @@
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Carneiro Baranov"
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Carneiro Baranov"
           }
         },
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Biri-biri Baranov"
           }
         },
         "mt": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Muntun Baranov"
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov-vær"
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Ram Baranov"
           }
         },
         "pl": {
@@ -2986,43 +2986,43 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Баранов Рам"
+            "value": "Баран Baranov"
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Berbec Baranov"
           }
         },
         "sq": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Dashi Baranov"
           }
         },
         "sk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov baran"
           }
         },
         "sl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Oven Baranov"
           }
         },
         "sr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Баранов ован"
           }
         },
         "sv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Baranov-bagge"
           }
         },
         "th": {
@@ -3040,19 +3040,19 @@
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Koç Baranov"
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Баранов Баран"
+            "value": "Баран Baranov"
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Baranov Ram"
+            "value": "Cừu đực Baranov"
           }
         },
         "zh-Hant": {
@@ -4502,7 +4502,7 @@
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "End Walk"
+            "value": "Završi šetnju"
           }
         },
         "ca": {
@@ -4676,7 +4676,7 @@
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "End Walk"
+            "value": "Akhiri berjalan"
           }
         },
         "mt": {
@@ -5348,7 +5348,7 @@
         "mt": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet %@"
+            "value": "Ħobb %@"
           }
         },
         "nb": {
@@ -5480,7 +5480,7 @@
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Pomazi ovna"
           }
         },
         "ca": {
@@ -5492,13 +5492,13 @@
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Klap vædderen"
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Pohladit berana"
           }
         },
         "en-AU": {
@@ -5582,7 +5582,7 @@
         "ga": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Reithe peataí"
           }
         },
         "he": {
@@ -5606,7 +5606,7 @@
         "hu": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Kisállat kos"
           }
         },
         "it": {
@@ -5660,13 +5660,13 @@
         "lv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Mājdzīvnieku auns"
           }
         },
         "lt": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Augintinis avinas"
           }
         },
         "pt-BR": {
@@ -5684,13 +5684,13 @@
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Domba jantan peliharaan"
           }
         },
         "mt": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Muntun domestiċi"
           }
         },
         "nb": {
@@ -5714,7 +5714,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Домашний Рам"
+            "value": "Погладить барана"
           }
         },
         "ro": {
@@ -5732,7 +5732,7 @@
         "sk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Pohladiť barana"
           }
         },
         "sl": {
@@ -5750,7 +5750,7 @@
         "sv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Husdjur bagge"
           }
         },
         "th": {
@@ -5774,7 +5774,7 @@
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Pet Ram"
+            "value": "Погладити барана"
           }
         },
         "vi": {
@@ -5868,7 +5868,7 @@
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Steps Walked"
+            "value": "Pređeni koraci"
           }
         },
         "ca": {
@@ -7570,7 +7570,7 @@
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Well Walked!"
+            "value": "Odlična šetnja!"
           }
         },
         "ca": {
@@ -8098,7 +8098,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Твой баран"
+            "value": "Ваш баран"
           }
         },
         "ro": {

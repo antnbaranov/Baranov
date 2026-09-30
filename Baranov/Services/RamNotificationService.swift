@@ -34,8 +34,12 @@ import UserNotifications
 final class RamNotificationService: NSObject {
 
     /// Set when the person taps a notification about a specific ram —
-    /// `RootView` opens the Pasture on that ram and clears it.
-    var tappedRamID: UUID?
+    /// `RootView` opens the Pasture on that ram and clears it. Taps arrive
+    /// through `NotificationManager`, the notification center's delegate.
+    var tappedRamID: UUID? {
+        get { NotificationManager.shared.tappedRamID }
+        set { NotificationManager.shared.tappedRamID = newValue }
+    }
 
     private let center = UNUserNotificationCenter.current()
     private let enabledKey = "com.baranov.notificationsEnabled"
@@ -71,7 +75,6 @@ final class RamNotificationService: NSObject {
 
     override init() {
         super.init()
-        center.delegate = self
         NotificationCenter.default.addObserver(
             forName: Self.preferencesChanged, object: nil, queue: .main
         ) { [weak self] _ in
@@ -170,20 +173,47 @@ final class RamNotificationService: NSObject {
         let letter = ram.letter
 
         switch (previous, ram.status) {
+        case (_, .arrivedAtGate) where ram.isGuest:
+            // Someone else's letter reached its town in this mailbag: the
+            // last step is a person-to-person one, no server involved.
+            deliver(
+                id: "gate-\(ram.id.uuidString)",
+                title: String(localized: "\(ram.name) reached \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage),
+                body: letter.map { String(localized: "\($0.senderName)'s letter for \($0.recipientName) is here. Meet \($0.recipientName) and hand it over, or pass it to someone who will.", bundle: .appLanguage, locale: .appLanguage) }
+                    ?? String(localized: "The letter you carried is here. Hand it over in person.", bundle: .appLanguage, locale: .appLanguage),
+                ramID: ram.id
+            )
+        case (_, .arrivedAtGate) where ram.addressedToThisPhone:
+            // A letter for this person, brought in by the post office or
+            // handed over with a key only this phone opens.
+            guard !NotificationManager.shared.shouldSkipGateNotice(for: ram) else { return }
+            let sender = letter?.senderName ?? ""
+            deliver(
+                id: "gate-\(ram.id.uuidString)",
+                title: String(localized: "A ram is at your gate", bundle: .appLanguage, locale: .appLanguage),
+                body: (letter?.isEncrypted ?? true)
+                    ? String(localized: "It brought a sealed letter from \(sender). Hold the wax to open it.", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "It brought a postcard from \(sender). Hold to lift it out.", bundle: .appLanguage, locale: .appLanguage),
+                ramID: ram.id,
+                interruptionLevel: .timeSensitive
+            )
         case (_, .arrivedAtGate) where isSender(of: letter):
             // Your own letter: the ram has set it down and is free again.
             deliver(
                 id: "gate-\(ram.id.uuidString)",
-                title: "\(ram.name) left your letter at the gate",
-                body: "\(letter?.recipientName ?? "The recipient") can collect it by walking to \(ram.targetCity). \(ram.name) is free for the next letter.",
+                title: String(localized: "\(ram.name) has arrived at \(letter?.recipientName ?? String(localized: "the recipient", bundle: .appLanguage, locale: .appLanguage))'s gate", bundle: .appLanguage, locale: .appLanguage),
+                body: (letter?.relayTicket != nil && TelemetryService.isServerConfigured)
+                    ? String(localized: "It's going into \(letter?.recipientName ?? String(localized: "the recipient", bundle: .appLanguage, locale: .appLanguage))'s mailbag. \(ram.name) is free for the next letter.", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "\(letter?.recipientName ?? String(localized: "The recipient", bundle: .appLanguage, locale: .appLanguage)) can collect it by walking to \(ram.targetCity). \(ram.name) is free for the next letter.", bundle: .appLanguage, locale: .appLanguage),
                 ramID: ram.id
             )
+            announcePassOn(after: ram)
         case (_, .arrivedAtGate):
             deliver(
                 id: "gate-\(ram.id.uuidString)",
-                title: "\(ram.name) is at the gate",
-                body: letter.map { "A letter from \($0.senderName) for \($0.recipientName) is waiting. Hold the seal to open it." }
-                    ?? "A letter is waiting. Hold the seal to open it.",
+                title: String(localized: "\(ram.name) is at the gate", bundle: .appLanguage, locale: .appLanguage),
+                body: letter.map { String(localized: "A letter from \($0.senderName) for \($0.recipientName) is waiting. Hold the seal to open it.", bundle: .appLanguage, locale: .appLanguage) }
+                    ?? String(localized: "A letter is waiting. Hold the seal to open it.", bundle: .appLanguage, locale: .appLanguage),
                 ramID: ram.id,
                 interruptionLevel: .timeSensitive
             )
@@ -192,23 +222,31 @@ final class RamNotificationService: NSObject {
             // intermediate step after a voyage landing or a fresh import.
             deliver(
                 id: "handoff-\(ram.id.uuidString)",
-                title: "\(ram.name) reached \(ram.legDestinationCity)",
-                body: "No road goes further. A packet will carry it across — or hand it to someone crossing sooner and it skips the wait.",
+                title: String(localized: "\(ram.name) reached \(ram.legDestinationCity)", bundle: .appLanguage, locale: .appLanguage),
+                body: String(localized: "No road goes further. A packet will carry it across — or hand it to someone crossing sooner and it skips the wait.", bundle: .appLanguage, locale: .appLanguage),
                 ramID: ram.id
             )
         case (_, .atSea):
             deliver(
                 id: "sailed-\(ram.id.uuidString)",
-                title: "\(ram.name) is at sea",
-                body: ram.voyage.map { "Aboard the packet out of \($0.departurePortName), due in \($0.arrivalPortName) \($0.arrivesAt.formatted(.relative(presentation: .named)))." }
-                    ?? "Crossing the water. Nothing to walk until it lands.",
+                title: String(localized: "\(ram.name) is at sea", bundle: .appLanguage, locale: .appLanguage),
+                body: ram.voyage.map { String(localized: "Aboard the packet out of \($0.departurePortName), due in \($0.arrivalPortName) \($0.arrivesAt.formatted(.relative(presentation: .named).locale(.appLanguage))).", bundle: .appLanguage, locale: .appLanguage) }
+                    ?? String(localized: "Crossing the water. Nothing to walk until it lands.", bundle: .appLanguage, locale: .appLanguage),
                 ramID: ram.id
             )
         case (.atSea, .grazing), (.atSea, .walking):
             deliver(
                 id: "landed-\(ram.id.uuidString)",
-                title: "\(ram.name) came ashore in \(ram.currentCity)",
-                body: "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it again.",
+                title: String(localized: "\(ram.name) came ashore in \(ram.currentCity)", bundle: .appLanguage, locale: .appLanguage),
+                body: String(localized: "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it again.", bundle: .appLanguage, locale: .appLanguage),
+                ramID: ram.id
+            )
+        case (nil, .grazing) where ram.isGuest, (nil, .walking) where ram.isGuest:
+            deliver(
+                id: "arrived-\(ram.id.uuidString)",
+                title: String(localized: "\(ram.name) is in your mailbag", bundle: .appLanguage, locale: .appLanguage),
+                body: letter.map { String(localized: "Carrying \($0.senderName)'s letter to \(ram.targetCity). It rides on your steps and takes no pen in your pasture.", bundle: .appLanguage, locale: .appLanguage) }
+                    ?? String(localized: "It rides on your steps and takes no pen in your pasture.", bundle: .appLanguage, locale: .appLanguage),
                 ramID: ram.id
             )
         case (nil, .grazing), (nil, .walking):
@@ -218,9 +256,9 @@ final class RamNotificationService: NSObject {
             if ram.routeHistory.count > 1 || !ram.stamps.filter({ $0.kind == .handoff }).isEmpty {
                 deliver(
                     id: "arrived-\(ram.id.uuidString)",
-                    title: "\(ram.name) is in your pasture",
-                    body: letter.map { "Carrying a letter from \($0.senderName) to \($0.recipientName). \(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it now." }
-                        ?? "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it now.",
+                    title: String(localized: "\(ram.name) is in your pasture", bundle: .appLanguage, locale: .appLanguage),
+                    body: letter.map { String(localized: "Carrying a letter from \($0.senderName) to \($0.recipientName). \(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it now.", bundle: .appLanguage, locale: .appLanguage) }
+                        ?? String(localized: "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) to \(ram.legDestinationCity) — your steps move it now.", bundle: .appLanguage, locale: .appLanguage),
                     ramID: ram.id
                 )
             }
@@ -229,16 +267,50 @@ final class RamNotificationService: NSObject {
         }
     }
 
-    /// The sender's letter was claimed by its recipient. Local, and only
-    /// while the app is in the foreground checking the relay — the relay
-    /// never learns or shares where the recipient chose to receive it.
-    func announceLetterClaimed(recipientName: String, code: String) {
+    /// Your own ram just finished, but someone else's letter is still in
+    /// your mailbag with road left — it only moves on your steps, so it's
+    /// the moment to pass it to someone heading that way.
+    private func announcePassOn(after ram: Ram) {
+        let guests = lastRams.filter { guest in
+            guard guest.isGuest else { return false }
+            switch guest.status {
+            case .grazing, .walking, .waitingForHandoff: return true
+            default: return false
+            }
+        }
+        guard let first = guests.first else { return }
+        let sender = first.letter?.senderName ?? ""
+        deliver(
+            id: "pass-on-\(first.id.uuidString)",
+            title: guests.count == 1
+                ? String(localized: "\(sender)'s letter still has \(DistanceFormatter.string(forMeters: first.remainingSteps)) to go", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "\(guests.count) letters for other people are still in your mailbag", bundle: .appLanguage, locale: .appLanguage),
+            body: String(localized: "\(ram.name) is done. Keep walking and they come along, or hand them to a courier heading their way.", bundle: .appLanguage, locale: .appLanguage),
+            ramID: first.id
+        )
+    }
+
+    /// Carrier side: the sender took their letter back out of this mailbag.
+    func announceTakenBack(ramName: String, senderName: String) {
         guard isEnabled else { return }
         let content = UNMutableNotificationContent()
-        content.title = "\(recipientName) claimed your letter"
-        content.body = "A ram is on its way to them now."
+        let sender = senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        content.title = sender.isEmpty
+            ? String(localized: "A letter was taken back", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "\(sender) took their letter back", bundle: .appLanguage, locale: .appLanguage)
+        content.body = String(localized: "\(ramName) left your mailbag. Thanks for carrying it this far.", bundle: .appLanguage, locale: .appLanguage)
         content.sound = .default
-        center.add(UNNotificationRequest(identifier: "claimed-\(code)", content: content, trigger: nil))
+        center.add(UNNotificationRequest(identifier: "taken-back-\(ramName)-\(Int(Date().timeIntervalSince1970))", content: content, trigger: nil))
+    }
+
+    /// Sender side: a letter asked back has come home.
+    func announceCameHome(ramName: String) {
+        guard isEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "\(ramName) is back", bundle: .appLanguage, locale: .appLanguage)
+        content.body = String(localized: "Your letter came home. Send it again whenever you like.", bundle: .appLanguage, locale: .appLanguage)
+        content.sound = .default
+        center.add(UNNotificationRequest(identifier: "came-home-\(ramName)-\(Int(Date().timeIntervalSince1970))", content: content, trigger: nil))
     }
 
     private func deliver(
@@ -295,13 +367,13 @@ final class RamNotificationService: NSObject {
         let nudges: [(String, TimeInterval, String, String)] = [
             (
                 "idle-1d-\(ram.id.uuidString)", 24 * 3600,
-                "\(ram.name) hasn't moved since yesterday",
-                "\(recipient) is \(remaining) away. A walk to the shop and back is a few hundred metres closer."
+                String(localized: "\(ram.name) hasn't moved since yesterday", bundle: .appLanguage, locale: .appLanguage),
+                String(localized: "\(recipient) is \(remaining) away. A walk to the shop and back is a few hundred metres closer.", bundle: .appLanguage, locale: .appLanguage)
             ),
             (
                 "idle-3d-\(ram.id.uuidString)", 3 * 24 * 3600,
-                "\(ram.name) is grazing",
-                "Three quiet days. The letter keeps; the ram waits. \(remaining) left whenever you are."
+                String(localized: "\(ram.name) is grazing", bundle: .appLanguage, locale: .appLanguage),
+                String(localized: "Three quiet days. The letter keeps; the ram waits. \(remaining) left whenever you are.", bundle: .appLanguage, locale: .appLanguage)
             ),
         ]
 
@@ -328,8 +400,10 @@ final class RamNotificationService: NSObject {
         let content = UNMutableNotificationContent()
         content.title = "\(remaining) to \(ram.legDestinationCity)"
         content.body = others > 0
-            ? "\(ram.name) is the farthest out, with \(others) more ram\(others == 1 ? "" : "s") walking. Every step today counts."
-            : "\(ram.name) walks when you do. Every step today counts."
+            ? (others == 1
+                ? String(localized: "\(ram.name) is the farthest out, with 1 more ram walking. Every step today counts.", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "\(ram.name) is the farthest out, with \(others) more rams walking. Every step today counts.", bundle: .appLanguage, locale: .appLanguage))
+            : String(localized: "\(ram.name) walks when you do. Every step today counts.", bundle: .appLanguage, locale: .appLanguage)
         content.threadIdentifier = ram.id.uuidString
         content.userInfo = ["ramID": ram.id.uuidString]
         content.interruptionLevel = .passive
@@ -349,31 +423,5 @@ final class RamNotificationService: NSObject {
         let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: fire)
         let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         center.add(UNNotificationRequest(identifier: "morning", content: content, trigger: trigger))
-    }
-}
-
-// MARK: - UNUserNotificationCenterDelegate
-
-extension RamNotificationService: UNUserNotificationCenterDelegate {
-    /// Show a banner even while the app is in the foreground — a ram
-    /// reaching the gate while you're looking at the map is still news.
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .sound])
-    }
-
-    nonisolated func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse,
-        withCompletionHandler completionHandler: @escaping () -> Void
-    ) {
-        let ramID = (response.notification.request.content.userInfo["ramID"] as? String).flatMap(UUID.init)
-        Task { @MainActor [weak self] in
-            self?.tappedRamID = ramID
-        }
-        completionHandler()
     }
 }

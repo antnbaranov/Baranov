@@ -16,15 +16,15 @@ struct PassportHeaderView: View {
         String(ram.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()
     }
 
-    private var tag: (text: LocalizedStringKey, tint: Color, symbol: String) {
+    private var tag: (text: String, tint: Color, symbol: String) {
         switch ram.status {
-        case .arrivedAtGate: ("At the Gate", PassportInk.green, "seal.fill")
-        case .walking: ("On the Way", PassportInk.blue, "figure.walk")
-        case .waitingForHandoff: ("At the Port", PassportInk.blue, "ferry")
-        case .atSea: ("At Sea", PassportInk.blue, "sailboat")
-        case .handedOff: ("Handed On", Color.secondary, "hand.wave")
-        case .delivered: ("Delivered", PassportInk.green, "checkmark.seal.fill")
-        case .grazing: ("Resting", Color.secondary, "leaf.fill")
+        case .arrivedAtGate: (String(localized: "At the Gate", bundle: .appLanguage, locale: .appLanguage), PassportInk.green, "seal.fill")
+        case .walking: (String(localized: "On the Way", bundle: .appLanguage, locale: .appLanguage), PassportInk.blue, "figure.walk")
+        case .waitingForHandoff: (String(localized: "At the Port", bundle: .appLanguage, locale: .appLanguage), PassportInk.blue, "ferry")
+        case .atSea: (String(localized: "At Sea", bundle: .appLanguage, locale: .appLanguage), PassportInk.blue, "sailboat")
+        case .handedOff: (String(localized: "Handed On", bundle: .appLanguage, locale: .appLanguage), Color.secondary, "hand.wave")
+        case .delivered: (String(localized: "Delivered", bundle: .appLanguage, locale: .appLanguage), PassportInk.green, "checkmark.seal.fill")
+        case .grazing: (String(localized: "Resting", bundle: .appLanguage, locale: .appLanguage), Color.secondary, "leaf.fill")
         }
     }
 
@@ -57,7 +57,7 @@ struct PassportHeaderView: View {
             HStack(alignment: .center, spacing: 12) {
                 luggageTag
                 if ram.isEnRoute {
-                    Text("Bound for \(ram.targetCity)")
+                    Text(String(localized: "Bound for \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage))
                         .font(.footnote)
                         .foregroundStyle(PassportInk.inkSoft)
                         .lineLimit(2)

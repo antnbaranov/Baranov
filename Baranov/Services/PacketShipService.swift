@@ -71,6 +71,34 @@ enum PacketShipService {
         return Date(timeIntervalSince1970: slots * departureInterval)
     }
 
+    /// How long a packet takes over `meters` of open water.
+    static func crossingDuration(meters: CLLocationDistance) -> TimeInterval {
+        max(minimumCrossingSeconds, meters / cruisingMetersPerSecond) / durationCompression
+    }
+
+    /// A quick, offline guess at the crossing a ram will need, for showing
+    /// the whole trip before it is sent: the port nearest the destination
+    /// that is far enough to be the other side. The real booking at the
+    /// quay still checks that a road leads on from it, so the arrival port
+    /// can differ — this is a preview, never a promise.
+    static func estimatedCrossing(
+        from port: CLLocationCoordinate2D,
+        toward destination: CLLocationCoordinate2D
+    ) -> (arrivalPortName: String, duration: TimeInterval)? {
+        let portLocation = CLLocation(latitude: port.latitude, longitude: port.longitude)
+        let destinationLocation = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+
+        let arrival = HandoffGatewayService.gateways
+            .map { gateway in
+                (gateway, CLLocation(latitude: gateway.coordinate.latitude, longitude: gateway.coordinate.longitude))
+            }
+            .filter { $0.1.distance(from: portLocation) >= minimumCrossingMeters }
+            .min { $0.1.distance(from: destinationLocation) < $1.1.distance(from: destinationLocation) }
+
+        guard let arrival else { return nil }
+        return (arrival.0.name, crossingDuration(meters: arrival.1.distance(from: portLocation)))
+    }
+
     // MARK: - Booking
 
     /// Books the ram standing at `port` onto a crossing toward
@@ -118,10 +146,7 @@ enum PacketShipService {
             )
             let seaDistance = portLocation.distance(from: arrivalLocation)
             let departsAt = nextDeparture(after: now)
-            let crossing = max(
-                minimumCrossingSeconds,
-                seaDistance / cruisingMetersPerSecond
-            ) / durationCompression
+            let crossing = crossingDuration(meters: seaDistance)
 
             return SeaVoyage(
                 departurePortName: portName,

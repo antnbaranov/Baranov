@@ -2,19 +2,19 @@
 //  LetterInbox.swift
 //  Baranov
 //
-//  Letters other people addressed to this person's profile code, waiting in
-//  the mailbag with nothing to type.
+//  Letters other people sent to this person's Shepherd ID.
 //
 //  On the first refresh the phone creates a key pair (`AddressKeychain`) and
-//  registers the public half under the profile address. After that, each
-//  refresh asks the relay for the letters filed under the address, opens each
-//  one's wrapped letter code with the private key (`LetterKeyWrap`), fetches
-//  who it's from, and keeps the code in `SealKeyVault` — so when the ram
-//  finally reaches the gate the seal already knows its key and there is no
-//  second code to enter.
+//  registers the public half under its profile address. After that, each
+//  refresh asks the relay for letters filed under the address, opens each
+//  one's wrapped ear tag with the private key (`LetterKeyWrap`), and hands it
+//  to the incoming cards (`ExpectedLetterStore`). The sender's ram walks the
+//  letter here; this phone just watches it come and receives it at the gate.
+//  The ear tag goes into `SealKeyVault`, so the seal opens with nothing to
+//  type.
 //
 //  Offline-first and silent on failure: a refresh that can't reach the relay
-//  leaves the list as it was and simply tries again on the next tick.
+//  simply tries again on the next tick.
 //
 
 import CryptoKit
@@ -24,18 +24,9 @@ import Observation
 @MainActor
 @Observable
 final class LetterInbox {
-    struct Item: Identifiable {
-        /// The relay lookup id.
-        let id: String
-        let preview: RelayLetterPreview
-        let receivedAt: Date
-    }
-
-    private(set) var items: [Item] = []
-
     @ObservationIgnored private var isRefreshing = false
 
-    /// Registers the address if needed, then pulls whatever is waiting.
+    /// Registers the address if needed, then adopts whatever is on its way.
     func refresh(using relay: LetterRelayService) async {
         guard !isRefreshing else { return }
         isRefreshing = true
@@ -57,25 +48,36 @@ final class LetterInbox {
             return
         }
 
-        var fresh: [Item] = []
-        for envelope in envelopes {
-            if let known = items.first(where: { $0.id == envelope.id }) {
-                fresh.append(known)
-                continue
-            }
-            guard let code = try? LetterKeyWrap.unwrap(envelope.wrappedKey, lookupID: envelope.id, with: privateKey),
-                  let preview = try? await relay.preview(id: envelope.id) else { continue }
-            if preview.payload.isEncrypted {
-                SealKeyVault.store(code, for: preview.payload.id)
-            }
-            fresh.append(Item(id: envelope.id, preview: preview, receivedAt: Self.date(from: envelope.createdAt)))
+        // Letters from older builds (the recipient walked them home) are no
+        // longer part of the post; only tracked letters are adopted.
+        for envelope in envelopes where envelope.tracked == true {
+            adoptTracked(envelope, privateKey: privateKey)
         }
-        items = fresh
     }
 
-    /// Drops a letter from the list once its ram is on the way.
-    func remove(id: String) {
-        items.removeAll { $0.id == id }
+    /// Unwraps a tracked letter's ear tag and hands it to the incoming
+    /// cards, which follow it at the relay from here on.
+    private func adoptTracked(_ envelope: InboxEnvelope, privateKey: Curve25519.KeyAgreement.PrivateKey) {
+        guard let rawID = envelope.letterId, let letterID = UUID(uuidString: rawID) else { return }
+        let store = ExpectedLetterStore.shared
+        if store.letters.contains(where: { $0.letterID == letterID && $0.code != nil }) { return }
+        guard let code = try? LetterKeyWrap.unwrap(envelope.wrappedKey, lookupID: envelope.id, with: privateKey) else { return }
+        store.add(ExpectedLetter(
+            letterID: letterID,
+            senderName: envelope.senderName,
+            ramName: "",
+            city: "",
+            expectedBy: nil,
+            code: code,
+            originName: envelope.originName
+        ))
+        // The relay pushes this too when it can; this is the fallback.
+        let sender = envelope.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        NotificationManager.shared.announce(
+            .dispatched, letterID: letterID,
+            title: String(localized: "\(sender.isEmpty ? String(localized: "Someone", bundle: .appLanguage, locale: .appLanguage) : sender) sent a ram your way", bundle: .appLanguage, locale: .appLanguage),
+            body: String(localized: "It's on the road. Follow it under Incoming.", bundle: .appLanguage, locale: .appLanguage)
+        )
     }
 
     // MARK: - Registration
@@ -99,13 +101,5 @@ final class LetterInbox {
         } catch {
             return nil
         }
-    }
-
-    private static func date(from iso: String) -> Date {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: iso) { return date }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: iso) ?? Date()
     }
 }

@@ -77,7 +77,7 @@ struct DestinationMapPicker: View {
             } else {
                 Image(systemName: "mappin.circle.fill").foregroundStyle(Color.accentColor)
             }
-            Text(placeName.isEmpty ? String(localized: "Move the map to place the pin") : placeName)
+            Text(placeName.isEmpty ? String(localized: "Move the map to place the pin", bundle: .appLanguage, locale: .appLanguage) : placeName)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -96,7 +96,7 @@ struct DestinationMapPicker: View {
             let pin = DroppedDestination(
                 latitude: center.latitude,
                 longitude: center.longitude,
-                name: placeName.isEmpty ? String(localized: "Dropped Pin") : placeName
+                name: placeName.isEmpty ? String(localized: "Dropped Pin", bundle: .appLanguage, locale: .appLanguage) : placeName
             )
             onConfirm(pin)
             dismiss()

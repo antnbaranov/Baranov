@@ -16,6 +16,7 @@ struct ShepherdPickerSheet: View {
     @State private var didConfirm = false
     @State private var showPlayground = false
     @State private var pickTick = 0
+    @State private var detent: PresentationDetent = .medium
 
     init(selection: Binding<String>, customFileName: Binding<String>, motto: Binding<String>) {
         _selection = selection
@@ -39,6 +40,17 @@ struct ShepherdPickerSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
             }
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .imagePlaygroundSheet(
+                isPresented: $showPlayground,
+                concept: "portrait of a friendly shepherd with a sheep"
+            ) { url in
+                guard let name = try? ShepherdAvatarStore.save(from: url) else { return }
+                if draftCustomFile != customFileName { ShepherdAvatarStore.remove(draftCustomFile) }
+                draftCustomFile = name
+                draftSelection = ShepherdIdentityKeys.customSelection
+                pickTick += 1
+            }
             .navigationTitle("Shepherd avatar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -53,24 +65,28 @@ struct ShepherdPickerSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: $detent)
         .presentationDragIndicator(.visible)
         .sensoryFeedback(.selection, trigger: pickTick)
         .onDisappear { if !didConfirm { discardGenerated() } }
-        .imagePlaygroundSheet(
-            isPresented: $showPlayground,
-            concept: "a cozy illustrated shepherd walking with a ram, storybook style"
-        ) { url in
-            guard let name = try? ShepherdAvatarStore.save(from: url) else { return }
-            if draftCustomFile != customFileName { ShepherdAvatarStore.remove(draftCustomFile) }
-            draftCustomFile = name
-            draftSelection = ShepherdIdentityKeys.customSelection
-            pickTick += 1
+    }
+
+    /// Image Playground is a full-screen system controller; presenting it
+    /// while this sheet is still resizing between detents is what froze the
+    /// screen. Settle on the large detent first, then present.
+    private func openPlayground() {
+        guard !showPlayground else { return }
+        if detent != .large {
+            withAnimation(.snappy) { detent = .large }
+        }
+        Task {
+            try? await Task.sleep(for: .milliseconds(450))
+            showPlayground = true
         }
     }
 
     private var playgroundBanner: some View {
-        Button { showPlayground = true } label: {
+        Button(action: openPlayground) {
             HStack(spacing: 12) {
                 Image(systemName: "apple.image.playground")
                     .font(.title2)
@@ -85,7 +101,7 @@ struct ShepherdPickerSheet: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(16)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
     }

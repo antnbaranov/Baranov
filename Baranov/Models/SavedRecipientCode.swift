@@ -24,6 +24,9 @@ struct SavedRecipientCode: Identifiable, Codable, Hashable, Sendable {
     var locationCoordinate: RamCoordinate?
     var notes: String?
     var createdAt: Date
+    /// Their profile public key (base64), cached the last time the relay was
+    /// asked, so a letter written offline can still be sealed to them.
+    var publicKey: String?
 
     init(
         id: UUID = UUID(),

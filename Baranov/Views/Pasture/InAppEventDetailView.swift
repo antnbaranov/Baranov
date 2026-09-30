@@ -62,31 +62,31 @@ struct InAppEventDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .padding(.horizontal)
 
                 // Features / details strip
                 VStack(spacing: 12) {
                     eventFeatureRow(
                         icon: "shoeprints.fill",
-                        title: "Every Step Counts",
-                        subtitle: "Your daily iPhone & Apple Watch steps advance the ram."
+                        title: String(localized: "Every Step Counts", bundle: .appLanguage, locale: .appLanguage),
+                        subtitle: String(localized: "Your daily iPhone & Apple Watch steps advance the ram.", bundle: .appLanguage, locale: .appLanguage)
                     )
                     Divider()
                     eventFeatureRow(
                         icon: "seal.fill",
-                        title: "Commemorative Stamp",
-                        subtitle: "Arriving at the destination stamps your explorer passport."
+                        title: String(localized: "Commemorative Stamp", bundle: .appLanguage, locale: .appLanguage),
+                        subtitle: String(localized: "Arriving at the destination stamps your explorer passport.", bundle: .appLanguage, locale: .appLanguage)
                     )
                     Divider()
                     eventFeatureRow(
                         icon: "person.2.fill",
-                        title: "Handoff Relay",
-                        subtitle: "Hand off letters to fellow carriers via AirDrop or Shake."
+                        title: String(localized: "Handoff Relay", bundle: .appLanguage, locale: .appLanguage),
+                        subtitle: String(localized: "Hand off letters to fellow carriers via AirDrop or Shake.", bundle: .appLanguage, locale: .appLanguage)
                     )
                 }
                 .padding(16)
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .padding(.horizontal)
 
                 // Action buttons
@@ -117,6 +117,7 @@ struct InAppEventDetailView: View {
                 .padding(.bottom, 24)
             }
         }
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

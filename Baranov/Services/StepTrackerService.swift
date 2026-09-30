@@ -122,6 +122,13 @@ final class StepTrackerService {
     init(pedometer: CMPedometer = CMPedometer(), todayPedometer: CMPedometer = CMPedometer()) {
         self.pedometer = pedometer
         self.todayPedometer = todayPedometer
+        #if DEBUG
+        if CommandLine.arguments.contains("-demoMode") {
+            self.isAvailable = false
+            self.healthStore = nil
+            return
+        }
+        #endif
         self.isAvailable = CMPedometer.isStepCountingAvailable()
         self.healthStore = HKHealthStore.isHealthDataAvailable() ? HKHealthStore() : nil
     }

@@ -22,10 +22,10 @@ enum ShepherdPreset: String, CaseIterable, Identifiable, Sendable {
     /// Suggested creed applied when the preset is picked.
     var defaultMotto: String {
         switch self {
-        case .wanderer: String(localized: "On foot through the fog to the Pacific")
-        case .redhead: String(localized: "Every letter is a step toward someone's home")
-        case .english: String(localized: "Slow but sure — the letter will arrive")
-        case .asian: String(localized: "A journey of a thousand miles begins with a single step")
+        case .wanderer: String(localized: "On foot through the fog to the Pacific", bundle: .appLanguage, locale: .appLanguage)
+        case .redhead: String(localized: "Every letter is a step toward someone's home", bundle: .appLanguage, locale: .appLanguage)
+        case .english: String(localized: "Slow but sure — the letter will arrive", bundle: .appLanguage, locale: .appLanguage)
+        case .asian: String(localized: "A journey of a thousand miles begins with a single step", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 }

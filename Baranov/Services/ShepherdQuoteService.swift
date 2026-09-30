@@ -20,16 +20,20 @@ enum ShepherdQuoteService {
     @available(iOS 26.0, *)
     private static func generateWithModel(languageCode: String) async -> String? {
         let model = SystemLanguageModel.default
-        guard case .available = model.availability else { return nil }
+        // No reply at all beats a reply in the wrong language: the caller
+        // then shows the translated classic sayings.
+        guard case .available = model.availability,
+              model.supportsLocale(Locale(identifier: languageCode)) else { return nil }
 
-        let language = Locale(identifier: "en").localizedString(forLanguageCode: languageCode) ?? "English"
+        let language = Locale(identifier: "en").localizedString(forIdentifier: languageCode) ?? Locale(identifier: "en").localizedString(forLanguageCode: languageCode) ?? "English"
         let session = LanguageModelSession(
             model: model,
             instructions: """
             You are a wise old shepherd who carries letters on foot together with a ram. \
             Reply with exactly one short aphorism, at most 90 characters, written in \(language). \
             Themes: slow travel, patience, steps, distance, letters, home. \
-            No quotation marks, no explanation, no emoji, no names.
+            No quotation marks, no explanation, no emoji, no names. \
+            Every word of the aphorism must be in \(language), even though these instructions are in English.
             """
         )
         let images = ["dawn", "fog", "the road", "a night's rest", "wind", "mountains", "rain", "the sea"]
@@ -49,7 +53,7 @@ enum ShepherdQuoteService {
     private static func clean(_ raw: String) -> String? {
         let quotes = CharacterSet(charactersIn: "\"«»“”„'").union(.whitespacesAndNewlines)
         let text = raw.trimmingCharacters(in: quotes)
-        guard !text.isEmpty else { return nil }
+        guard !text.isEmpty, AppLanguage.isInAppLanguage(text) else { return nil }
         return String(text.prefix(140))
     }
 }

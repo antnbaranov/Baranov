@@ -51,7 +51,7 @@ struct ReelSnackbar: View {
             artwork
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(job.ramName ?? "Your")'s reel")
+                (job.ramName.map { Text("\($0)'s reel") } ?? Text("Your reel"))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -68,8 +68,8 @@ struct ReelSnackbar: View {
                     ProgressView(value: job.phase == .rendering ? job.progress : nil)
                         .progressViewStyle(.linear)
                     Text(job.phase == .rendering
-                         ? String(localized: "Rendering in the background · \(Int(job.progress * 100))%")
-                         : String(localized: "Getting started…"))
+                         ? String(localized: "Rendering in the background · \(Int(job.progress * 100))%", bundle: .appLanguage, locale: .appLanguage)
+                         : String(localized: "Getting started…", bundle: .appLanguage, locale: .appLanguage))
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -120,7 +120,7 @@ struct ReelSnackbar: View {
             if let url = job.videoURL {
                 Button {
                     let message = job.data?.shareMessage
-                        ?? String(localized: "Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)")
+                        ?? String(localized: "Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)", bundle: .appLanguage, locale: .appLanguage)
                     ActivitySharer.present(items: [url, message])
                 } label: {
                     Image(systemName: "square.and.arrow.up")

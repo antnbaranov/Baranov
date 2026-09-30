@@ -4,7 +4,7 @@
 //
 //  "Notes from the Road": the journey told in the ram's own voice, one
 //  postcard per stamp, in a horizontal carousel that opens on the newest
-//  card. Each kind of stop has its own colour and stamp-sized symbol, the
+//  card. Each kind of stop has its own symbol on a plain white card, the
 //  cards sit at a slight tilt like a pile of real postcards, and any note
 //  can be shared as text.
 //
@@ -26,32 +26,6 @@ struct TravelNote: Identifiable, Hashable {
     let text: String
 }
 
-extension JourneyStampKind {
-    /// Each kind of stop gets its own postcard colour.
-    var postcardColor: Color {
-        let base: Color = switch self {
-        case .setOut: .orange
-        case .town: .indigo
-        case .water: .teal
-        case .landmark: .pink
-        case .handoff: .green
-        case .arrival: .purple
-        }
-        return base.calmed(0.15)
-    }
-
-    var postcardLabel: LocalizedStringKey {
-        switch self {
-        case .setOut: "SET OUT"
-        case .town: "TOWN"
-        case .water: "WATER"
-        case .landmark: "LANDMARK"
-        case .handoff: "HANDOFF"
-        case .arrival: "ARRIVED"
-        }
-    }
-}
-
 enum TravelNoteWriter {
     /// Oldest first, so the carousel reads left to right like a diary.
     static func notes(from stamps: [JourneyStamp]) -> [TravelNote] {
@@ -71,29 +45,29 @@ enum TravelNoteWriter {
     private static func line(for kind: JourneyStampKind, place: String, variant: Int) -> String {
         let format: String
         switch (kind, variant) {
-        case (.setOut, 0): format = String(localized: "Set out from %@ with the letter tucked safely in my bag.")
-        case (.setOut, 1): format = String(localized: "Left %@ at a steady trot. The road is long, and I am ready.")
-        case (.setOut, _): format = String(localized: "Hooves on the road out of %@. Off we go.")
+        case (.setOut, 0): format = String(localized: "Set out from %@ with the letter tucked safely in my bag.", bundle: .appLanguage, locale: .appLanguage)
+        case (.setOut, 1): format = String(localized: "Left %@ at a steady trot. The road is long, and I am ready.", bundle: .appLanguage, locale: .appLanguage)
+        case (.setOut, _): format = String(localized: "Hooves on the road out of %@. Off we go.", bundle: .appLanguage, locale: .appLanguage)
 
-        case (.town, 0): format = String(localized: "Trotted through %@. Nobody asked about the letter, which is just how I like it.")
-        case (.town, 1): format = String(localized: "Slowed down in %@ to take it all in. The letter is safe.")
-        case (.town, _): format = String(localized: "Passed %@ and got another stamp. Chest out.")
+        case (.town, 0): format = String(localized: "Trotted through %@. Nobody asked about the letter, which is just how I like it.", bundle: .appLanguage, locale: .appLanguage)
+        case (.town, 1): format = String(localized: "Slowed down in %@ to take it all in. The letter is safe.", bundle: .appLanguage, locale: .appLanguage)
+        case (.town, _): format = String(localized: "Passed %@ and got another stamp. Chest out.", bundle: .appLanguage, locale: .appLanguage)
 
-        case (.water, 0): format = String(localized: "Crossed %@ with great care. The letter stayed dry.")
-        case (.water, 1): format = String(localized: "%@ was wider than it looked, but we made it over.")
-        case (.water, _): format = String(localized: "Splashed across %@ and shook off on the far side.")
+        case (.water, 0): format = String(localized: "Crossed %@ with great care. The letter stayed dry.", bundle: .appLanguage, locale: .appLanguage)
+        case (.water, 1): format = String(localized: "%@ was wider than it looked, but we made it over.", bundle: .appLanguage, locale: .appLanguage)
+        case (.water, _): format = String(localized: "Splashed across %@ and shook off on the far side.", bundle: .appLanguage, locale: .appLanguage)
 
-        case (.landmark, 0): format = String(localized: "Went past %@. Lovely, but the letter comes first.")
-        case (.landmark, 1): format = String(localized: "Paused at %@ for exactly one breath, then on again.")
-        case (.landmark, _): format = String(localized: "%@ ticked off the list. Onward.")
+        case (.landmark, 0): format = String(localized: "Went past %@. Lovely, but the letter comes first.", bundle: .appLanguage, locale: .appLanguage)
+        case (.landmark, 1): format = String(localized: "Paused at %@ for exactly one breath, then on again.", bundle: .appLanguage, locale: .appLanguage)
+        case (.landmark, _): format = String(localized: "%@ ticked off the list. Onward.", bundle: .appLanguage, locale: .appLanguage)
 
-        case (.handoff, 0): format = String(localized: "Reached %@ and waited for the next pair of hands.")
-        case (.handoff, 1): format = String(localized: "Handed over at %@ after a good long walk.")
-        case (.handoff, _): format = String(localized: "The road needs someone new from %@. Waiting politely.")
+        case (.handoff, 0): format = String(localized: "Reached %@ and waited for the next pair of hands.", bundle: .appLanguage, locale: .appLanguage)
+        case (.handoff, 1): format = String(localized: "Handed over at %@ after a good long walk.", bundle: .appLanguage, locale: .appLanguage)
+        case (.handoff, _): format = String(localized: "The road needs someone new from %@. Waiting politely.", bundle: .appLanguage, locale: .appLanguage)
 
-        case (.arrival, 0): format = String(localized: "Reached the gate at %@. Waiting for someone to break the seal.")
-        case (.arrival, 1): format = String(localized: "Arrived at %@. The letter is home.")
-        case (.arrival, _): format = String(localized: "Standing at the gate in %@, ears up. Delivered.")
+        case (.arrival, 0): format = String(localized: "Reached the gate at %@. Waiting for someone to break the seal.", bundle: .appLanguage, locale: .appLanguage)
+        case (.arrival, 1): format = String(localized: "Arrived at %@. The letter is home.", bundle: .appLanguage, locale: .appLanguage)
+        case (.arrival, _): format = String(localized: "Standing at the gate in %@, ears up. Delivered.", bundle: .appLanguage, locale: .appLanguage)
         }
         return String(format: format, place)
     }
@@ -150,57 +124,61 @@ struct PassportNotesSection: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// A plain white card on the grouped gray page, like every other card
+    /// in the app: the stop's symbol and place in secondary, the ram's own
+    /// line in primary. No per-kind colour, no eyebrow label.
     private func postcard(_ note: TravelNote) -> some View {
-        let color = note.kind.postcardColor
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text(note.kind.postcardLabel)
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
-                    .tracking(1.5)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.white.opacity(0.28), in: Capsule())
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: note.kind.symbolName)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(Color(uiColor: .systemGray6), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 1) {
+                    if !note.place.isEmpty {
+                        Text(verbatim: note.place)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
+                    Text(note.time.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(.appLanguage)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer(minLength: 0)
-                Text(note.time.formatted(.dateTime.day().month(.abbreviated).hour().minute()))
-                    .font(.caption.weight(.semibold))
-                    .opacity(0.85)
             }
 
             Text(note.text)
                 .scaledFont(size: 19, weight: .semibold, design: .serif)
                 .italic()
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
 
             HStack {
                 Label("\(DistanceFormatter.string(forMeters: note.metersIn)) in", systemImage: "figure.walk")
-                    .font(.caption.weight(.bold))
-                    .opacity(0.9)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                ShareLink(item: "“\(note.text)” — \(ramName), on the road with Baranov") {
+                ShareLink(item: String(localized: "\u{201C}\(note.text)\u{201D} \u{2014} \(ramName), on the road with Baranov", bundle: .appLanguage, locale: .appLanguage)) {
                     Image(systemName: "square.and.arrow.up")
-                        .font(.footnote.weight(.bold))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
                         .frame(width: 32, height: 32)
-                        .background(.white.opacity(0.28), in: Circle())
+                        .background(Color(uiColor: .systemGray6), in: Circle())
                 }
                 .accessibilityLabel("Share note")
             }
         }
-        .foregroundStyle(.white)
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .fill(color)
-                .overlay(alignment: .bottomTrailing) {
-                    Image(systemName: note.kind.symbolName)
-                        .font(.system(size: 110, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.14))
-                        .offset(x: 18, y: 18)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        }
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 26, style: .continuous)
+        )
         .fixedSize(horizontal: false, vertical: true)
     }
 }

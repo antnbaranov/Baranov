@@ -125,7 +125,8 @@ actor Analytics {
     /// Call when the app moves to the background.
     func flush() async {
         flushSteps()
-        guard isEnabled, !isFlushing, !queue.isEmpty else { return }
+        // No server: keep the (bounded) queue for when one is configured.
+        guard isEnabled, !isFlushing, !queue.isEmpty, TelemetryService.isServerConfigured else { return }
         isFlushing = true
         defer { isFlushing = false }
 

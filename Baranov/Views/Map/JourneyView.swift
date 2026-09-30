@@ -63,7 +63,6 @@ struct JourneyView: View {
 
     @Environment(FlockViewModel.self) private var flockViewModel
     @Environment(CarrierPresenceService.self) private var presence
-    @Environment(RelayOutbox.self) private var relayOutbox
     @Environment(LetterInbox.self) private var letterInbox
     @Environment(ProximityCodeDiscovery.self) private var proximity
     @Environment(NearbyCourierService.self) private var nearbyCouriers
@@ -162,6 +161,15 @@ struct JourneyView: View {
     /// A destination marked by pressing and holding on the map; read by Compose.
     @State private var droppedDestination: DroppedDestination?
 
+    /// The trip Compose is planning, drawn on the map while it is being
+    /// planned — see `RoutePreview`.
+    @State private var routePreview: RoutePreview?
+    /// 0…1 along the preview, from `RoutePreviewClock`.
+    @State private var previewProgress: Double = 0
+    /// The ram being tracked when the preview started, so backing out can
+    /// tell "cancelled" from "dispatched" (which has its own flyover).
+    @State private var previewBaselineRamId: Ram.ID?
+
     /// Whether the profile sheet is up — owned by `RootView`, like Pasture.
     @Binding var isProfilePresented: Bool
     /// Whether the "Enter Code" sheet is up — also owned by `RootView`;
@@ -211,9 +219,9 @@ struct JourneyView: View {
         case mailbag
     }
 
-    @State private var panelPage: PanelPage = .compose
+    @State private var panelPage: PanelPage = CommandLine.arguments.contains("-demoMode") ? .mailbag : .compose
     @State private var codeDraft = ""
-    @State private var mailbagSection: MailbagSection = .incoming
+    @State private var mailbagSection: MailbagSection = CommandLine.arguments.contains("-demoMode") ? .outgoing : .incoming
     /// What is pushed inside the mailbag page (a ram's bag, a letter). Held
     /// here rather than in the page so it survives the page being recycled
     /// by the horizontal pager.
@@ -357,20 +365,26 @@ struct JourneyView: View {
     /// actively walking, or — if none is — the most recently dispatched ram
     /// still waiting to set out.
     private var trackedRam: Ram? {
-        flockViewModel.activeRams.first { $0.status == .walking }
-            ?? flockViewModel.activeRams.first { $0.status == .grazing }
-            // A ram at the recipient's gate owns the dock next: the letter
-            // waiting to be opened is the payoff of the whole walk, and the
-            // dock is now the only way to reach it (the Satchel is gone).
-            // Ranked below walking/grazing because those need the
-            // pedometer, which follows `trackedRam`.
-            ?? flockViewModel.activeRams.first { $0.status == .arrivedAtGate }
-            // Nothing is walking, but something may still be moving: a ram
-            // aboard the packet crosses on the clock, and the map is the
-            // one place that progress is legible. Ranked last so a ram
-            // that needs the person's steps always wins the screen.
-            ?? flockViewModel.activeRams.first { $0.status == .atSea }
-            ?? flockViewModel.activeRams.first { $0.status == .waitingForHandoff }
+        let own: [Ram] = flockViewModel.ownRams
+        let active: [Ram] = flockViewModel.activeRams
+
+        // The person's own ram first: guests ride along on its steps.
+        if let ram = own.first(where: { $0.status == .walking }) { return ram }
+        if let ram = own.first(where: { $0.status == .grazing }) { return ram }
+        if let ram = active.first(where: { $0.status == .walking }) { return ram }
+        if let ram = active.first(where: { $0.status == .grazing }) { return ram }
+        // A ram at the recipient's gate owns the dock next: the letter
+        // waiting to be opened is the payoff of the whole walk, and the
+        // dock is now the only way to reach it (the Satchel is gone).
+        // Ranked below walking/grazing because those need the
+        // pedometer, which follows `trackedRam`.
+        if let ram = active.first(where: { $0.status == .arrivedAtGate }) { return ram }
+        // Nothing is walking, but something may still be moving: a ram
+        // aboard the packet crosses on the clock, and the map is the
+        // one place that progress is legible. Ranked last so a ram
+        // that needs the person's steps always wins the screen.
+        if let ram = active.first(where: { $0.status == .atSea }) { return ram }
+        return active.first(where: { $0.status == .waitingForHandoff })
     }
 
     /// The docked panel is Journey's own UI — it should disappear while
@@ -429,7 +443,7 @@ struct JourneyView: View {
 
     private var journeyBase: some View {
             NavigationStack {
-                mapContent
+                mapWithPreview
                     .navigationTitle("Journey")
                     .navigationBarTitleDisplayMode(.inline)
                     // Look Around in split/full screen owns the top of
@@ -472,7 +486,6 @@ struct JourneyView: View {
                     // gets the same explicit copy rather than trusting
                     // inheritance alone.
                     .environment(flockViewModel)
-                    .environment(relayOutbox)
                     .environment(letterInbox)
                     .environment(entitlementService)
                     .environment(locationService)
@@ -663,6 +676,13 @@ struct JourneyView: View {
                 stepTracker.startTrackingToday()
             }
             .onAppear {
+                #if DEBUG
+                if CommandLine.arguments.contains("-demoMode") {
+                    panelPage = .mailbag
+                    panelDetent = .dockMedium
+                    mailbagSection = .outgoing
+                }
+                #endif
                 // Continuous location + compass heading for as long as the
                 // map is on screen: this is what moves the marker as the
                 // person walks and turns its heading indicator. Stopped
@@ -670,6 +690,11 @@ struct JourneyView: View {
                 // `resolveCurrentLocation()` still works independently.
                 guard hasCompletedOnboarding else { return }
                 locationService.startLiveTracking()
+            }
+            .onChange(of: flockViewModel.activeRams.contains { $0.status == .walking }, initial: true) { _, walking in
+                // Background location only while a ram is walking; otherwise
+                // it stops when the app leaves the screen.
+                locationService.setWalkKeepAlive(walking)
             }
             .onChange(of: hasCompletedOnboarding) { _, completed in
                 if completed {
@@ -775,12 +800,12 @@ struct JourneyView: View {
     /// the person's own.
     private var lookAroundSubtitle: String? {
         if let ram = trackedRam {
-            return "Where \(ram.name) is now"
+            return String(localized: "Where \(ram.name) is now", bundle: .appLanguage, locale: .appLanguage)
         }
-        if let city = locationService.currentCityName, !city.isEmpty, city != "Current Location" {
-            return "Near you · \(city)"
+        if let city = locationService.currentCityName, !city.isEmpty, city != String(localized: "Current Location", bundle: .appLanguage, locale: .appLanguage) {
+            return String(localized: "Near you · \(city)", bundle: .appLanguage, locale: .appLanguage)
         }
-        return "Near you"
+        return String(localized: "Near you", bundle: .appLanguage, locale: .appLanguage)
     }
 
     // MARK: - Docked panel
@@ -852,6 +877,12 @@ struct JourneyView: View {
                             }
                         }
                     )
+                    .onAppear {
+                        proximity.setEntryListening(true)
+                        prefillCodeFromNearby()
+                    }
+                    .onDisappear { proximity.setEntryListening(false) }
+                    .onChange(of: proximity.state) { prefillCodeFromNearby() }
                 } else if isPanelCollapsed, panelPage == .compose || isPanelTiny {
                     // On the dots' own line, so it never steals height from
                     // the form above.
@@ -895,8 +926,8 @@ struct JourneyView: View {
 
     private var panelPageItems: [PanelPageControl<PanelPage>.Item] {
         [
-            .init(page: .compose, title: String(localized: "New Letter")),
-            .init(page: .mailbag, title: String(localized: "Mailbag")),
+            .init(page: .compose, title: String(localized: "New Letter", bundle: .appLanguage, locale: .appLanguage)),
+            .init(page: .mailbag, title: String(localized: "Mailbag", bundle: .appLanguage, locale: .appLanguage)),
         ]
     }
 
@@ -909,8 +940,7 @@ struct JourneyView: View {
             isTiny: isPanelTiny,
             path: $mailbagPath,
             onShakeHandoff: onManualHoofbeat,
-            publishedLetters: relayOutbox.letters,
-            idleName: ramCompanionStore.companion?.name ?? String(localized: "Your ram"),
+            idleName: ramCompanionStore.companion?.name ?? String(localized: "Your ram", bundle: .appLanguage, locale: .appLanguage),
             onExpand: {
                 withAnimation { panelDetent = .dockMedium }
             },
@@ -992,11 +1022,14 @@ struct JourneyView: View {
             },
             relay: relay,
             shepherdIDRequest: $sendToShepherdID,
+            nearbyProfileCode: nearbyProfileCode,
+            onListenForNearbyCode: { proximity.setEntryListening($0) },
             isPanelExpanded: !isPanelCollapsed,
             droppedDestination: $droppedDestination,
             onChooseOnMap: { isDestinationPickerPresented = true },
             isPanelCompact: isPanelCompact,
-            isPanelTiny: isPanelTiny
+            isPanelTiny: isPanelTiny,
+            routePreview: $routePreview
         )
     }
 
@@ -1039,6 +1072,85 @@ struct JourneyView: View {
             return .hybrid(elevation: .realistic, showsTraffic: false)
         }
         return .standard(elevation: .realistic)
+    }
+
+    /// The map plus the route preview's clock and camera.
+    private var mapWithPreview: some View {
+        mapContent
+            .task(id: routePreview?.key) { await runRoutePreviewClock() }
+            .onChange(of: routePreview?.key) { oldKey, newKey in
+                handleRoutePreviewChange(oldKey: oldKey, newKey: newKey)
+            }
+    }
+
+    private func runRoutePreviewClock() async {
+        guard routePreview != nil else {
+            previewProgress = 0
+            return
+        }
+        if reduceMotion {
+            previewProgress = 1
+            return
+        }
+        while !Task.isCancelled {
+            previewProgress = RoutePreviewClock.progress(at: .now)
+            try? await Task.sleep(for: .milliseconds(33))
+        }
+    }
+
+    private func handleRoutePreviewChange(oldKey: String?, newKey: String?) {
+        if let routePreview, newKey != nil {
+            if oldKey == nil { previewBaselineRamId = trackedRam?.id }
+            camera.showRoutePreview(routePreview.path, reduceMotion: reduceMotion)
+        } else if oldKey != nil, trackedRam?.id == previewBaselineRamId {
+            // Backed out of the letter: return the camera to where it lives.
+            if let ram = trackedRam {
+                camera.resumeFollowing(ramCoordinate: ram.currentCoordinate ?? ram.originCoordinate, animated: true)
+            } else {
+                camera.centerOnUser(locationService.currentCoordinate, animated: true)
+            }
+        }
+    }
+
+    /// The planned trip: a faint full path, the part the ram has run drawn
+    /// over it, the destination, and the ram itself.
+    @MapContentBuilder
+    private func routePreviewContent(_ preview: RoutePreview) -> some MapContent {
+        MapPolyline(coordinates: preview.path)
+            .stroke(Color.secondary.opacity(0.4), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [1, 7]))
+
+        MapPolyline(coordinates: preview.trail(upTo: previewProgress))
+            .stroke(Color.accentColor, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+
+        if let via = preview.via {
+            Annotation(preview.viaName ?? "", coordinate: via) {
+                Image(systemName: "ferry.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .annotationTitles(.hidden)
+        }
+
+        Annotation(preview.destinationName, coordinate: preview.destination) {
+            Image(systemName: "flag.checkered")
+                .font(.callout)
+                .foregroundStyle(.primary)
+                .padding(8)
+                .background(.regularMaterial, in: Circle())
+        }
+        .annotationTitles(.visible)
+
+        Annotation("", coordinate: preview.point(at: previewProgress)) {
+            RamSpriteMarkerView(
+                bearingDegrees: preview.bearing(at: previewProgress),
+                motionState: previewProgress < 1 ? .moving(speed: 0.7) : .idle,
+                markerSize: 40
+            )
+            .allowsHitTesting(false)
+        }
+        .annotationTitles(.hidden)
     }
 
     private var mapContent: some View {
@@ -1113,6 +1225,10 @@ struct JourneyView: View {
                 }
             }
 
+            if let preview = routePreview {
+                routePreviewContent(preview)
+            }
+
             if let ram = trackedRam {
                 // While a ram is aboard the packet the leg it is travelling
                 // is the crossing, not the road it walked to the quay — so
@@ -1147,10 +1263,21 @@ struct JourneyView: View {
                 // segments so frame 0 is never a north-facing default.
                 if let position = ram.currentCoordinate ?? ram.originCoordinate {
                     Annotation("", coordinate: position) {
-                        ramMarker(
-                            bearingDegrees: ram.currentBearingDegrees ?? ram.originBearingDegrees ?? 0,
-                            motionState: motionState(for: ram)
-                        )
+                        Group {
+                            if ram.status == .atSea, let voyage = ram.voyage {
+                                // Across the water the ram rides a ship, or
+                                // flies when the crossing is an ocean wide.
+                                SeaVesselMarker(
+                                    isAirplane: voyage.usesAirplane,
+                                    bearingDegrees: ram.currentBearingDegrees ?? voyage.bearingDegrees()
+                                )
+                            } else {
+                                ramMarker(
+                                    bearingDegrees: ram.currentBearingDegrees ?? ram.originBearingDegrees ?? 0,
+                                    motionState: motionState(for: ram)
+                                )
+                            }
+                        }
                         // Tap the ram to look at the letter it carries.
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -1162,7 +1289,7 @@ struct JourneyView: View {
                         .accessibilityHint(Text("Opens the letter"))
                     }
                 }
-            } else if let homeCoordinate = locationService.currentCoordinate {
+            } else if routePreview == nil, let homeCoordinate = locationService.currentCoordinate {
                 // No active journey: the ram *is* the person's own puck —
                 // it stands at their live location, faces the way they're
                 // facing (compass heading, or GPS course once moving), and
@@ -1344,6 +1471,23 @@ struct JourneyView: View {
         }
     }
 
+    /// The profile code a phone nearby is broadcasting, if that is what it is sharing.
+    private var nearbyProfileCode: String? {
+        if case .locked(let shared) = proximity.state, CourierCodeStore.isAddress(shared) { return shared }
+        return nil
+    }
+
+    /// A letter code a phone nearby is broadcasting, ready for the Enter Code field.
+    private var nearbyLetterCode: String? {
+        if case .locked(let shared) = proximity.state, !CourierCodeStore.isAddress(shared) { return shared }
+        return nil
+    }
+
+    private func prefillCodeFromNearby() {
+        guard let shared = nearbyLetterCode, codeDraft.isEmpty else { return }
+        codeDraft = shared
+    }
+
     private var isNearbySenderLocked: Bool {
         if case .locked = proximity.state { return true }
         return false
@@ -1351,7 +1495,7 @@ struct JourneyView: View {
 
     private func sightingLabel(_ sighting: CarrierPresenceService.Sighting) -> String {
         let ramName = flockViewModel.activeRams.first { $0.id == sighting.ramID }?.name ?? ""
-        let carrier = sighting.carrierName.isEmpty ? String(localized: "A courier") : sighting.carrierName
+        let carrier = sighting.carrierName.isEmpty ? String(localized: "A courier", bundle: .appLanguage, locale: .appLanguage) : sighting.carrierName
         return ramName.isEmpty ? carrier : "\(carrier) · \(ramName)"
     }
 
@@ -1577,7 +1721,7 @@ struct JourneyView: View {
             if trackedRam != nil {
                 mapControlButton(
                     systemImage: "scope",
-                    accessibilityLabel: "Find Ram",
+                    accessibilityLabel: String(localized: "Find Ram", bundle: .appLanguage, locale: .appLanguage),
                     tint: camera.isFollowingRam ? Color.primary : Color.accentColor,
                     action: { returnToRam() }
                 )
@@ -1585,7 +1729,7 @@ struct JourneyView: View {
 
             mapControlButton(
                 systemImage: "location.fill",
-                accessibilityLabel: "My Location",
+                accessibilityLabel: String(localized: "My Location", bundle: .appLanguage, locale: .appLanguage),
                 tint: camera.focus == .user ? Color.accentColor : Color.primary,
                 action: {
                     locationService.resolveCurrentLocation()
@@ -1741,7 +1885,7 @@ struct JourneyView: View {
                 Spacer(minLength: 12)
 
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text(ram.remainingSteps.formatted(.number.grouping(.automatic)))
+                    Text(ram.remainingSteps.formatted(.number.grouping(.automatic).locale(.appLanguage)))
                         .font(.system(.title3, design: .rounded).weight(.semibold).monospacedDigit())
                         .contentTransition(.numericText(value: Double(ram.remainingSteps)))
                         .animation(.snappy, value: ram.remainingSteps)
@@ -1813,7 +1957,7 @@ struct JourneyView: View {
                 .controlSize(.regular)
             }
 
-            if ram.status == .grazing || ram.status == .walking || ram.status == .waitingForHandoff {
+            if !ram.isGuest, ram.status == .grazing || ram.status == .walking || ram.status == .waitingForHandoff {
                 // Withdrawing a letter is a full slide, never a tap: this
                 // sheet gets dragged between detents constantly, and a
                 // tappable "Cancel" here would eventually be hit by
@@ -1838,13 +1982,13 @@ struct JourneyView: View {
     private func waitingHeadline(for ram: Ram) -> String {
         if let recipient = ram.letter?.recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
            !recipient.isEmpty {
-            return String(format: String(localized: "%@ is waiting"), recipient)
+            return String(format: String(localized: "%@ is waiting", bundle: .appLanguage, locale: .appLanguage), recipient)
         }
         if let passenger = ram.passengerLetters.first?.recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
            !passenger.isEmpty {
-            return String(format: String(localized: "%@ is waiting"), passenger)
+            return String(format: String(localized: "%@ is waiting", bundle: .appLanguage, locale: .appLanguage), passenger)
         }
-        return String(format: String(localized: "On the way to %@"), ram.targetCity)
+        return String(format: String(localized: "On the way to %@", bundle: .appLanguage, locale: .appLanguage), ram.targetCity)
     }
 
     private func nextLandmarkRow(_ landmark: NextLandmarkService.Landmark, for ram: Ram) -> some View {
@@ -1855,7 +1999,7 @@ struct JourneyView: View {
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Text("\(stepsAway.formatted(.number.grouping(.automatic))) steps to \(landmark.name)")
+            Text("\(stepsAway.formatted(.number.grouping(.automatic).locale(.appLanguage))) steps to \(landmark.name)")
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -1880,7 +2024,7 @@ struct JourneyView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
-            Text("\(stamp.kind.caption) \(stamp.placeName)")
+            Text("\(stamp.kind.caption) \(stamp.displayPlaceName)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -1895,19 +2039,19 @@ struct JourneyView: View {
     /// ultimately going to Frankfurt".
     private func routeSummary(for ram: Ram) -> some View {
         HStack(spacing: 6) {
-            routeStop(label: "Start", city: ram.currentCity, stage: .completed)
+            routeStop(label: String(localized: "Start", bundle: .appLanguage, locale: .appLanguage), city: ram.currentCity, stage: .completed)
 
             routeArrow(isActive: true)
 
             routeStop(
-                label: ram.requiresHandoffAtLegEnd ? "Handoff" : "Now",
+                label: ram.requiresHandoffAtLegEnd ? String(localized: "Handoff", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Now", bundle: .appLanguage, locale: .appLanguage),
                 city: ram.legDestinationCity,
                 stage: .active
             )
 
             routeArrow(isActive: false)
 
-            routeStop(label: "Final", city: ram.targetCity, stage: .upcoming)
+            routeStop(label: String(localized: "Final", bundle: .appLanguage, locale: .appLanguage), city: ram.targetCity, stage: .upcoming)
         }
     }
 
@@ -2076,8 +2220,8 @@ struct JourneyView: View {
             // "who/where" leads, "how far, tap to view" trails — this is
             // what stopped the pill's text from colliding with the
             // progress step cards underneath on compact screens.
-            let firstLine = isViewingUser ? "Ram is \(distance) away" : "You are here\(city)"
-            let secondLine = isViewingUser ? "Tap to view" : "\(distance) away • Tap to view"
+            let firstLine = isViewingUser ? String(localized: "Ram is \(distance) away", bundle: .appLanguage, locale: .appLanguage) : String(localized: "You are here\(city)", bundle: .appLanguage, locale: .appLanguage)
+            let secondLine = isViewingUser ? String(localized: "Tap to view", bundle: .appLanguage, locale: .appLanguage) : String(localized: "\(distance) away • Tap to view", bundle: .appLanguage, locale: .appLanguage)
 
             Button {
                 if isViewingUser {

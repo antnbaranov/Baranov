@@ -34,7 +34,7 @@ final class SavedRecipientCodeStore {
     func add(name: String, code: String, locationName: String?, locationCoordinate: RamCoordinate?, notes: String?) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let entry = SavedRecipientCode(
-            name: trimmedName.isEmpty ? String(localized: "Someone") : trimmedName,
+            name: trimmedName.isEmpty ? String(localized: "Someone", bundle: .appLanguage, locale: .appLanguage) : trimmedName,
             code: CourierCodeStore.formatted(code),
             locationName: locationName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             locationCoordinate: locationCoordinate,
@@ -47,6 +47,13 @@ final class SavedRecipientCodeStore {
     func update(_ entry: SavedRecipientCode) {
         guard let index = saved.firstIndex(where: { $0.id == entry.id }) else { return }
         saved[index] = entry
+        save()
+    }
+
+    /// Keeps the profile key the relay gave for this entry.
+    func cachePublicKey(_ key: String, for id: UUID) {
+        guard let index = saved.firstIndex(where: { $0.id == id }), saved[index].publicKey != key else { return }
+        saved[index].publicKey = key
         save()
     }
 

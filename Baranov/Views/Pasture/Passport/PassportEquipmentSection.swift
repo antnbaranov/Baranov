@@ -38,15 +38,15 @@ enum DistanceComparison: CaseIterable {
 
     func sentence(for totalMeters: Int) -> String {
         let count = Double(totalMeters) / meters
-        let number = count.formatted(.number.precision(.fractionLength(count < 10 ? 1 : 0)))
+        let number = count.formatted(.number.precision(.fractionLength(count < 10 ? 1 : 0)).locale(.appLanguage))
         switch self {
-        case .bananas: return String(localized: "That is \(number) bananas in a row. Peels not included.")
-        case .ramLengths: return String(localized: "That is \(number) rams nose to tail. Nobody is cutting in line.")
-        case .giraffes: return String(localized: "That is \(number) giraffes lying nose to tail.")
-        case .footballFields: return String(localized: "That is \(number) football fields, and not a single touchdown.")
-        case .eiffelTowers: return String(localized: "That is \(number) Eiffel Towers laid flat. Very flat.")
-        case .seawalls: return String(localized: "That is \(number) laps of the Stanley Park seawall.")
-        case .marathons: return String(localized: "That is \(number) marathons. On four legs. Showing off.")
+        case .bananas: return String(localized: "That is \(number) bananas in a row. Peels not included.", bundle: .appLanguage, locale: .appLanguage)
+        case .ramLengths: return String(localized: "That is \(number) rams nose to tail. Nobody is cutting in line.", bundle: .appLanguage, locale: .appLanguage)
+        case .giraffes: return String(localized: "That is \(number) giraffes lying nose to tail.", bundle: .appLanguage, locale: .appLanguage)
+        case .footballFields: return String(localized: "That is \(number) football fields, and not a single touchdown.", bundle: .appLanguage, locale: .appLanguage)
+        case .eiffelTowers: return String(localized: "That is \(number) Eiffel Towers laid flat. Very flat.", bundle: .appLanguage, locale: .appLanguage)
+        case .seawalls: return String(localized: "That is \(number) laps of the Stanley Park seawall.", bundle: .appLanguage, locale: .appLanguage)
+        case .marathons: return String(localized: "That is \(number) marathons. On four legs. Showing off.", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
@@ -104,6 +104,7 @@ struct PassportEquipmentSection: View {
     @State private var zeroIndex = 0
     @State private var isWritingLine = false
     @State private var flippedId: String?
+    @State private var comparisonTapTick = 0
     @State private var flipTick = 0
     @State private var shareImages: [String: UIImage] = [:]
     @State private var isReelPresented = false
@@ -129,9 +130,9 @@ struct PassportEquipmentSection: View {
     /// Three hand-written lines for a ram that has not moved yet.
     private var zeroLines: [String] {
         [
-            String(localized: "\(ramName) has not gone anywhere yet. Suspiciously relaxed."),
-            String(localized: "0 m so far. \(ramName) is still deciding which foot goes first."),
-            String(localized: "Not one step yet. The grass here is apparently excellent."),
+            String(localized: "\(ramName) has not gone anywhere yet. Suspiciously relaxed.", bundle: .appLanguage, locale: .appLanguage),
+            String(localized: "0 m so far. \(ramName) is still deciding which foot goes first.", bundle: .appLanguage, locale: .appLanguage),
+            String(localized: "Not one step yet. The grass here is apparently excellent.", bundle: .appLanguage, locale: .appLanguage),
         ]
     }
 
@@ -243,6 +244,7 @@ struct PassportEquipmentSection: View {
             JournalHeading(title: "Milestones", symbol: "trophy.fill")
             reelCard
             funFact
+            weatherFunFact
             deck
         }
         .padding(18)
@@ -312,7 +314,7 @@ struct PassportEquipmentSection: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     // MARK: Fun fact
@@ -331,25 +333,94 @@ struct PassportEquipmentSection: View {
                 .opacity(isWritingLine ? 0.4 : 1)
                 .id(currentLine)
                 .transition(.opacity)
+            // Icon-only, round and glassy — the same shape language as
+            // the reel's play button (`RamReelSheet`), so "there's more
+            // here, tap it" reads the same everywhere in the passport.
             Button {
+                comparisonTapTick += 1
                 nextComparison()
             } label: {
-                Label("Tap for another comparison", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 40)
-                    .liquidGlass(in: Capsule(style: .continuous), tint: .orange.opacity(0.25),
-                                 pressed: false, fallbackMaterial: .regularMaterial)
-                    .contentShape(Capsule(style: .continuous))
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 48, height: 48)
+                    .liquidGlass(in: Circle(), fallbackMaterial: .regularMaterial)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .sensoryFeedback(.impact(weight: .light), trigger: comparisonTapTick)
             .disabled(isWritingLine)
+            .accessibilityLabel("Tap for another comparison")
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: Weather fun fact
+
+    /// Every stamp that happened to get a WeatherKit reading, oldest first.
+    /// WeatherKit is best-effort and budget-capped, so this can be empty —
+    /// that's a normal, silent state, not an error.
+    private var weatherReadings: [StampWeather] {
+        stamps.compactMap(\.weather)
+    }
+
+    /// A symbol and one sentence summarizing every reading collected so
+    /// far, or `nil` until there is at least one. Favors a wet symbol when
+    /// any stop was wet, since that's the more memorable detail.
+    private var weatherSummary: (symbol: String, sentence: String)? {
+        guard !weatherReadings.isEmpty else { return nil }
+        let temps = weatherReadings.map(\.temperatureCelsius)
+        guard let coldest = temps.min(), let warmest = temps.max() else { return nil }
+        let wetCount = weatherReadings.filter(\.isWet).count
+        let symbol = weatherReadings.last(where: { $0.isWet })?.symbolName ?? weatherReadings.last!.symbolName
+
+        func degrees(_ celsius: Double) -> String {
+            Measurement(value: celsius.rounded(), unit: UnitTemperature.celsius)
+                .formatted(.measurement(width: .narrow).locale(.appLanguage))
+        }
+
+        let sentence: String
+        if coldest == warmest {
+            sentence = wetCount > 0
+                ? String(localized: "One reading so far: \(degrees(coldest)), rain along the way.", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "One reading so far: \(degrees(coldest)).", bundle: .appLanguage, locale: .appLanguage)
+        } else if wetCount > 0 {
+            sentence = wetCount == 1
+                ? String(localized: "From \(degrees(coldest)) to \(degrees(warmest)) — one stop caught in the rain.", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "From \(degrees(coldest)) to \(degrees(warmest)) — \(wetCount) stops caught in the rain.", bundle: .appLanguage, locale: .appLanguage)
+        } else {
+            sentence = String(localized: "From \(degrees(coldest)) to \(degrees(warmest)), dry the whole way.", bundle: .appLanguage, locale: .appLanguage)
+        }
+        return (symbol, sentence)
+    }
+
+    /// Renders nothing until at least one stamp has a real WeatherKit
+    /// reading — never a placeholder or a loading state.
+    @ViewBuilder
+    private var weatherFunFact: some View {
+        if let weatherSummary {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: weatherSummary.symbol)
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.primary)
+                    .frame(width: 28)
+                Text(weatherSummary.sentence)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .id(weatherSummary.sentence)
+                    .transition(.opacity)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(PassportInk.paper, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .animation(.easeInOut(duration: 0.25), value: weatherSummary.sentence)
+        }
     }
 
     // MARK: Deck
@@ -619,7 +690,7 @@ private struct ReelCardButton: View {
     private func tap() {
         if isThisRam, job.phase == .ready, let url = job.videoURL {
             let message = job.data?.shareMessage
-                ?? String(localized: "Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)")
+                ?? String(localized: "Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)", bundle: .appLanguage, locale: .appLanguage)
             ActivitySharer.present(items: [url, message])
         } else {
             action()

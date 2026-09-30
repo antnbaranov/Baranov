@@ -185,7 +185,7 @@ extension CNContact {
             return formatted
         }
         let organization = organizationName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return organization.isEmpty ? "Unknown Contact" : organization
+        return organization.isEmpty ? String(localized: "Unknown Contact", bundle: .appLanguage, locale: .appLanguage) : organization
     }
 
     /// This contact's postal addresses as flat, single-line display

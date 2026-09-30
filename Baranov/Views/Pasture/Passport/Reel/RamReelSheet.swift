@@ -95,6 +95,7 @@ struct RamReelSheet: View {
                 } else {
                     TimelineView(.animation(paused: isPaused)) { context in
                         RamReelScene(data: shown, time: playbackTime(at: context.date))
+                            .environment(\.locale, .appLanguage)
                             .scaleEffect(scale, anchor: .topLeading)
                             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                     }
@@ -178,7 +179,7 @@ struct RamReelSheet: View {
                 Image(systemName: shown.voice?.symbol ?? "waveform")
                     .symbolRenderingMode(.hierarchical)
                     .contentTransition(.symbolEffect(.replace))
-                Text(shown.voice?.name ?? String(localized: "Narrator"))
+                Text(shown.voice?.name ?? String(localized: "Narrator", bundle: .appLanguage, locale: .appLanguage))
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.secondary)
@@ -223,8 +224,8 @@ struct RamReelSheet: View {
                         ProgressView(value: isWriting ? nil : progress)
                             .progressViewStyle(.circular)
                         Text(isWriting
-                             ? String(localized: "Finding a narrator…")
-                             : String(localized: "Rendering… \(Int(progress * 100))%"))
+                             ? String(localized: "Finding a narrator…", bundle: .appLanguage, locale: .appLanguage)
+                             : String(localized: "Rendering… \(Int(progress * 100))%", bundle: .appLanguage, locale: .appLanguage))
                             .monospacedDigit()
                     }
                     .frame(maxWidth: .infinity)
@@ -262,8 +263,8 @@ private struct ReelRenderingPlaceholder: View {
                         .font(.largeTitle)
                         .foregroundStyle(.white.opacity(0.55))
                     Text(isWriting
-                         ? String(localized: "Finding a narrator…")
-                         : String(localized: "Rendering…"))
+                         ? String(localized: "Finding a narrator…", bundle: .appLanguage, locale: .appLanguage)
+                         : String(localized: "Rendering…", bundle: .appLanguage, locale: .appLanguage))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.75))
                 }

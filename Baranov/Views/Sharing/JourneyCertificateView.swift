@@ -91,11 +91,11 @@ struct JourneyCertificateView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 20) {
-                statBlock(value: DistanceFormatter.string(forMeters: metersWalked), label: "Walked")
+                statBlock(value: DistanceFormatter.string(forMeters: metersWalked), label: String(localized: "Walked", bundle: .appLanguage, locale: .appLanguage))
                 if let daysTraveled {
-                    statBlock(value: "\(daysTraveled)", label: daysTraveled == 1 ? "Day" : "Days")
+                    statBlock(value: "\(daysTraveled)", label: daysTraveled == 1 ? String(localized: "Day", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Days", bundle: .appLanguage, locale: .appLanguage))
                 }
-                statBlock(value: "\(carriers.count)", label: carriers.count == 1 ? "Carrier" : "Carriers")
+                statBlock(value: "\(carriers.count)", label: carriers.count == 1 ? String(localized: "Carrier", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Carriers", bundle: .appLanguage, locale: .appLanguage))
             }
             .padding(.top, 2)
         }
@@ -127,7 +127,7 @@ struct JourneyCertificateView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .frame(width: 18)
-                        Text(stamp.placeName)
+                        Text(stamp.displayPlaceName)
                             .font(.footnote.weight(.medium))
                             .lineLimit(1)
                         Spacer(minLength: 8)

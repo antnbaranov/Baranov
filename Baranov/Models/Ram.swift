@@ -43,13 +43,13 @@ enum RamStatus: String, Codable, Hashable, Sendable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .grazing: return "Grazing"
-        case .walking: return "Walking"
-        case .waitingForHandoff: return "At the Port"
-        case .atSea: return "At Sea"
-        case .handedOff: return "Handed On"
-        case .arrivedAtGate: return "At the Gate"
-        case .delivered: return "Delivered"
+        case .grazing: return String(localized: "Grazing", bundle: .appLanguage, locale: .appLanguage)
+        case .walking: return String(localized: "Walking", bundle: .appLanguage, locale: .appLanguage)
+        case .waitingForHandoff: return String(localized: "At the Port", bundle: .appLanguage, locale: .appLanguage)
+        case .atSea: return String(localized: "At Sea", bundle: .appLanguage, locale: .appLanguage)
+        case .handedOff: return String(localized: "Handed On", bundle: .appLanguage, locale: .appLanguage)
+        case .arrivedAtGate: return String(localized: "At the Gate", bundle: .appLanguage, locale: .appLanguage)
+        case .delivered: return String(localized: "Delivered", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
@@ -123,6 +123,26 @@ struct Ram: Identifiable, Codable, Hashable, Sendable {
     /// handoff — can be resolved without re-geocoding the destination
     /// city name, which could resolve differently a second time.
     var finalDestinationCoordinate: RamCoordinate
+    /// Where the phone holding this ram was when it took custody (received
+    /// it, or first saw it after dispatch), and when. A handoff never moves
+    /// the ram on the map; this is what later tells whether the phone has
+    /// actually travelled across the water since, so the ram can ride
+    /// along. Reset on every handoff — each carrier's trip is their own.
+    var custodyOrigin: RamCoordinate?
+    var custodySince: Date?
+    /// Someone else's letter this phone is only carrying. A guest rides in
+    /// the mailbag with the carrier's own ram — it takes no pasture pen,
+    /// walks on the same steps, and can be recalled by its sender.
+    var isGuest: Bool = false
+    /// Sender side: when "Take it back" was asked for a handed-on ram.
+    /// Cleared when the carrier gives it up and it comes home.
+    var recallRequestedAt: Date?
+    /// Recipient side: this letter is for the person holding this phone,
+    /// proven rather than guessed from a display name — the relay handed it
+    /// over under a code this phone holds, or the `.ram` carried a key only
+    /// this phone's profile could open. It can be opened here straight
+    /// away, wherever the phone happens to be.
+    var addressedToThisPhone: Bool = false
 
     init(
         id: UUID = UUID(),
@@ -168,6 +188,9 @@ struct Ram: Identifiable, Codable, Hashable, Sendable {
         case requiresHandoffAtLegEnd, letter, passengerLetters, stamps
         case voyage
         case finalDestinationCoordinate
+        case custodyOrigin, custodySince
+        case isGuest, recallRequestedAt
+        case addressedToThisPhone
     }
 
     /// A hand-written decode rather than the synthesized one, for the same
@@ -196,6 +219,29 @@ struct Ram: Identifiable, Codable, Hashable, Sendable {
         stamps = try container.decodeIfPresent([JourneyStamp].self, forKey: .stamps) ?? []
         voyage = try container.decodeIfPresent(SeaVoyage.self, forKey: .voyage)
         finalDestinationCoordinate = try container.decode(RamCoordinate.self, forKey: .finalDestinationCoordinate)
+        custodyOrigin = try container.decodeIfPresent(RamCoordinate.self, forKey: .custodyOrigin)
+        custodySince = try container.decodeIfPresent(Date.self, forKey: .custodySince)
+        isGuest = try container.decodeIfPresent(Bool.self, forKey: .isGuest) ?? false
+        recallRequestedAt = try container.decodeIfPresent(Date.self, forKey: .recallRequestedAt)
+        addressedToThisPhone = try container.decodeIfPresent(Bool.self, forKey: .addressedToThisPhone) ?? false
+    }
+
+    /// Whether water still lies between this ram and its destination:
+    /// walking toward a port, waiting on the quay, or already sailing.
+    /// Only these rams can ride along with a carrier — land is walked.
+    /// Handed over at its gate, to the person it was for: finished, not
+    /// merely passed along — so it can't be "taken back" and it belongs in
+    /// the archive.
+    var wasDeliveredInPerson: Bool {
+        status == .handedOff && stamps.last?.kind == .arrival
+    }
+
+    var hasWaterAhead: Bool {
+        switch status {
+        case .grazing, .walking: return requiresHandoffAtLegEnd
+        case .waitingForHandoff, .atSea: return true
+        case .handedOff, .arrivedAtGate, .delivered: return false
+        }
     }
 
     var progress: Double {

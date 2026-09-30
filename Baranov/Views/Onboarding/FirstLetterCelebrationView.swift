@@ -30,6 +30,9 @@ extension Notification.Name {
     /// Posted by the compose sheet each time a letter is dispatched;
     /// `RootView` decides whether it's the first.
     static let firstLetterDispatched = Notification.Name("com.baranov.firstLetterDispatched")
+    /// A tracked letter just left; `userInfo["message"]` is the tracking
+    /// message for the recipient. `RootView` offers the share sheet.
+    static let letterReadyToShare = Notification.Name("com.baranov.letterReadyToShare")
 }
 
 struct FirstLetterCelebrationView: View {
@@ -53,17 +56,17 @@ struct FirstLetterCelebrationView: View {
     /// "Anna", or "Grandma" from onboarding, or a neutral fallback.
     private var who: String {
         if !recipient.isEmpty { return recipient }
-        return missedPerson?.label ?? String(localized: "them")
+        return missedPerson?.label ?? String(localized: "them", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private var gateOwner: String {
-        if !recipient.isEmpty { return String(localized: "\(recipient)'s") }
-        return missedPerson?.possessive ?? String(localized: "their")
+        if !recipient.isEmpty { return String(localized: "\(recipient)'s", bundle: .appLanguage, locale: .appLanguage) }
+        return missedPerson?.possessive ?? String(localized: "their", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private var distanceText: String {
         Measurement(value: Double(moment.meters), unit: UnitLength.meters)
-            .formatted(.measurement(width: .abbreviated, usage: .road))
+            .formatted(.measurement(width: .abbreviated, usage: .road).locale(.appLanguage))
     }
 
     private var days: Int {
@@ -97,13 +100,13 @@ struct FirstLetterCelebrationView: View {
                         .foregroundStyle(.secondary)
 
                     NotificationPreviewCard(
-                        title: String(localized: "\(moment.ramName) is at \(gateOwner) gate"),
-                        message: String(localized: "The seal is waiting. Share the ear tag and let them break it."),
-                        time: String(localized: "in about \(days) days"),
+                        title: String(localized: "\(moment.ramName) is at \(gateOwner) gate", bundle: .appLanguage, locale: .appLanguage),
+                        message: String(localized: "The seal is waiting. Share the ear tag and let them break it.", bundle: .appLanguage, locale: .appLanguage),
+                        time: String(localized: "in about \(days) days", bundle: .appLanguage, locale: .appLanguage),
                         fill: AnyShapeStyle(Color(.secondarySystemGroupedBackground))
                     )
 
-                    Text("An estimate at \(Self.assumedStepsPerDay.formatted()) steps a day. Every step you take moves \(moment.ramName) one metre closer.")
+                    Text("An estimate at \(Self.assumedStepsPerDay.formatted(.number.locale(.appLanguage))) steps a day. Every step you take moves \(moment.ramName) one metre closer.")
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)

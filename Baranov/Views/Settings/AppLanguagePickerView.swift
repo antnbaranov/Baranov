@@ -2,19 +2,16 @@
 //  AppLanguagePickerView.swift
 //  Baranov
 //
-//  A full, searchable list of languages to save as a preference — pushed
-//  from the "Language" row on Pasture (`PastureView`). Honest about what
-//  it does right now: Baranov only actually ships English copy today, so
-//  picking anything else here doesn't retranslate the app yet — it just
-//  saves the preference (`@AppStorage`, `AppLanguagePickerView.storageKey`)
-//  for whenever real localization lands, rather than pretending to be a
-//  working language switcher it isn't.
+//  A full, searchable list of languages — pushed from the "Language" row.
+//  SwiftUI text follows the pick through `.environment(\.locale, …)` at the
+//  root; strings built in code follow it through `AppLanguage`
+//  (`bundle: .appLanguage`), so the whole app switches at once.
 //
 
 import SwiftUI
 
 struct AppLanguagePickerView: View {
-    static let storageKey = "com.baranov.appLanguageCode"
+    static let storageKey = AppLanguage.storageKey
 
     /// Full set of App Store Connect supported languages and all European languages
     static let languageCodes: [String] = [
@@ -86,6 +83,11 @@ struct AppLanguagePickerView: View {
                 ForEach(filteredLanguages) { language in
                     Button {
                         selectedCode = language.code
+                        // System-drawn text (permission prompts, share sheet)
+                        // follows on next launch; scheduled notifications are
+                        // rewritten now so they arrive in the new language.
+                        AppLanguage.applyToSystem(language.code)
+                        NotificationCenter.default.post(name: RamNotificationService.preferencesChanged, object: nil)
                         dismiss()
                     } label: {
                         HStack {
@@ -101,14 +103,17 @@ struct AppLanguagePickerView: View {
                             Spacer()
                             if language.code == selectedCode || (selectedCode.starts(with: language.code) && language.code == "en" && selectedCode == "en-US") {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(.tint)
+                                    .foregroundStyle(.primary)
                             }
                         }
                     }
                 }
+            } footer: {
+                Text("Apple Maps text and system prompts switch to the new language after you restart Baranov.")
             }
         }
         .searchable(text: $searchText, prompt: "Search Languages")
+        .tint(.primary)
         .navigationTitle("Language")
         .navigationBarTitleDisplayMode(.inline)
     }

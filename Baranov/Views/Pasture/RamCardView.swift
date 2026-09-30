@@ -54,7 +54,7 @@ struct RamCardView: View {
 
                 statsRow
 
-                if ram.status == .waitingForHandoff || ram.status == .atSea {
+                if ram.hasWaterAhead {
                     PassageNoticeView(ram: ram)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
@@ -303,11 +303,11 @@ struct RamCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel({
-            var label = "Route: \(ram.currentCity) to \(ram.targetCity). \(Int(ram.progress * 100)) percent complete"
+            var label = String(localized: "Route: \(ram.currentCity) to \(ram.targetCity). \(Int(ram.progress * 100)) percent complete", bundle: .appLanguage, locale: .appLanguage)
             if ram.remainingSteps > 0 {
-                label += ", \(DistanceFormatter.string(forMeters: ram.remainingSteps)) remaining"
+                label += String(localized: ", \(DistanceFormatter.string(forMeters: ram.remainingSteps)) remaining", bundle: .appLanguage, locale: .appLanguage)
             } else {
-                label += ", arrived"
+                label += String(localized: ", arrived", bundle: .appLanguage, locale: .appLanguage)
             }
             return label
         }())
@@ -383,7 +383,7 @@ struct RamCardView: View {
             // Only this ram's own letter — not a passenger it picked up
             // along the way, which isn't this sender's to hand a code
             // out for.
-            if !isPassenger, let shareMessage = letter.shareMessage(carrierName: ram.name) {
+            if !isPassenger, let shareMessage = ram.letterShareMessage {
                 shareCodeButton(shareMessage)
             }
         }
@@ -404,13 +404,13 @@ struct RamCardView: View {
     }
 
     private func letterRowLabel(for letter: Letter, isPassenger: Bool) -> String {
-        let kind = letter.isEncrypted ? "a sealed letter" : "an open postcard"
+        let kind = letter.isEncrypted ? String(localized: "a sealed letter", bundle: .appLanguage, locale: .appLanguage) : String(localized: "an open postcard", bundle: .appLanguage, locale: .appLanguage)
         guard isPassenger else {
-            return letter.isSealed ? "Carrying \(kind) from \(letter.senderName)" : "Delivered from \(letter.senderName)"
+            return letter.isSealed ? String(localized: "Carrying \(kind) from \(letter.senderName)", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Delivered from \(letter.senderName)", bundle: .appLanguage, locale: .appLanguage)
         }
         return letter.isSealed
-            ? "Also carrying \(kind) from \(letter.senderName)"
-            : "Also carried a letter from \(letter.senderName)"
+            ? String(localized: "Also carrying \(kind) from \(letter.senderName)", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "Also carried a letter from \(letter.senderName)", bundle: .appLanguage, locale: .appLanguage)
     }
 }
 

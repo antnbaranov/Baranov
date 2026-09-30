@@ -7,10 +7,10 @@
 //  What it sells, and what it refuses to: one ram — writing, walking,
 //  handing off, receiving, breaking the seal — is free forever and is
 //  never gated here or anywhere. The pasture expansion is for people who
-//  want to run five rams at once and seal in colours other than crimson;
+//  want to run five rams at once;
 //  adopting a ram is the one-time alternative for people who'd rather own
 //  a second ram than rent a pasture. The screen only ever appears when
-//  someone actually bumps into the limit (a third ram, a locked wax), not
+//  someone actually bumps into the limit (a third ram), not
 //  on launch, not on a timer.
 //
 //  Styled after the highest-converting RevenueCat paywall patterns — a
@@ -32,6 +32,7 @@
 import Foundation
 import RevenueCat
 import RevenueCatUI
+import StoreKit
 import SwiftUI
 
 /// A modal paywall sheet offering the pasture expansion and ram adoption.
@@ -41,8 +42,7 @@ import SwiftUI
 /// demonstration of what the purchase actually changes, not a bullet
 /// list. The pasture at the top shows the person's own ram alone, then
 /// — a beat after the sheet opens, and again whenever they pick a plan —
-/// the locked pens open and more rams walk in. The wax row seals a real
-/// envelope in whichever colour they tap. The plan toggle morphs the price
+/// the locked pens open and more rams walk in. The plan toggle morphs the price
 /// in place. Nothing here is a picture of a feature; it's the feature in
 /// miniature.
 struct PasturePaywallView: View {
@@ -55,21 +55,21 @@ struct PasturePaywallView: View {
     @State private var isCustomerCenterPresented = false
     @State private var unlockTick = 0
 
+    /// The wax the paywall's seal demo is currently showing.
+    @State private var demoWax: SealColor = .crimson
+    @State private var waxTick = 0
+
     /// How many pens the pasture scene is currently showing open — starts
     /// at what the person really has, then previews what the selected
     /// plan would give them.
     @State private var previewedSlots = 1
     @State private var hasRunIntro = false
 
-    /// The wax the demo envelope is currently sealed with.
-    @State private var demoWax: SealColor = .crimson
-    @State private var waxTick = 0
-
     @State private var legalDocument: LegalDocument?
-    private let termsOfUseURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    @State private var isRedeemSheetPresented = false
 
     private var companionName: String {
-        companionStore.companion?.name ?? "Your ram"
+        companionStore.companion?.name ?? String(localized: "Your ram", bundle: .appLanguage, locale: .appLanguage)
     }
 
     /// Slots the selected option would unlock — what the scene previews.
@@ -89,8 +89,12 @@ struct PasturePaywallView: View {
                     } else {
                         planPicker
                     }
+                    PaywallUnlockShowcase()
                     waxDemo
-                    featureList
+                    scratchDemo
+                    if !entitlementService.hasPastureExpansion {
+                        promoCodeCard
+                    }
                     walkedSoFar
                 }
                 .frame(maxWidth: .infinity)
@@ -98,8 +102,14 @@ struct PasturePaywallView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 210)
             }
-            .background(.regularMaterial)
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationBarTitleDisplayMode(.inline)
+            .offerCodeRedemption(isPresented: $isRedeemSheetPresented) { result in
+                if case .success = result {
+                    Task { await entitlementService.refresh() }
+                }
+            }
             .toolbar {
                 // Same standard close control as Pasture.
                 ToolbarItem(placement: .topBarLeading) {
@@ -147,7 +157,6 @@ struct PasturePaywallView: View {
                 }
             }
             .sensoryFeedback(.success, trigger: unlockTick)
-            .sensoryFeedback(.impact(weight: .light), trigger: waxTick)
             .presentCustomerCenter(isPresented: $isCustomerCenterPresented)
         }
     }
@@ -178,11 +187,11 @@ struct PasturePaywallView: View {
     /// name until translated in the catalog.
     private static var previewRamNames: [String] {
         [
-            String(localized: "Juniper", comment: "Sample ram name shown in the paywall's pasture preview. A name that would suit a farm animal — keep all 5 preview ram names in the same language/script as each other when translating."),
-            String(localized: "Basalt", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
-            String(localized: "Thistle", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
-            String(localized: "Clove", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
-            String(localized: "Ember", comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Juniper", bundle: .appLanguage, locale: .appLanguage, comment: "Sample ram name shown in the paywall's pasture preview. A name that would suit a farm animal — keep all 5 preview ram names in the same language/script as each other when translating."),
+            String(localized: "Basalt", bundle: .appLanguage, locale: .appLanguage, comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Thistle", bundle: .appLanguage, locale: .appLanguage, comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Clove", bundle: .appLanguage, locale: .appLanguage, comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
+            String(localized: "Ember", bundle: .appLanguage, locale: .appLanguage, comment: "Sample ram name shown in the paywall's pasture preview. See note on \"Juniper\": keep all 5 names in one language/script."),
         ]
     }
 
@@ -213,7 +222,7 @@ struct PasturePaywallView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .paywallCard(cornerRadius: 22)
     }
 
     private var sceneCaption: LocalizedStringKey {
@@ -232,7 +241,7 @@ struct PasturePaywallView: View {
                 .font(.title.bold())
                 .multilineTextAlignment(.center)
 
-            Text("More rams out at once, and every colour of wax to seal them with.")
+            Text("More rams out at once, each with a name of its own.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -286,46 +295,99 @@ struct PasturePaywallView: View {
         }
     }
 
+    // MARK: - Scratch-off demo
+
+    /// The same full-width, standalone treatment the wax row used to get:
+    /// one real, working feature front and center, not a card buried in a
+    /// strip — this is the actual `ScratchOffRevealView` used on a real
+    /// arrival, just placed here with a throwaway secret to try.
+    private var scratchDemo: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Scratch-off secrets")
+                    .font(.subheadline.weight(.semibold))
+                Text("A second line the recipient uncovers by hand. Try it below.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            ScratchOffRevealView(secretText: String(localized: "P.S. I still have your umbrella.", bundle: .appLanguage, locale: .appLanguage))
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .paywallCard()
+    }
+
+    // MARK: - Promo code
+
+    /// Where App Store offer codes and gift-card codes go: Apple's own
+    /// redeem sheet, presented directly. It takes the code itself and the
+    /// new entitlement then arrives through RevenueCat as usual.
+    private var promoCodeCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Promo code")
+                .font(.subheadline.weight(.semibold))
+            Button {
+                isRedeemSheetPresented = true
+            } label: {
+                Label("Redeem", systemImage: "gift")
+            }
+            .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            Text("App Store and gift card codes open Apple's own redeem sheet.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .paywallCard()
+    }
+
     // MARK: - Wax demo
 
+    /// The wax the recipient breaks. A real `WaxSealView` on a small
+    /// envelope, with every colour one tap away; the rare finishes shimmer
+    /// as the phone tilts, exactly as they do on a real letter.
     private var waxDemo: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(.thickMaterial)
-                        .frame(width: 96, height: 62)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(.secondary.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(uiColor: .systemGroupedBackground))
+                    .frame(width: 104, height: 72)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color(uiColor: .separator), lineWidth: 0.5)
+                    )
+                    .overlay {
+                        WaxSealView(
+                            wax: demoWax,
+                            monogram: String(companionName.prefix(1)).uppercased(),
+                            diameter: 44
                         )
-                    Circle()
-                        .fill(demoWax.color)
-                        .frame(width: 26, height: 26)
-                        .overlay(Image(systemName: "seal.fill").font(.caption).foregroundStyle(.white))
                         .id(demoWax)
-                        .transition(.scale(scale: 0.4).combined(with: .opacity))
-                }
+                        .transition(.scale(scale: 0.5).combined(with: .opacity))
+                    }
+                    .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Seal in \(demoWax.displayName.lowercased())")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Seal it in \(demoWax.displayName.lowercased())")
                         .font(.subheadline.weight(.semibold))
                         .contentTransition(.opacity)
-                    Text(demoWax.isIncludedFree
-                         ? "Crimson is every shepherd's. Tap another wax."
-                         : "Comes with the pasture. The recipient breaks the colour you chose.")
+                    Text(demoWax.hasShimmer
+                         ? "Catches the light, even before you tilt the phone."
+                         : "Crimson is free. The recipient breaks the colour you chose.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 0)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(SealColor.allCases) { wax in
                         Button {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) { demoWax = wax }
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.65)) { demoWax = wax }
                             waxTick += 1
                         } label: {
                             ZStack {
@@ -333,54 +395,20 @@ struct PasturePaywallView: View {
                                 if demoWax == wax {
                                     Circle().strokeBorder(.primary, lineWidth: 2).frame(width: 34, height: 34)
                                 }
-                                if !wax.isIncludedFree, !entitlementService.hasPastureExpansion {
-                                    Image(systemName: "lock.fill")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(.white.opacity(0.9))
-                                }
                             }
-                            .frame(width: 34, height: 34)
+                            .frame(width: 36, height: 36)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(wax.displayName) wax")
+                        .accessibilityAddTraits(demoWax == wax ? .isSelected : [])
                     }
                 }
-                .frame(minWidth: 0, maxWidth: .infinity)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-
-    // MARK: - Feature list
-
-    private var featureList: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            FeatureRow(
-                symbol: "pawprint.fill",
-                title: "Five Rams at Once",
-                subtitle: "Five letters walking to five people at the same time."
-            )
-            FeatureRow(
-                symbol: "seal.fill",
-                title: "Every Wax Colour, Plus Three Rare Ones",
-                subtitle: "Gold to obsidian black — including three shimmering rare finishes and heirloom parchment."
-            )
-            FeatureRow(
-                symbol: "lock.clock.fill",
-                title: "Time-Capsules & Geo-Locks",
-                subtitle: "Hold a letter for a future date, or lock it to a real spot on the ground."
-            )
-            FeatureRow(
-                symbol: "sparkles",
-                title: "Scratch-Off Secrets",
-                subtitle: "Hide a second line behind a foil the recipient scratches clear by hand."
-            )
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .paywallCard()
+        .sensoryFeedback(.selection, trigger: waxTick)
     }
 
     // MARK: - Already subscribed
@@ -389,18 +417,18 @@ struct PasturePaywallView: View {
         VStack(spacing: 10) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(.green)
+                .foregroundStyle(.primary)
                 .symbolRenderingMode(.hierarchical)
             Text("Your pasture is expanded")
                 .font(.headline)
-            Text("Five rams, every wax. Thank you for keeping a slow post alive.")
+            Text("Five rams out at once. Thank you for keeping a slow post alive.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .paywallCard()
     }
 
     // MARK: - What you've walked
@@ -506,7 +534,7 @@ struct PasturePaywallView: View {
                 Button("Privacy") { legalDocument = .privacy }
                 Text("·")
                     .foregroundStyle(.tertiary)
-                Link("Terms", destination: termsOfUseURL)
+                Button("Terms") { legalDocument = .terms }
             }
             .buttonStyle(.plain)
             .font(.caption)
@@ -575,7 +603,7 @@ private struct PlanRow: View {
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.thinMaterial, in: Capsule())
+                            .background(Color(uiColor: .systemGray5), in: Capsule())
                             .foregroundStyle(.primary)
                     }
                     Text(subtitle)
@@ -598,7 +626,7 @@ private struct PlanRow: View {
             .frame(maxWidth: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemBackground))
+                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -606,7 +634,7 @@ private struct PlanRow: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(title), \(option.priceString) \(option.isOneTime ? "once" : option.periodDescription)")
+        .accessibilityLabel("\(title), \(option.priceString) \(option.isOneTime ? String(localized: "once", bundle: .appLanguage, locale: .appLanguage) : option.periodDescription)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -661,7 +689,7 @@ private struct PasturePenView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .animation(.spring(response: 0.7, dampingFraction: 0.8).delay(Double(index) * 0.14), value: isOpen)
 
-            Text(isOpen ? name : (isOwned ? "Open" : "Locked"))
+            Text(isOpen ? name : (isOwned ? String(localized: "Open", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Locked", bundle: .appLanguage, locale: .appLanguage)))
                 .font(.system(size: 10, weight: isOpen ? .semibold : .regular))
                 .foregroundStyle(isOpen ? .primary : .tertiary)
                 .lineLimit(1)
@@ -669,41 +697,6 @@ private struct PasturePenView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(isOpen ? "\(name), pen open" : "Locked pen")
-    }
-}
-
-// MARK: - Feature Row
-
-private struct FeatureRow: View {
-    let symbol: String
-    let title: LocalizedStringKey
-    let subtitle: LocalizedStringKey
-
-    @State private var bounce = 0
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.secondary)
-                .frame(width: 26)
-                .symbolEffect(.bounce, value: bounce)
-                .task {
-                    try? await Task.sleep(for: .milliseconds(1_500))
-                    bounce += 1
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 0)
-        }
     }
 }
 
@@ -729,9 +722,9 @@ struct PaywallOption: Identifiable {
     /// "/ year", "/ month" — the price's small suffix in a plan row.
     var shortPeriod: String {
         switch approximateDays {
-        case 7: return "/ week"
-        case 30: return "/ month"
-        case 365: return "/ year"
+        case 7: return String(localized: "/ week", bundle: .appLanguage, locale: .appLanguage)
+        case 30: return String(localized: "/ month", bundle: .appLanguage, locale: .appLanguage)
+        case 365: return String(localized: "/ year", bundle: .appLanguage, locale: .appLanguage)
         default: return periodDescription
         }
     }
@@ -747,24 +740,24 @@ struct PaywallOption: Identifiable {
         id = package.identifier
         switch package.packageType {
         case .weekly:
-            title = "Weekly"; periodDescription = "per week"; approximateDays = 7
+            title = String(localized: "Weekly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per week", bundle: .appLanguage, locale: .appLanguage); approximateDays = 7
         case .monthly:
-            title = "Monthly"; periodDescription = "per month"; approximateDays = 30
+            title = String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per month", bundle: .appLanguage, locale: .appLanguage); approximateDays = 30
         case .twoMonth:
-            title = "Every 2 Months"; periodDescription = "every 2 months"; approximateDays = 60
+            title = String(localized: "Every 2 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 2 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 60
         case .threeMonth:
-            title = "Every 3 Months"; periodDescription = "every 3 months"; approximateDays = 90
+            title = String(localized: "Every 3 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 3 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 90
         case .sixMonth:
-            title = "Every 6 Months"; periodDescription = "every 6 months"; approximateDays = 180
+            title = String(localized: "Every 6 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 6 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 180
         case .annual:
-            title = "Annual"; periodDescription = "per year"; approximateDays = 365
+            title = String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per year", bundle: .appLanguage, locale: .appLanguage); approximateDays = 365
         case .lifetime:
-            title = "Adopt a Ram"; periodDescription = "one-time purchase"; approximateDays = nil
+            title = String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage); approximateDays = nil
         default:
             if product.subscriptionPeriod == nil {
-                title = "Adopt a Ram"; periodDescription = "one-time purchase"; approximateDays = nil
+                title = String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage); approximateDays = nil
             } else {
-                title = product.localizedTitle.isEmpty ? "Custom" : product.localizedTitle
+                title = product.localizedTitle.isEmpty ? String(localized: "Custom", bundle: .appLanguage, locale: .appLanguage) : product.localizedTitle
                 periodDescription = ""; approximateDays = nil
             }
         }
@@ -866,7 +859,7 @@ final class PasturePaywallViewModel {
         defer { isPurchasing = false }
 
         guard let selectedOption else {
-            present(error: "This offer isn't available right now. Please try again later.")
+            present(error: String(localized: "This offer isn't available right now. Please try again later.", bundle: .appLanguage, locale: .appLanguage))
             return
         }
 
@@ -878,8 +871,9 @@ final class PasturePaywallViewModel {
         do {
             let result = try await Purchases.shared.purchase(package: package)
             if result.userCancelled { return }
-            if result.customerInfo.entitlements.active.isEmpty {
-                present(error: "Your purchase couldn't be completed. Please try again.")
+            let info = result.customerInfo
+            if info.entitlements.active.isEmpty && info.activeSubscriptions.isEmpty && info.nonSubscriptions.isEmpty {
+                present(error: String(localized: "Your purchase couldn't be completed. Please try again.", bundle: .appLanguage, locale: .appLanguage))
             } else {
                 // `EntitlementService`'s delegate callback will catch this
                 // too, but refreshing explicitly means the pasture unlocks
@@ -887,7 +881,10 @@ final class PasturePaywallViewModel {
                 await entitlementService?.refresh()
             }
         } catch {
-            present(error: "Your purchase couldn't be completed. Please try again.")
+            #if DEBUG
+            print("[Paywall] purchase failed: \(error)")
+            #endif
+            present(error: String(localized: "Your purchase couldn't be completed. Please try again.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 
@@ -897,7 +894,7 @@ final class PasturePaywallViewModel {
         defer { isRestoring = false }
 
         guard Purchases.isConfigured else {
-            present(error: "Purchases aren't configured in this build.")
+            present(error: String(localized: "Purchases aren't configured in this build.", bundle: .appLanguage, locale: .appLanguage))
             return
         }
 
@@ -905,7 +902,7 @@ final class PasturePaywallViewModel {
             _ = try await Purchases.shared.restorePurchases()
             await entitlementService?.refresh()
         } catch {
-            present(error: "We couldn't restore your purchases. Please try again.")
+            present(error: String(localized: "We couldn't restore your purchases. Please try again.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 
@@ -928,7 +925,7 @@ final class PasturePaywallViewModel {
         let ratio = Double(truncating: (thisWeekly / mostExpensive) as NSDecimalNumber)
         let percentOff = Int(((1 - ratio) * 100).rounded())
         guard percentOff >= 5 else { return nil }
-        return "Best value · save \(percentOff)%"
+        return String(localized: "Best value · save \(percentOff)%", bundle: .appLanguage, locale: .appLanguage)
     }
 
     /// The subscription with the lowest normalized weekly price — what
@@ -967,10 +964,10 @@ final class PasturePaywallViewModel {
     /// RevenueCat dashboard — for design review and demos without a key.
     private static var sampleOptions: [PaywallOption] {
         [
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: "Monthly", periodDescription: "per month", priceString: "$2.99", price: 2.99, approximateDays: 30),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureQuarterly, title: "Every 3 Months", periodDescription: "every 3 months", priceString: "$5.99", price: 5.99, approximateDays: 90),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: "Annual", periodDescription: "per year", priceString: "$19.99", price: 19.99, approximateDays: 365, hasIntroductoryOffer: true),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: "Adopt a Ram", periodDescription: "one-time purchase", priceString: "$2.99", price: 2.99, approximateDays: nil),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per month", bundle: .appLanguage, locale: .appLanguage), priceString: "$2.99", price: 2.99, approximateDays: 30),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureQuarterly, title: String(localized: "Every 3 Months", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "every 3 months", bundle: .appLanguage, locale: .appLanguage), priceString: "$5.99", price: 5.99, approximateDays: 90),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per year", bundle: .appLanguage, locale: .appLanguage), priceString: "$19.99", price: 19.99, approximateDays: 365, hasIntroductoryOffer: true),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage), priceString: "$2.99", price: 2.99, approximateDays: nil),
         ]
     }
 }

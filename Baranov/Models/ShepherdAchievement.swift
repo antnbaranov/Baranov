@@ -29,23 +29,23 @@ enum ShepherdAchievement: String, CaseIterable, Identifiable, Sendable {
 
     var title: String {
         switch self {
-        case .firstLetter: return "First Letter"
-        case .sealBroken: return "Seal Broken"
-        case .tenKilometres: return "10 km on Hoof"
-        case .hundredKilometres: return "100 km on Hoof"
-        case .oceanCrossing: return "Ocean Crossing"
-        case .fullPasture: return "Full Pasture"
+        case .firstLetter: return String(localized: "First Letter", bundle: .appLanguage, locale: .appLanguage)
+        case .sealBroken: return String(localized: "Seal Broken", bundle: .appLanguage, locale: .appLanguage)
+        case .tenKilometres: return String(localized: "10 km on Hoof", bundle: .appLanguage, locale: .appLanguage)
+        case .hundredKilometres: return String(localized: "100 km on Hoof", bundle: .appLanguage, locale: .appLanguage)
+        case .oceanCrossing: return String(localized: "Ocean Crossing", bundle: .appLanguage, locale: .appLanguage)
+        case .fullPasture: return String(localized: "Full Pasture", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
     var caption: String {
         switch self {
-        case .firstLetter: return "Send a ram on its way."
-        case .sealBroken: return "A letter reached its gate and was opened."
-        case .tenKilometres: return "Your rams have walked ten kilometres."
-        case .hundredKilometres: return "Your rams have walked a hundred kilometres."
-        case .oceanCrossing: return "Hand a ram to someone at a coast or border."
-        case .fullPasture: return "Every pen full — five rams out walking at once."
+        case .firstLetter: return String(localized: "Send a ram on its way.", bundle: .appLanguage, locale: .appLanguage)
+        case .sealBroken: return String(localized: "A letter reached its gate and was opened.", bundle: .appLanguage, locale: .appLanguage)
+        case .tenKilometres: return String(localized: "Your rams have walked ten kilometres.", bundle: .appLanguage, locale: .appLanguage)
+        case .hundredKilometres: return String(localized: "Your rams have walked a hundred kilometres.", bundle: .appLanguage, locale: .appLanguage)
+        case .oceanCrossing: return String(localized: "Hand a ram to someone at a coast or border.", bundle: .appLanguage, locale: .appLanguage)
+        case .fullPasture: return String(localized: "Every pen full — five rams out walking at once.", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 

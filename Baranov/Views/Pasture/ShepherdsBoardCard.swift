@@ -112,11 +112,17 @@ struct ShepherdsBoardCard: View {
                         .font(.title3.weight(.bold).monospacedDigit())
                         .contentTransition(.numericText())
                         .animation(.snappy, value: localEntry.rank)
-                    Text(totalPlayers > 0 ? "of \(totalPlayers) shepherds" : "on the board")
+                    Text(totalPlayers > 0
+                        ? String(localized: "of \(totalPlayers) shepherds", bundle: .appLanguage, locale: .appLanguage)
+                        : String(localized: "on the board", bundle: .appLanguage, locale: .appLanguage))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text(isAuthenticated ? "Not ranked yet" : (isCheckingSignIn ? "Checking…" : "Not signed in"))
+                    Text(isAuthenticated
+                        ? String(localized: "Not ranked yet", bundle: .appLanguage, locale: .appLanguage)
+                        : (isCheckingSignIn
+                            ? String(localized: "Checking…", bundle: .appLanguage, locale: .appLanguage)
+                            : String(localized: "Not signed in", bundle: .appLanguage, locale: .appLanguage)))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -317,7 +323,7 @@ struct ShepherdsBoardCard: View {
                     .font(.caption.weight(.bold).monospacedDigit())
                     .foregroundStyle(row.rank <= 3 ? Color.accentColor : Color.secondary)
             }
-            Text(row.isLocalPlayer ? "You" : row.displayName)
+            Text(row.isLocalPlayer ? String(localized: "You", bundle: .appLanguage, locale: .appLanguage) : row.displayName)
                 .font(.subheadline.weight(row.isLocalPlayer ? .semibold : .regular))
                 .lineLimit(1)
             Spacer()

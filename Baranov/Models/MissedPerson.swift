@@ -26,24 +26,24 @@ enum MissedPerson: String, CaseIterable, Identifiable, Sendable {
     /// How the person reads in a sentence ("walks it to Grandma").
     var label: String {
         switch self {
-        case .grandma: return String(localized: "Grandma")
-        case .parents: return String(localized: "Mom & Dad")
-        case .friend: return String(localized: "an old friend")
-        case .partner: return String(localized: "someone you love")
-        case .sibling: return String(localized: "your sibling")
-        case .someone: return String(localized: "someone")
+        case .grandma: return String(localized: "Grandma", bundle: .appLanguage, locale: .appLanguage)
+        case .parents: return String(localized: "Mom & Dad", bundle: .appLanguage, locale: .appLanguage)
+        case .friend: return String(localized: "an old friend", bundle: .appLanguage, locale: .appLanguage)
+        case .partner: return String(localized: "someone you love", bundle: .appLanguage, locale: .appLanguage)
+        case .sibling: return String(localized: "your sibling", bundle: .appLanguage, locale: .appLanguage)
+        case .someone: return String(localized: "someone", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
     /// The short chip title.
     var chipTitle: String {
         switch self {
-        case .grandma: return String(localized: "Grandma")
-        case .parents: return String(localized: "Parents")
-        case .friend: return String(localized: "A friend")
-        case .partner: return String(localized: "Partner")
-        case .sibling: return String(localized: "Sibling")
-        case .someone: return String(localized: "Someone else")
+        case .grandma: return String(localized: "Grandma", bundle: .appLanguage, locale: .appLanguage)
+        case .parents: return String(localized: "Parents", bundle: .appLanguage, locale: .appLanguage)
+        case .friend: return String(localized: "A friend", bundle: .appLanguage, locale: .appLanguage)
+        case .partner: return String(localized: "Partner", bundle: .appLanguage, locale: .appLanguage)
+        case .sibling: return String(localized: "Sibling", bundle: .appLanguage, locale: .appLanguage)
+        case .someone: return String(localized: "Someone else", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
@@ -62,12 +62,12 @@ enum MissedPerson: String, CaseIterable, Identifiable, Sendable {
     /// specific — and how long ago.
     var lastMessage: (text: String, ago: String) {
         switch self {
-        case .grandma: return ("🎂", String(localized: "3 weeks ago"))
-        case .parents: return ("ok 👍", String(localized: "2 weeks ago"))
-        case .friend: return ("lol we should catch up", String(localized: "2 months ago"))
-        case .partner: return ("miss you", String(localized: "yesterday"))
-        case .sibling: return ("call me when you're free?", String(localized: "5 weeks ago"))
-        case .someone: return ("👍", String(localized: "a while ago"))
+        case .grandma: return ("🎂", String(localized: "3 weeks ago", bundle: .appLanguage, locale: .appLanguage))
+        case .parents: return ("ok 👍", String(localized: "2 weeks ago", bundle: .appLanguage, locale: .appLanguage))
+        case .friend: return (String(localized: "lol we should catch up", bundle: .appLanguage, locale: .appLanguage), String(localized: "2 months ago", bundle: .appLanguage, locale: .appLanguage))
+        case .partner: return (String(localized: "miss you", bundle: .appLanguage, locale: .appLanguage), String(localized: "yesterday", bundle: .appLanguage, locale: .appLanguage))
+        case .sibling: return (String(localized: "call me when you're free?", bundle: .appLanguage, locale: .appLanguage), String(localized: "5 weeks ago", bundle: .appLanguage, locale: .appLanguage))
+        case .someone: return ("👍", String(localized: "a while ago", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 
@@ -84,9 +84,9 @@ enum MissedPerson: String, CaseIterable, Identifiable, Sendable {
     /// neutral word otherwise.
     var possessive: String {
         switch self {
-        case .grandma: return String(localized: "Grandma's")
-        case .parents: return String(localized: "Mom & Dad's")
-        default: return String(localized: "their")
+        case .grandma: return String(localized: "Grandma's", bundle: .appLanguage, locale: .appLanguage)
+        case .parents: return String(localized: "Mom & Dad's", bundle: .appLanguage, locale: .appLanguage)
+        default: return String(localized: "their", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 }

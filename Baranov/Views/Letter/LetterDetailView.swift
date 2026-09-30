@@ -117,7 +117,18 @@ struct LetterDetailView: View {
         distanceToGate.map { $0 <= Ram.pickupRadiusMeters }
     }
 
-    private var isVerifiedRecipient: Bool { recipientNameMatches && isAtPickupSpot == true }
+    /// The recipient, able to open it here: proven by the post office or a
+    /// key only this phone could open (wherever they are), or by name while
+    /// standing where the letter was left.
+    private var isVerifiedRecipient: Bool {
+        liveRam.addressedToThisPhone || (recipientNameMatches && isAtPickupSpot == true)
+    }
+
+    /// Someone looking at a letter that's at somebody else's gate: its
+    /// sender, or a courier who brought it there.
+    private var isDeliverer: Bool {
+        !liveRam.addressedToThisPhone && !recipientNameMatches
+    }
 
     private var sealInteraction: HoldToBreakSeal.Interaction {
         guard isAtGate, !isSealBroken else { return .display }
@@ -181,7 +192,11 @@ struct LetterDetailView: View {
                     withAnimation(.easeInOut(duration: 0.5)) { proxy.scrollTo("letter", anchor: .top) }
                 }
             }
-            .background { LinenSurface().ignoresSafeArea() }
+            .background {
+                // Embedded in the mailbag sheet, the sheet's glass shows
+                // through; the linen only backs the standalone screen.
+                if !isEmbedded { LinenSurface().ignoresSafeArea() }
+            }
             .navigationTitle(liveRam.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -274,12 +289,114 @@ struct LetterDetailView: View {
                             .transition(.opacity)
                     }
                 }
+            } else if isDeliverer, let letter {
+                gateDeliveryCard(for: letter)
             } else {
                 LetterGateNoticeView(ram: liveRam, onVerified: {})
             }
         } else {
             transitPill
         }
+    }
+
+    // MARK: - Delivering at the gate
+
+    private enum GateDelivery {
+        /// The post office is taking it; this phone hasn't reached it yet.
+        case handingOver
+        /// The relay holds it for the recipient.
+        case atPostOffice
+        /// The recipient's phone has it.
+        case collected
+        /// No post office: it's up to the sender or courier.
+        case byHand
+    }
+
+    private func gateDelivery(for letter: Letter) -> GateDelivery {
+        let tracker = LetterTracker.shared
+        guard TelemetryService.isServerConfigured, tracker.isTracked(letter) else { return .byHand }
+        if tracker.state(for: letter.id) == .collected { return .collected }
+        return tracker.wasHandedToPostOffice(letter) ? .atPostOffice : .handingOver
+    }
+
+    /// What happens now the ram is at the recipient's gate, and the ways to
+    /// get the letter to them by hand when there's no post office (or they
+    /// simply meet first).
+    private func gateDeliveryCard(for letter: Letter) -> some View {
+        let recipient = letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = recipient.isEmpty ? String(localized: "the recipient", bundle: .appLanguage, locale: .appLanguage) : recipient
+        let delivery = gateDelivery(for: letter)
+        let title: String
+        let detail: String
+        let symbol: String
+        switch delivery {
+        case .handingOver:
+            title = String(localized: "Handing it to the post office", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "It goes into \(to)'s mailbag as soon as this phone is online.", bundle: .appLanguage, locale: .appLanguage)
+            symbol = "arrow.up.circle"
+        case .atPostOffice:
+            title = String(localized: "In \(to)'s mailbag", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "It lands on their phone the next time Baranov is open.", bundle: .appLanguage, locale: .appLanguage)
+            symbol = "tray.and.arrow.down.fill"
+        case .collected:
+            title = String(localized: "\(to) has it", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "It's on their phone, ready to open.", bundle: .appLanguage, locale: .appLanguage)
+            symbol = "checkmark.circle.fill"
+        case .byHand:
+            title = String(localized: "At \(to)'s gate", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "Hand it over when you meet, or send \(to) the letter file.", bundle: .appLanguage, locale: .appLanguage)
+            symbol = "flag.checkered"
+        }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            Text(detail)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if delivery != .collected {
+                if delivery != .byHand {
+                    Text("Meeting \(to) first? You can hand it over yourself.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack(spacing: 10) {
+                    if onShakeHandoff != nil {
+                        Button { shakeHandoff() } label: {
+                            Label("Hand over nearby", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                        }
+                    }
+                    ShareLink(
+                        item: LetterTracker.deliveryPackage(of: liveRam, carrying: letter),
+                        preview: SharePreview(
+                            String(localized: "\(letter.senderName)'s letter for \(to)", bundle: .appLanguage, locale: .appLanguage),
+                            image: Image(systemName: "envelope.fill")
+                        )
+                    ) {
+                        Label("Send the file", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+
+                Button {
+                    flockViewModel.markHandedOff(ramId: ram.id, to: recipient.isEmpty ? nil : recipient)
+                } label: {
+                    Label("\(to) has it", systemImage: "checkmark.circle")
+                }
+                .font(.footnote.weight(.semibold))
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .accessibilityElement(children: .contain)
     }
 
     private var holdPrompt: LocalizedStringKey {
@@ -423,7 +540,7 @@ struct LetterDetailView: View {
             .init(id: "walked", symbol: "figure.walk",
                   value: DistanceFormatter.string(forMeters: walked), caption: "walked"),
             .init(id: "steps", symbol: "shoeprints.fill",
-                  value: walked.formatted(.number.grouping(.automatic)), caption: "steps"),
+                  value: walked.formatted(.number.grouping(.automatic).locale(.appLanguage)), caption: "steps"),
             .init(id: "togo", symbol: "flag.checkered",
                   value: liveRam.remainingSteps > 0 ? DistanceFormatter.string(forMeters: liveRam.remainingSteps) : "0",
                   caption: "to go"),
@@ -434,7 +551,7 @@ struct LetterDetailView: View {
 
     @ViewBuilder
     private var handoffSection: some View {
-        if liveRam.status == .waitingForHandoff || liveRam.status == .atSea {
+        if liveRam.hasWaterAhead {
             VStack(alignment: .leading, spacing: 12) {
                 PassageNoticeView(ram: liveRam)
 
@@ -543,16 +660,17 @@ struct LetterDetailView: View {
     /// headline. Only the writer's own device holds the code.
     @ViewBuilder
     private var shareCodeBar: some View {
-        if !isRevealed, let message = letter?.shareMessage(carrierName: liveRam.name) {
+        if !isRevealed, let message = liveRam.letterShareMessage {
             ShareLink(item: message) {
-                Label("Share Code", systemImage: "square.and.arrow.up")
+                if liveRam.letter?.relayTicket != nil {
+                    Label("Share tracking link", systemImage: "square.and.arrow.up")
+                } else {
+                    Label("Share Code", systemImage: "square.and.arrow.up")
+                }
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .controlSize(.regular)
-            .frame(maxWidth: .infinity)
+            .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(.bar)
         }
     }
 
@@ -582,10 +700,14 @@ struct LetterDetailView: View {
             wrongCodeTick += 1
             sealResetToken += 1
             withAnimation(.easeOut(duration: 0.2)) {
-                wrongCodeMessage = String(localized: "That code doesn't fit this seal. Check the message from \(letter.senderName).")
+                wrongCodeMessage = String(localized: "That code doesn't fit this seal. Check the message from \(letter.senderName).", bundle: .appLanguage, locale: .appLanguage)
             }
             return
         }
+
+        // The sender hears about it: a push "… broke the seal" when the post
+        // office knows this letter (queued if offline).
+        ExpectedLetterStore.shared.noteOpened(letter)
 
         isCodeFieldFocused = false
         withAnimation { wrongCodeMessage = nil }

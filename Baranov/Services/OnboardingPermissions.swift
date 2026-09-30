@@ -6,7 +6,13 @@
 //  page where each one makes sense — not all together on the first map.
 //  Every request is best-effort: a "Don't Allow" (or an already-decided
 //  status) simply returns, and the feature that needed it degrades on its
-//  own. Nothing here can block or fail the onboarding flow.
+//  own. Nothing here can block or fail the onboarding flow — and now that
+//  every request below is wrapped in `BestEffort.run`, that's actually
+//  guaranteed rather than just hoped for: a stalled system prompt (a real
+//  problem some people hit, most visibly on the "Turn on arrival alerts"
+//  page, where the button stayed disabled forever because the completion
+//  handler for the notification permission simply never fired) times out
+//  and the flow moves on instead of freezing.
 //
 //    Ram page      → Motion & Fitness (iPhone step counting)
 //    Ocean page    → Location (start city, map marker, nearby handoffs)
@@ -30,13 +36,20 @@ enum OnboardingPermissions {
     /// the system sheet appears on the first query — so ask for one minute
     /// of history and discard the answer.
     nonisolated static func requestMotion() async {
+        #if DEBUG
+        if CommandLine.arguments.contains("-demoMode") { return }
+        #endif
         guard CMPedometer.isStepCountingAvailable(),
               CMPedometer.authorizationStatus() == .notDetermined else { return }
         let pedometer = CMPedometer()
         let now = Date()
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            pedometer.queryPedometerData(from: now.addingTimeInterval(-60), to: now) { _, _ in
-                continuation.resume()
+        let box = UncheckedSendable(pedometer)
+        await BestEffort.run {
+            let pedometer = box.value
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                pedometer.queryPedometerData(from: now.addingTimeInterval(-60), to: now) { _, _ in
+                    continuation.resume()
+                }
             }
         }
         pedometer.stopUpdates()
@@ -47,17 +60,26 @@ enum OnboardingPermissions {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let store = HKHealthStore()
         let stepType = HKQuantityType(.stepCount)
-        _ = try? await store.requestAuthorization(toShare: [], read: [stepType])
+        let box = UncheckedSendable((store: store, stepType: stepType))
+        await BestEffort.run {
+            _ = try? await box.value.store.requestAuthorization(toShare: [], read: [box.value.stepType])
+        }
     }
 
     /// Notifications. Mirrors the Pasture toggle: the person's own switch
     /// follows what they just chose.
     nonisolated static func requestNotifications() async {
-        let center = UNUserNotificationCenter.current()
-        let settings = await center.notificationSettings()
-        guard settings.authorizationStatus == .notDetermined else { return }
-        let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-        UserDefaults.standard.set(granted, forKey: "com.baranov.notificationsEnabled")
+        let box = UncheckedSendable(UNUserNotificationCenter.current())
+        await BestEffort.run {
+            let center = box.value
+            let settings = await center.notificationSettings()
+            guard settings.authorizationStatus == .notDetermined else { return }
+            let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+            UserDefaults.standard.set(granted, forKey: "com.baranov.notificationsEnabled")
+        }
+        // Allowed: register for pushes straight away (the token reaches the
+        // relay once the Shepherd ID is registered).
+        await NotificationManager.shared.registerForRemoteIfAuthorized()
     }
 }
 
@@ -78,6 +100,13 @@ final class OnboardingLocationRequester: NSObject, CLLocationManagerDelegate {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             self.continuation = continuation
             manager.requestWhenInUseAuthorization()
+            // A stalled system prompt (the same kind of OS hang the
+            // notification request above can hit) must never hold the
+            // onboarding flow open forever.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(8))
+                self.finish()
+            }
         }
         self.manager = nil
     }
@@ -88,8 +117,14 @@ final class OnboardingLocationRequester: NSObject, CLLocationManagerDelegate {
             // The delegate also reports the initial, undecided status as
             // soon as it is set; only the person's answer finishes this.
             guard status != .notDetermined else { return }
-            self.continuation?.resume()
-            self.continuation = nil
+            self.finish()
         }
+    }
+
+    /// Resumes the pending continuation exactly once, however it was
+    /// reached — the person's real answer or the timeout above racing it.
+    private func finish() {
+        continuation?.resume()
+        continuation = nil
     }
 }

@@ -26,9 +26,18 @@ final class RamBleatPlayer {
 
     private init() {}
 
-    /// Plays the bleat through SoundEffectPlayer.
+    private static let variants: [SoundEffectPlayer.Sound] = [.ramBleat, .ramBleat2, .ramBleat3]
+    private var lastVariantIndex: Int?
+
+    /// Plays one of several bleats, never the same one twice in a row, so
+    /// repeated petting sounds like a living animal rather than a sample.
     func play() {
-        SoundEffectPlayer.shared.play(.ramBleat)
+        var index = Int.random(in: 0..<Self.variants.count)
+        if index == lastVariantIndex {
+            index = (index + 1) % Self.variants.count
+        }
+        lastVariantIndex = index
+        SoundEffectPlayer.shared.play(Self.variants[index])
     }
 
     private static var bundledBleatURL: URL? {

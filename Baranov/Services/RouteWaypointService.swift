@@ -98,7 +98,7 @@ final class RouteWaypointService {
 
     private func placemark(at coordinate: RamCoordinate) async -> CLPlacemark? {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return try? await geocoder.reverseGeocodeLocation(location).first
+        return try? await geocoder.reverseGeocodeLocation(location, preferredLocale: .appLanguage).first
     }
 
     /// The city-level name for an endpoint — what a person would call

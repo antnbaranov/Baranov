@@ -41,6 +41,7 @@ final class FlockViewModel {
     init(activeRams: [Ram] = [], maxAllowedRams: Int = 1) {
         self.store = nil
         self.activeRams = activeRams
+        self.selectedRamId = activeRams.first?.id
         self.maxAllowedRams = maxAllowedRams
     }
 
@@ -55,11 +56,11 @@ final class FlockViewModel {
         }
         PhoneWatchSessionManager.shared.onStepsReceived = { [weak self] steps in
             guard let self else { return }
-            if let active = self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
+            if let active = self.ownRams.first(where: { $0.status == .walking }) ?? self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
                 self.addStepProgress(ramId: active.id, steps: steps)
             }
         }
-        if let active = self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
+        if let active = self.ownRams.first(where: { $0.status == .walking }) ?? self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
             self.startOrUpdateLiveActivity(for: active)
         }
     }
@@ -74,21 +75,64 @@ final class FlockViewModel {
 
     @ObservationIgnored private var liveActivities: [UUID: Activity<RamActivityAttributes>] = [:]
     @ObservationIgnored private var lastActivityUpdate: [UUID: Date] = [:]
-    private let activityUpdateInterval: TimeInterval = 60
+    /// ActivityKit silently drops updates once its budget is spent, and a dropped
+    /// update is usually the one that changes the icon. The bar and the walking
+    /// clock move by themselves between pushes, so a push every 3 s is plenty.
+    private let activityUpdateInterval: TimeInterval = 3
+    /// The last status symbol pushed per ram. A change of status (walking, at
+    /// sea, arrived...) is always pushed at once, never throttled away.
+    @ObservationIgnored private var lastPushedSymbol: [UUID: String] = [:]
+    /// Advances the gait frame the widget shows; bumped on every pushed update.
+    @ObservationIgnored private var activityStride: [UUID: Int] = [:]
+    /// When each ram's current walk began, for the self-ticking clock.
+    @ObservationIgnored private var walkingSince: [UUID: Date] = [:]
+    /// Recent step deltas per ram, for a live cadence (steps/second).
+    @ObservationIgnored private var stepSamples: [UUID: [(date: Date, steps: Int)]] = [:]
+    /// When the last steps landed. The person counts as "moving" for a few
+    /// seconds after this, so the ram keeps trotting between pedometer callbacks.
+    @ObservationIgnored private var lastStepAt: [UUID: Date] = [:]
+    @ObservationIgnored private var lastPushedMoving: [UUID: Bool] = [:]
+    /// Pushes a Live Activity update every second while a ram is walking. A
+    /// Live Activity cannot animate on its own, so this is what makes the
+    /// ram's gait, the step count and the bar visibly move instead of
+    /// waiting for the next pedometer callback.
+    @ObservationIgnored private var liveTicker: Task<Void, Never>?
+    /// Last ride-along route check per ram, so a phone sitting in the
+    /// wrong place doesn't send an MKDirections request every 30 seconds.
+    @ObservationIgnored private var isCarryingGuests = false
+    @ObservationIgnored private var liftAttempts: [UUID: (position: CLLocationCoordinate2D, date: Date)] = [:]
+    private static let movingGrace: TimeInterval = 8
+
+    /// The most recent SF Symbol WeatherKit gave us for each ram's live
+    /// position. Refreshed best-effort, in the background, off
+    /// `WeatherSnapshotService`'s own reuse cache — never awaited, never
+    /// something the Live Activity waits on.
+    @ObservationIgnored private var liveWeatherSymbols: [UUID: String] = [:]
 
     func startOrUpdateLiveActivity(for ram: Ram) {
-        let state = contentState(for: ram)
+        refreshLiveWeather(for: ram)
+        var state = contentState(for: ram)
         // One Live Activity for the whole flock: the ram that is walking now (or the
         // first one). Other rams never spawn their own card.
-        let primary = activeRams.first(where: { $0.status == .walking }) ?? activeRams.first
+        let primary = ownRams.first(where: { $0.status == .walking }) ?? activeRams.first(where: { $0.status == .walking }) ?? activeRams.first
         if ActivityAuthorizationInfo().areActivitiesEnabled, primary == nil || primary?.id == ram.id {
             if let existing = liveActivities[ram.id], existing.activityState == .active {
                 let now = Date()
-                if let last = lastActivityUpdate[ram.id], now.timeIntervalSince(last) < activityUpdateInterval {
+                let statusChanged = lastPushedSymbol[ram.id] != state.statusSymbol
+                if !statusChanged, let last = lastActivityUpdate[ram.id], now.timeIntervalSince(last) < activityUpdateInterval {
                     // Throttle ActivityKit updates to avoid system limits
                 } else {
                     lastActivityUpdate[ram.id] = now
-                    Task { await existing.update(using: state) }
+                    lastPushedSymbol[ram.id] = state.statusSymbol
+                    // Only a ram whose shepherd is walking right now takes steps;
+                    // anything else holds its frame.
+                    if ram.status == .walking, isMoving(ram.id, now: now) {
+                        activityStride[ram.id, default: 0] += 1
+                    }
+                    state = contentState(for: ram)
+                    lastPushedMoving[ram.id] = state.isMoving
+                    let content = ActivityContent(state: state, staleDate: liveStaleDate(for: state, now: now))
+                    Task { await existing.update(content) }
                 }
             } else {
                 liveActivities.removeValue(forKey: ram.id)
@@ -105,7 +149,8 @@ final class FlockViewModel {
                 if let adopted {
                     liveActivities[ram.id] = adopted
                     lastActivityUpdate[ram.id] = Date()
-                    Task { await adopted.update(using: state) }
+                    lastPushedSymbol[ram.id] = state.statusSymbol
+                    Task { await adopted.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(30 * 60))) }
                 } else {
                     let attrs = RamActivityAttributes(ramName: ram.name, fromCity: ram.currentCity, toCity: ram.targetCity)
                     do {
@@ -115,6 +160,7 @@ final class FlockViewModel {
                         )
                         liveActivities[ram.id] = activity
                         lastActivityUpdate[ram.id] = Date()
+                        lastPushedSymbol[ram.id] = state.statusSymbol
                     } catch { /* not supported or authorized */ }
                 }
             }
@@ -132,6 +178,72 @@ final class FlockViewModel {
             seaVoyageTitle: ram.voyage.map { "\($0.departurePortName) → \($0.arrivalPortName)" }
         )
         WidgetCenter.shared.reloadAllTimelines()
+        if ram.status == .walking { ensureLiveTicker() }
+    }
+
+    // MARK: Live Activity ticker
+
+    private func isMoving(_ id: UUID, now: Date = Date()) -> Bool {
+        guard let last = lastStepAt[id] else { return false }
+        return now.timeIntervalSince(last) <= Self.movingGrace
+    }
+
+    /// Records a step delta so the Live Activity can show a real cadence.
+    private func noteSteps(ramId: UUID, steps: Int) {
+        let now = Date()
+        lastStepAt[ramId] = now
+        var samples = (stepSamples[ramId] ?? []).filter { now.timeIntervalSince($0.date) <= 30 }
+        samples.append((date: now, steps: steps))
+        stepSamples[ramId] = samples
+    }
+
+    private func stepsPerSecond(_ id: UUID, now: Date) -> Double {
+        let recent = (stepSamples[id] ?? []).filter { now.timeIntervalSince($0.date) <= 30 }
+        guard let first = recent.first else { return 0 }
+        let total = recent.reduce(0) { $0 + $1.steps }
+        let span = max(now.timeIntervalSince(first.date), 5)
+        return min(Double(total) / span, 3.5)
+    }
+
+    /// While the person is walking, the card is only trusted for 30 s: if the
+    /// app is suspended and stops pushing, the widget drops the self-running
+    /// bar instead of sliding it on toward an arrival that never happened.
+    private func liveStaleDate(for state: RamActivityAttributes.ContentState, now: Date) -> Date {
+        state.isMoving == true ? now.addingTimeInterval(30) : now.addingTimeInterval(30 * 60)
+    }
+
+    private func ensureLiveTicker() {
+        guard liveTicker == nil else { return }
+        liveTicker = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                if !self.tickLiveActivity() {
+                    self.liveTicker = nil
+                    return
+                }
+            }
+        }
+    }
+
+    /// One tick. Returns `false` when there is nothing left to tick for.
+    private func tickLiveActivity() -> Bool {
+        guard let ram = activeRams.first(where: { $0.status == .walking }),
+              let activity = liveActivities[ram.id],
+              activity.activityState == .active else { return false }
+        let now = Date()
+        if let last = lastActivityUpdate[ram.id], now.timeIntervalSince(last) < activityUpdateInterval { return true }
+        let moving = isMoving(ram.id, now: now)
+        // Already showing "paused" and still paused: nothing new to say.
+        if !moving, lastPushedMoving[ram.id] == false { return true }
+        lastActivityUpdate[ram.id] = now
+        lastPushedSymbol[ram.id] = ram.status.symbolName
+        if moving { activityStride[ram.id, default: 0] += 1 }
+        let state = contentState(for: ram)
+        lastPushedMoving[ram.id] = state.isMoving
+        let content = ActivityContent(state: state, staleDate: liveStaleDate(for: state, now: now))
+        Task { await activity.update(content) }
+        return true
     }
 
     func endLiveActivity(for ramId: UUID) {
@@ -139,20 +251,77 @@ final class FlockViewModel {
         Task { await activity.end(nil, dismissalPolicy: .after(Date().addingTimeInterval(5))) }
         liveActivities.removeValue(forKey: ramId)
         lastActivityUpdate.removeValue(forKey: ramId)
+        activityStride.removeValue(forKey: ramId)
+        walkingSince.removeValue(forKey: ramId)
+        stepSamples.removeValue(forKey: ramId)
+        lastStepAt.removeValue(forKey: ramId)
+        lastPushedMoving.removeValue(forKey: ramId)
+        lastPushedSymbol.removeValue(forKey: ramId)
+        if liveActivities.isEmpty {
+            liveTicker?.cancel()
+            liveTicker = nil
+        }
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func contentState(for ram: Ram) -> RamActivityAttributes.ContentState {
+        if ram.status == .walking {
+            if walkingSince[ram.id] == nil { walkingSince[ram.id] = Date() }
+        } else {
+            walkingSince.removeValue(forKey: ram.id)
+        }
         let remaining = max(0, ram.totalStepsRequired - ram.stepsWalked)
         let progress = ram.totalStepsRequired > 0 ? min(1.0, Double(ram.stepsWalked) / Double(ram.totalStepsRequired)) : 0
         let distanceStr = remaining >= 1000 ? String(format: "%.1f km", Double(remaining) / 1000) : "\(remaining) m"
+        let now = Date()
+        var moving: Bool?
+        var stepsPerMinute: Int?
+        var barStart: Date?
+        var barEnd: Date?
+        if ram.status == .walking {
+            let isMovingNow = isMoving(ram.id, now: now)
+            moving = isMovingNow
+            let pace = stepsPerSecond(ram.id, now: now)
+            if isMovingNow, pace > 0 { stepsPerMinute = Int((pace * 60).rounded()) }
+            if isMovingNow, pace >= 0.3, remaining > 0, ram.totalStepsRequired > 0 {
+                let secondsLeft = Double(remaining) / pace
+                if secondsLeft <= 6 * 3600 {
+                    let end = now.addingTimeInterval(secondsLeft)
+                    barEnd = end
+                    barStart = end.addingTimeInterval(-Double(ram.totalStepsRequired) / pace)
+                }
+            }
+        }
         return RamActivityAttributes.ContentState(
             progress: progress,
             remainingSteps: remaining,
             remainingDistance: distanceStr,
             statusSymbol: ram.status.symbolName,
-            statusLabel: ram.status.displayName
+            statusLabel: ram.status.displayName,
+            weatherSymbol: liveWeatherSymbols[ram.id],
+            stride: activityStride[ram.id, default: 0],
+            walkingSince: walkingSince[ram.id],
+            isMoving: moving,
+            totalSteps: ram.totalStepsRequired,
+            stepsPerMinute: stepsPerMinute,
+            barStart: barStart,
+            barEnd: barEnd
         )
+    }
+
+    /// Best-effort, fire-and-forget: asks `WeatherSnapshotService` for a
+    /// reading at the ram's current position and remembers the symbol for
+    /// the next `contentState(for:)`. Costs nothing extra against the
+    /// monthly WeatherKit budget beyond what stamps already spend — the
+    /// service's own 5 km / 30-minute reuse cache absorbs repeat calls
+    /// from a ram that hasn't moved far. Never blocks, never throws.
+    private func refreshLiveWeather(for ram: Ram) {
+        guard let coordinate = ram.currentCoordinate else { return }
+        let ramId = ram.id
+        Task { @MainActor [weak self] in
+            guard let weather = await WeatherSnapshotService.snapshot(at: coordinate) else { return }
+            self?.liveWeatherSymbols[ramId] = weather.symbolName
+        }
     }
 
     private func persist() {
@@ -194,7 +363,172 @@ final class FlockViewModel {
         // goes for a ram that has reached the gate: it has left the
         // letter there for the recipient to walk over and collect, so it
         // is free to carry the next one.
-        activeRams.filter { $0.status != .handedOff && $0.status != .arrivedAtGate }.count < maxAllowedRams
+        //
+        // Someone else's letter (a guest) never takes a pen either: it rides
+        // in the mailbag with this person's own ram.
+        //
+        // A delivered letter is history, and a letter that came TO this
+        // person is theirs to open, not a ram they walk.
+        //
+        // A letter held for its recipient's gate (Code mode) keeps the pen
+        // its ram will walk from.
+        activeRams.filter {
+            !$0.isGuest && !$0.addressedToThisPhone
+                && $0.status != .handedOff && $0.status != .arrivedAtGate && $0.status != .delivered
+        }.count + LetterTracker.shared.heldCount < maxAllowedRams
+    }
+
+    /// How many other people's letters one phone will carry at once. Not a
+    /// paywall — just a sane bound on a mailbag.
+    static let maxGuests = 5
+
+    /// Other people's letters this phone is carrying right now.
+    var guestRams: [Ram] {
+        activeRams.filter { $0.isGuest && Self.isInPlay($0) }
+    }
+
+    /// This person's own rams — what the pasture pens, the ram selector
+    /// and step tracking are about.
+    var ownRams: [Ram] {
+        activeRams.filter { !$0.isGuest }
+    }
+
+    private static func isInPlay(_ ram: Ram) -> Bool {
+        switch ram.status {
+        case .grazing, .walking, .waitingForHandoff, .atSea: return true
+        case .handedOff, .arrivedAtGate, .delivered: return false
+        }
+    }
+
+    /// Whether a letter bound for `destination` is going this person's way:
+    /// its destination is near where one of their own rams is headed
+    /// (`KnownCarrierDirectory.matchRadiusMeters`), or, seen from `here`,
+    /// it lies in roughly the same direction. `nil` when there's nothing to
+    /// compare against (no own ram out and no position).
+    func isGoingMyWay(to destination: CLLocationCoordinate2D, from here: CLLocationCoordinate2D?) -> Bool? {
+        let target = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+        let mine = ownRams.filter { Self.isInPlay($0) }.map(\.finalDestinationCoordinate)
+        guard !mine.isEmpty else { return nil }
+
+        for own in mine {
+            let ownLocation = CLLocation(latitude: own.latitude, longitude: own.longitude)
+            if ownLocation.distance(from: target) <= KnownCarrierDirectory.matchRadiusMeters { return true }
+        }
+        guard let here else { return false }
+        let hereLocation = CLLocation(latitude: here.latitude, longitude: here.longitude)
+        guard hereLocation.distance(from: target) > 50_000 else { return true }
+        let theirs = Self.bearing(from: here, to: destination)
+        return mine.contains { own in
+            let ownLocation = CLLocation(latitude: own.latitude, longitude: own.longitude)
+            guard hereLocation.distance(from: ownLocation) > 50_000 else { return false }
+            let diff = abs(theirs - Self.bearing(from: here, to: own.clLocationCoordinate))
+            return min(diff, 360 - diff) <= 40
+        }
+    }
+
+    private static func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+        let lat1 = from.latitude * .pi / 180
+        let lat2 = to.latitude * .pi / 180
+        let deltaLon = (to.longitude - from.longitude) * .pi / 180
+        let y = sin(deltaLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(deltaLon)
+        return (atan2(y, x) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    /// Whether this ram's letter is someone else's: this phone holds no
+    /// recall token for it. A letter coming back to its own sender is not
+    /// a guest.
+    static func isGuestLetter(_ ram: Ram) -> Bool {
+        guard let letter = ram.letter else { return false }
+        return !RecallTokenVault.isMine(letter.id) && !isAddressedToMe(letter)
+            && !RecipientKeyring.isAddressedToMe(letter)
+    }
+
+    /// Whether this person is the letter's recipient, by the display name
+    /// they carry — the same identity the arrival screen checks.
+    static func isAddressedToMe(_ letter: Letter) -> Bool {
+        let mine = (UserDefaults.standard.string(forKey: "com.baranov.carrierDisplayName") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !mine.isEmpty else { return false }
+        return letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare(mine) == .orderedSame
+    }
+
+    // MARK: - Delivery receipts
+
+    /// Whether this package is a delivery receipt: a ram whose letter has
+    /// been opened, coming back to the phone that sent it.
+    static func isDeliveryReceipt(_ package: RamTransitPackage) -> Bool {
+        package.ram.status == .delivered
+    }
+
+    /// Applies a receipt the recipient sent back (iMessage, AirDrop): the
+    /// sender's own record of the letter learns it was opened and gets the
+    /// whole journey — every stamp and every carrier along the way. The
+    /// sender's own copy of the letter is kept. Returns the ram's name, or
+    /// `nil` when this phone didn't send that letter.
+    @discardableResult
+    func applyDeliveryReceipt(_ package: RamTransitPackage) -> String? {
+        let incoming = package.ram
+        guard let letterID = incoming.letter?.id,
+              let index = activeRams.firstIndex(where: { $0.letter?.id == letterID && !$0.isGuest })
+        else { return nil }
+        var ram = activeRams[index]
+        guard ram.status != .delivered || ram.stamps.count < incoming.stamps.count else { return ram.name }
+        ram.status = .delivered
+        ram.stamps = incoming.stamps
+        ram.routeHistory = incoming.routeHistory
+        ram.recallRequestedAt = nil
+        activeRams[index] = ram
+        endLiveActivity(for: ram.id)
+        return ram.name
+    }
+
+    /// Sender side: the relay says the recipient broke the seal. The ram's
+    /// journey is complete: delivered, with a last passport stamp. Returns
+    /// the ram's name, or `nil` when this phone has no such letter.
+    @discardableResult
+    func markOpenedByRecipient(letterID: UUID, recipientName: String) -> String? {
+        guard let index = activeRams.firstIndex(where: { $0.letter?.id == letterID && !$0.isGuest }) else { return nil }
+        var ram = activeRams[index]
+        guard ram.status != .delivered else { return ram.name }
+        let name = recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        appendStamp(
+            to: &ram,
+            placeName: String(localized: "Opened by \(name.isEmpty ? String(localized: "the recipient", bundle: .appLanguage, locale: .appLanguage) : name)", bundle: .appLanguage, locale: .appLanguage),
+            kind: .arrival,
+            coordinate: ram.gateCoordinate
+        )
+        ram.status = .delivered
+        ram.recallRequestedAt = nil
+        activeRams[index] = ram
+        endLiveActivity(for: ram.id)
+        return ram.name
+    }
+
+    // MARK: - More than one letter per ram
+
+    /// An own ram already heading to (within 25 km of) this destination,
+    /// which can carry another letter in its mailbag instead of a new ram
+    /// taking a pen.
+    func ramHeading(to destination: CLLocationCoordinate2D) -> Ram? {
+        let target = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+        return ownRams.first { ram in
+            guard ram.status == .grazing || ram.status == .walking
+                    || ram.status == .waitingForHandoff || ram.status == .atSea else { return false }
+            let goal = CLLocation(latitude: ram.finalDestinationCoordinate.latitude,
+                                  longitude: ram.finalDestinationCoordinate.longitude)
+            return goal.distance(from: target) <= 25_000
+        }
+    }
+
+    /// Sends a letter along with a ram that is already going there.
+    func bundle(_ letter: Letter, into ramId: UUID) {
+        var letter = letter
+        if letter.recallTokenHash == nil {
+            letter.recallTokenHash = RecallTokenVault.issue(for: letter.id)
+        }
+        addPassengerLetter(letter, to: ramId)
     }
 
     /// Whether importing this AirDropped package would be admitted right
@@ -202,7 +536,11 @@ final class FlockViewModel {
     /// (idempotent, e.g. resuming a leg after a handoff), while a
     /// brand-new ram is only admitted while under `maxAllowedRams`.
     func canImport(_ package: RamTransitPackage) -> Bool {
-        activeRams.contains { $0.id == package.ram.id } || hasFreeRamSlot
+        if activeRams.contains(where: { $0.id == package.ram.id }) { return true }
+        // A letter delivered at the gate takes no pen: it's here to be opened.
+        if package.ram.status == .arrivedAtGate { return true }
+        if Self.isGuestLetter(package.ram) { return guestRams.count < Self.maxGuests }
+        return hasFreeRamSlot
     }
 
     /// Applies real-world steps (from CoreMotion) toward a ram's current
@@ -251,7 +589,21 @@ final class FlockViewModel {
         }
 
         activeRams[index] = ram
-        startOrUpdateLiveActivity(for: ram)
+
+        if !ram.isGuest {
+            noteSteps(ramId: ramId, steps: steps)
+            startOrUpdateLiveActivity(for: ram)
+        }
+
+        // Guests ride in the mailbag of the ram being walked: the same steps
+        // carry them along their own roads. (Guarded so the guests' own
+        // updates don't fan out again.)
+        guard !isCarryingGuests else { return }
+        isCarryingGuests = true
+        defer { isCarryingGuests = false }
+        for guest in guestRams where guest.id != ramId && (guest.status == .grazing || guest.status == .walking) {
+            addStepProgress(ramId: guest.id, steps: steps)
+        }
     }
 
     /// Records a passport stamp for a real, named place this ram has just
@@ -354,6 +706,14 @@ final class FlockViewModel {
         try letter.open(withReceivingCode: receivingCode, currentCoordinate: currentCoordinate)
         ram.letter = letter
         ram.status = .delivered
+        // The last page of the passport, and what the delivery receipt
+        // carries home to the sender.
+        appendStamp(
+            to: &ram,
+            placeName: String(localized: "Opened by \(Self.currentCarrierName(fallback: letter.recipientName))", bundle: .appLanguage, locale: .appLanguage),
+            kind: .arrival,
+            coordinate: currentCoordinate ?? ram.currentCoordinate
+        )
         activeRams[index] = ram
     }
 
@@ -400,6 +760,12 @@ final class FlockViewModel {
         // — nothing recorded before this moment may move this ram.
         dispatched.stepsWalked = 0
         dispatched.status = .grazing
+        dispatched.isGuest = false
+        // The sender's proof, for "Take it back" once it's handed on.
+        if var letter = dispatched.letter, letter.recallTokenHash == nil {
+            letter.recallTokenHash = RecallTokenVault.issue(for: letter.id)
+            dispatched.letter = letter
+        }
         appendStamp(
             to: &dispatched,
             placeName: dispatched.currentCity,
@@ -425,6 +791,9 @@ final class FlockViewModel {
     func recall(ramId: UUID) -> Bool {
         guard let index = activeRams.firstIndex(where: { $0.id == ramId }) else { return false }
         let ram = activeRams[index]
+        // Someone else's letter is never ours to withdraw — only its
+        // sender can take it back (see `RecallService`).
+        guard !ram.isGuest else { return false }
         guard ram.status == .grazing || ram.status == .walking || ram.status == .waitingForHandoff else {
             // Not `.atSea` (the packet has it and there is nobody to ask),
             // not `.handedOff` (it is someone else's to carry now), and
@@ -454,43 +823,55 @@ final class FlockViewModel {
     /// `maxAllowedRams`, so a completed paywall unlock is required before
     /// the flock can grow.
     ///
-    /// `receivedAt` is where the person taking the ram is actually
-    /// standing. It matters more than it looks: a ram handed over
-    /// mid-walk arrives carrying the *sender's* road polyline, and
-    /// without re-resolving it the new carrier would be walking a street
-    /// they are nowhere near. See `resumeLeg(for:from:)`.
+    /// A handoff changes who carries the ram, never where it is. Two phones
+    /// that shake are in the same spot, so the receiver's position says
+    /// nothing about the letter's journey: a ram already across the
+    /// Atlantic must not snap back to North America because the friend who
+    /// took it lives there. The ram keeps its place on the map, its road,
+    /// its steps and any packet booking; the receiver's steps walk it on
+    /// from there.
+    ///
+    /// `receivedAt` only starts the new carrier's custody. If that phone
+    /// later turns up across the water, `rideAlong(carrierAt:)` lets the
+    /// ram go ashore with it.
     func importPackage(
         _ package: RamTransitPackage,
-        receivedAt coordinate: CLLocationCoordinate2D? = nil
+        receivedAt coordinate: CLLocationCoordinate2D? = nil,
+        asRecipient: Bool = false,
+        now: Date = Date()
     ) async {
         var importedRam = package.ram
         let alreadyTracked = activeRams.contains { $0.id == importedRam.id }
 
-        guard alreadyTracked || hasFreeRamSlot else { return }
+        guard canImport(package) else { return }
+
+        // A key sealed to this phone's profile opens here and nowhere else:
+        // keep the code for the seal, and the letter is this person's.
+        let keyedToMe = RecipientKeyring.adoptAll(in: importedRam)
+
+        // Someone else's letter rides in the mailbag rather than taking a pen
+        // or the ram selector; the sender's own letter coming back is theirs.
+        importedRam.isGuest = Self.isGuestLetter(importedRam)
+        importedRam.recallRequestedAt = nil
+        if asRecipient || (keyedToMe && importedRam.status == .arrivedAtGate) {
+            // Delivered by the post office, or handed over at the gate with a
+            // key only this phone could open: here to be opened, right away.
+            importedRam.isGuest = false
+            importedRam.addressedToThisPhone = true
+            if importedRam.letter?.relayTicket != nil { importedRam.letter?.relayTicket = nil }
+        }
 
         switch importedRam.status {
-        case .waitingForHandoff, .atSea:
-            // Someone took the ram off the quay. If they are standing
-            // somewhere a road reaches the destination from, the crossing
-            // has effectively already happened and the booked passage is
-            // cancelled inside `beginNextLeg`. If they are still on the
-            // near shore, the booking stands — taking a letter into your
-            // pocket must never make it slower than leaving it for the
-            // packet.
-            importedRam.status = .waitingForHandoff
-            await beginNextLeg(for: &importedRam, from: coordinate)
-        case .grazing, .walking, .handedOff:
-            await resumeLeg(for: &importedRam, from: coordinate)
-            // A ram handed away and then given back is livestock again,
-            // even if its route couldn't be re-resolved just now —
-            // otherwise it would sit here permanently marked as somebody
-            // else's and never take another step.
-            if importedRam.status == .handedOff {
-                importedRam.status = .grazing
-            }
-        case .arrivedAtGate, .delivered:
+        case .handedOff:
+            // Handed away and then given back: livestock again.
+            importedRam.status = .grazing
+        case .grazing, .walking, .waitingForHandoff, .atSea, .arrivedAtGate, .delivered:
             break
         }
+
+        importedRam.custodyOrigin = coordinate.map { RamCoordinate($0) }
+        importedRam.custodySince = coordinate == nil ? nil : now
+        liftAttempts[importedRam.id] = nil
 
         if let index = activeRams.firstIndex(where: { $0.id == importedRam.id }) {
             activeRams[index] = importedRam
@@ -498,7 +879,210 @@ final class FlockViewModel {
             activeRams.append(importedRam)
         }
 
-        selectedRamId = importedRam.id
+        // A guest never takes the selected ram's place.
+        if !importedRam.isGuest || !ownRams.contains(where: { Self.isInPlay($0) }) {
+            selectedRamId = importedRam.id
+        }
+    }
+
+    // MARK: - Taking a letter back
+
+    /// Whether the sender can ask for this ram's letter back: it was handed
+    /// on from this phone, and this phone holds the letter's recall token.
+    func canTakeBack(_ ram: Ram) -> Bool {
+        guard ram.status == .handedOff, !ram.isGuest, !ram.wasDeliveredInPerson,
+              let letter = ram.letter, letter.recallTokenHash != nil else { return false }
+        return RecallTokenVault.isMine(letter.id)
+    }
+
+    /// Sender side: the recall request reached the relay.
+    func markRecallRequested(ramId: UUID, at date: Date = Date()) {
+        guard let index = activeRams.firstIndex(where: { $0.id == ramId }) else { return }
+        activeRams[index].recallRequestedAt = date
+    }
+
+    /// Sender side: the carrier gave the letter up. The ram comes home and
+    /// walks again from where it was handed on — to the quay if it was
+    /// waiting there, otherwise back to grazing.
+    @discardableResult
+    func restoreRecalled(letterID: UUID) -> String? {
+        guard let index = activeRams.firstIndex(where: {
+            $0.letter?.id == letterID && $0.status == .handedOff && !$0.isGuest
+        }) else { return nil }
+        var ram = activeRams[index]
+        let atQuay = ram.requiresHandoffAtLegEnd && ram.stepsWalked >= ram.totalStepsRequired
+        ram.status = atQuay ? .waitingForHandoff : .grazing
+        ram.recallRequestedAt = nil
+        ram.custodyOrigin = nil
+        ram.custodySince = nil
+        appendStamp(
+            to: &ram,
+            placeName: String(localized: "Came back home", bundle: .appLanguage, locale: .appLanguage),
+            kind: .arrival,
+            coordinate: ram.currentCoordinate
+        )
+        activeRams[index] = ram
+        return ram.name
+    }
+
+    /// Carrier side: the sender asked for their letter back and the recall's
+    /// hash matches the one inside the letter. The guest leaves this
+    /// mailbag. Returns the ram's name, or `nil` if nothing was released.
+    @discardableResult
+    func releaseRecalled(letterID: UUID, tokenHash: String) -> String? {
+        guard let index = activeRams.firstIndex(where: {
+            $0.isGuest && $0.letter?.id == letterID && Self.isInPlay($0)
+        }),
+        let expected = activeRams[index].letter?.recallTokenHash,
+        expected.lowercased() == tokenHash.lowercased()
+        else { return nil }
+
+        let ram = activeRams.remove(at: index)
+        endLiveActivity(for: ram.id)
+        liftAttempts[ram.id] = nil
+        if selectedRamId == ram.id {
+            selectedRamId = ownRams.first?.id ?? activeRams.first?.id
+        }
+        return ram.name
+    }
+
+    // MARK: - Riding along
+
+    /// How far the carrying phone must have moved since taking custody
+    /// before a ride-along is even considered. Keeps a phone that simply
+    /// stayed home from ever lifting a ram.
+    static let rideAlongMinimumTravelMeters: CLLocationDistance = 300_000
+
+    /// The ram must end up at least this much closer to its destination.
+    static let rideAlongMinimumGainMeters: CLLocationDistance = 100_000
+
+    /// Faster than any airliner means the location isn't real.
+    static let rideAlongMaximumSpeed: CLLocationSpeed = 300
+
+    /// A failed route check is not repeated until the phone has moved this
+    /// far again, or this much time has passed.
+    private static let rideAlongRetryDistance: CLLocationDistance = 50_000
+    private static let rideAlongRetryInterval: TimeInterval = 30 * 60
+
+    /// Lets rams with water ahead of them ride along with the phone
+    /// carrying them.
+    ///
+    /// Land is walked, water is crossed by the packet or in someone's
+    /// pocket. The pocket half is decided here, not at the moment of a
+    /// handoff: once the carrying phone has actually travelled (a flight,
+    /// a ferry) and turned up somewhere a road reaches the destination
+    /// from, and that is clearly closer than where the ram is, the ram
+    /// goes ashore there, any packet booking is cancelled, and the new leg
+    /// starts from the carrier's own position. It only ever moves a ram
+    /// forward.
+    ///
+    /// Called with the phone's position from the app's 30-second loop and
+    /// whenever the app becomes active.
+    func rideAlong(carrierAt position: CLLocationCoordinate2D, now: Date = Date()) async {
+        let here = CLLocation(latitude: position.latitude, longitude: position.longitude)
+
+        // First sight of a ram with no custody on record (sent from this
+        // phone, or from an older build): custody starts here and now.
+        for index in activeRams.indices where activeRams[index].custodyOrigin == nil {
+            guard activeRams[index].hasWaterAhead else { continue }
+            activeRams[index].custodyOrigin = RamCoordinate(position)
+            activeRams[index].custodySince = now
+        }
+
+        let candidates = activeRams.filter { ram in
+            guard ram.hasWaterAhead,
+                  let origin = ram.custodyOrigin,
+                  let since = ram.custodySince,
+                  let ramPosition = ram.currentCoordinate
+            else { return false }
+
+            let start = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+            let travelled = here.distance(from: start)
+            guard travelled >= Self.rideAlongMinimumTravelMeters else { return false }
+
+            let elapsed = max(now.timeIntervalSince(since), 1)
+            guard travelled / elapsed <= Self.rideAlongMaximumSpeed else { return false }
+
+            let destination = CLLocation(
+                latitude: ram.finalDestinationCoordinate.latitude,
+                longitude: ram.finalDestinationCoordinate.longitude
+            )
+            let ramLocation = CLLocation(latitude: ramPosition.latitude, longitude: ramPosition.longitude)
+            let gain = ramLocation.distance(from: destination) - here.distance(from: destination)
+            guard gain >= Self.rideAlongMinimumGainMeters else { return false }
+
+            if let last = liftAttempts[ram.id],
+               now.timeIntervalSince(last.date) < Self.rideAlongRetryInterval,
+               here.distance(from: CLLocation(latitude: last.position.latitude, longitude: last.position.longitude)) < Self.rideAlongRetryDistance {
+                return false
+            }
+            return true
+        }
+
+        for ram in candidates {
+            liftAttempts[ram.id] = (position, now)
+
+            // "Across the water" means a road now reaches the destination.
+            // Landing in Iceland on the way to Berlin doesn't count.
+            guard let leg = try? await RouteService.drivingRoute(
+                from: position,
+                to: ram.finalDestinationCoordinate.clLocationCoordinate
+            ) else { continue }
+
+            // Name the shore for the passport; offline, the stamp still says
+            // who carried it and the leg still starts in the right place.
+            let geocoded = try? await CLGeocoder().reverseGeocodeLocation(here, preferredLocale: .appLanguage)
+            let shoreName = geocoded?.first?.locality ?? geocoded?.first?.name
+                ?? String(localized: "Across the water", bundle: .appLanguage, locale: .appLanguage)
+
+            // Re-find by id: steps or an import may have reshaped the flock
+            // while those requests were in flight.
+            guard let index = activeRams.firstIndex(where: { $0.id == ram.id }),
+                  activeRams[index].hasWaterAhead
+            else { continue }
+
+            var updated = activeRams[index]
+            let carrier = Self.currentCarrierName(fallback: updated.name)
+
+            if updated.stepsWalked > 0 {
+                let point = updated.currentCoordinate
+                updated.routeHistory.append(RouteNode(
+                    cityName: updated.currentCity,
+                    latitude: point?.latitude ?? 0,
+                    longitude: point?.longitude ?? 0,
+                    carrierName: updated.name,
+                    stepsContributed: updated.stepsWalked
+                ))
+            }
+            updated.routeHistory.append(RouteNode(
+                cityName: shoreName,
+                latitude: position.latitude,
+                longitude: position.longitude,
+                carrierName: carrier,
+                stepsContributed: 0
+            ))
+            appendStamp(
+                to: &updated,
+                placeName: String(localized: "Crossed with \(carrier)", bundle: .appLanguage, locale: .appLanguage),
+                kind: .water,
+                coordinate: position
+            )
+
+            updated.voyage = nil
+            updated.currentCity = shoreName
+            updated.routeCoordinates = leg.coordinates
+            updated.totalStepsRequired = leg.distanceMeters
+            updated.stepsWalked = 0
+            updated.legDestinationCity = updated.targetCity
+            updated.requiresHandoffAtLegEnd = false
+            updated.status = leg.distanceMeters <= 25 ? .arrivedAtGate : .grazing
+            updated.custodyOrigin = RamCoordinate(position)
+            updated.custodySince = now
+
+            activeRams[index] = updated
+            liftAttempts[ram.id] = nil
+            startOrUpdateLiveActivity(for: updated)
+        }
     }
 
     /// Records that a ram has been given to another carrier.
@@ -513,15 +1097,27 @@ final class FlockViewModel {
     func markHandedOff(ramId: UUID, to carrierName: String?) {
         guard let index = activeRams.firstIndex(where: { $0.id == ramId }) else { return }
         var ram = activeRams[index]
-        guard ram.status != .delivered, ram.status != .arrivedAtGate, ram.status != .handedOff else { return }
+        guard ram.status != .delivered, ram.status != .handedOff else { return }
 
         let recipient = (carrierName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        appendStamp(
-            to: &ram,
-            placeName: recipient.isEmpty ? "Handed on" : "Handed to \(recipient)",
-            kind: .handoff,
-            coordinate: ram.currentCoordinate
-        )
+        if ram.status == .arrivedAtGate {
+            // Handed over at the gate: that's a delivery, in person.
+            appendStamp(
+                to: &ram,
+                placeName: recipient.isEmpty
+                    ? String(localized: "Delivered in person", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "Delivered to \(recipient)", bundle: .appLanguage, locale: .appLanguage),
+                kind: .arrival,
+                coordinate: ram.currentCoordinate
+            )
+        } else {
+            appendStamp(
+                to: &ram,
+                placeName: recipient.isEmpty ? "Handed on" : "Handed to \(recipient)",
+                kind: .handoff,
+                coordinate: ram.currentCoordinate
+            )
+        }
         ram.status = .handedOff
         activeRams[index] = ram
 
@@ -613,7 +1209,7 @@ final class FlockViewModel {
                 cityName: voyage.arrivalPortName,
                 latitude: shore.latitude,
                 longitude: shore.longitude,
-                carrierName: "The packet",
+                carrierName: String(localized: "The packet", bundle: .appLanguage, locale: .appLanguage),
                 stepsContributed: 0
             ))
             updated.currentCity = voyage.arrivalPortName
@@ -679,46 +1275,6 @@ final class FlockViewModel {
         }
     }
 
-    /// Re-resolves the leg a ram was already walking, from the position of
-    /// whoever has just taken it.
-    ///
-    /// Without this a mid-walk handoff is quietly broken: the package
-    /// carries the previous carrier's road polyline, and the new carrier's
-    /// steps would push the ram along a street on the other side of the
-    /// city. Re-resolving also makes the relay honest about cost — a
-    /// carrier who is farther from the destination gets a longer leg,
-    /// because they are, in fact, farther away.
-    ///
-    /// With no location fix the sender's leg is kept as-is: a wrong route
-    /// is worse than a slightly stale one.
-    private func resumeLeg(for ram: inout Ram, from origin: CLLocationCoordinate2D?) async {
-        guard let origin else { return }
-
-        let destination = ram.requiresHandoffAtLegEnd
-            ? (ram.routeCoordinates.last?.clLocationCoordinate ?? ram.finalDestinationCoordinate.clLocationCoordinate)
-            : ram.finalDestinationCoordinate.clLocationCoordinate
-
-        guard let leg = try? await RouteService.drivingRoute(from: origin, to: destination) else { return }
-
-        // Bank the steps the previous carrier walked before handing it on,
-        // so the passport's running total survives the relay instead of
-        // restarting at zero on the new phone.
-        if ram.stepsWalked > 0 {
-            ram.routeHistory.append(RouteNode(
-                cityName: ram.currentCity,
-                latitude: ram.currentCoordinate?.latitude ?? 0,
-                longitude: ram.currentCoordinate?.longitude ?? 0,
-                carrierName: ram.name,
-                stepsContributed: ram.stepsWalked
-            ))
-        }
-
-        ram.routeCoordinates = leg.coordinates
-        ram.totalStepsRequired = leg.distanceMeters
-        ram.stepsWalked = 0
-        ram.status = .grazing
-    }
-
 }
 
 #if DEBUG
@@ -765,7 +1321,7 @@ extension FlockViewModel {
             RamCoordinate(latitude: 48.9564, longitude: -54.6089),  // Gander
         ]
 
-        let klaus = Ram(
+        var klaus = Ram(
             name: "Klaus",
             status: .walking,
             stepsWalked: 7300,
@@ -779,8 +1335,15 @@ extension FlockViewModel {
             letter: letter,
             finalDestinationCoordinate: RamCoordinate(latitude: 50.1109, longitude: 8.6821) // Frankfurt
         )
+        klaus.stamps = [
+            JourneyStamp(placeName: "Burnaby", kind: .setOut, latitude: 49.2488, longitude: -122.9805, stepsAtStamp: 0, carrierName: "Anton", timestamp: Date().addingTimeInterval(-86_400 * 7)),
+            JourneyStamp(placeName: "Calgary", kind: .town, latitude: 51.0447, longitude: -114.0719, stepsAtStamp: 4200, carrierName: "Anton", timestamp: Date().addingTimeInterval(-86_400 * 4)),
+            JourneyStamp(placeName: "Thunder Bay", kind: .landmark, latitude: 48.3809, longitude: -89.2477, stepsAtStamp: 7300, carrierName: "Anton", timestamp: Date().addingTimeInterval(-86_400 * 1))
+        ]
 
-        return FlockViewModel(activeRams: [klaus], maxAllowedRams: 1)
+        let model = FlockViewModel(activeRams: [klaus], maxAllowedRams: 1)
+        model.selectedRamId = klaus.id
+        return model
     }
 }
 #endif

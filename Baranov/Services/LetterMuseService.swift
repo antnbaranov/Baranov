@@ -37,7 +37,10 @@ final class LetterMuseService {
     static var isSupported: Bool {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *) {
-            if case .available = SystemLanguageModel.default.availability {
+            // Also needs to write the app's language; otherwise the
+            // translated static text reads better than an English reply.
+            if case .available = SystemLanguageModel.default.availability,
+               AppLanguage.modelSupportsAppLanguage {
                 return true
             }
         }
@@ -66,11 +69,12 @@ final class LetterMuseService {
         defer { isThinking = false }
 
         let distance = DistanceFormatter.string(forMeters: context.distanceMeters)
-        let month = Date().formatted(.dateTime.month(.wide))
+        let month = Date().formatted(.dateTime.month(.wide).locale(Locale(identifier: "en")))
         let session = LanguageModelSession(instructions: """
             You give a spark for a letter, never the letter. \
             Reply with ONE short sentence of at most 15 words, in the second person, naming one thing to write about or ask. \
-            No greeting, no sign-off, no quotation marks, no emoji, no second sentence.
+            No greeting, no sign-off, no quotation marks, no emoji, no second sentence. \
+            \(AppLanguage.modelInstruction)
             """)
         let prompt = """
             Letter to \(context.recipientName.isEmpty ? "someone" : context.recipientName) in \(context.destinationCity), \
@@ -101,14 +105,19 @@ final class LetterMuseService {
         defer { isThinking = false }
 
         let legs = stamps.map { stamp -> String in
-            let when = stamp.timestamp.formatted(.dateTime.day().month(.abbreviated))
-            return "\(stamp.kind.rawValue) at \(stamp.placeName) on \(when), carried by \(stamp.carrierName), \(DistanceFormatter.string(forMeters: stamp.stepsAtStamp)) into the walk"
+            let when = stamp.timestamp.formatted(.dateTime.day().month(.abbreviated).locale(.appLanguage))
+            let weatherPart = stamp.weather.map { w in
+                ", \(Int(w.temperatureCelsius.rounded()))°C and \(w.condition.lowercased())"
+            } ?? ""
+            return "\(stamp.kind.rawValue) at \(stamp.displayPlaceName) on \(when), carried by \(stamp.carrierName), \(DistanceFormatter.string(forMeters: stamp.stepsAtStamp)) into the walk\(weatherPart)"
         }.joined(separator: "; ")
 
         let session = LanguageModelSession(instructions: """
             You write the short travelogue stamped inside a letter's passport. \
             Reply with two or three plain sentences, under 70 words total, past tense, third person, naming the real places and carriers given. \
-            Do not invent places, people, weather or events. No emoji, no exclamation marks, no headings.
+            When a stop has a temperature and condition, you may weave it in naturally (e.g. the weather it walked through), but only using the exact figures given. \
+            Do not invent places, people, weather or events. No emoji, no exclamation marks, no headings. \
+            \(AppLanguage.modelInstruction)
             """)
         let prompt = """
             The ram \(ram.name) carried a letter from \(ram.letter?.senderName ?? "the sender") to \(ram.letter?.recipientName ?? "the recipient"), \
@@ -140,7 +149,8 @@ final class LetterMuseService {
             Reply with ONE sentence of at most 22 words. \
             If the distance is above zero, compare it to a real, well-known thing of matching size with a correct rough number. \
             If the distance is zero, tease the ram for not having left yet. \
-            No quotation marks, no emoji, no second sentence.
+            No quotation marks, no emoji, no second sentence. \
+            \(AppLanguage.modelInstruction)
             """)
         let distance = DistanceFormatter.string(forMeters: totalMeters)
         var prompt = "The ram \(ramName) has walked \(totalMeters > 0 ? distance : "0 m")."
@@ -175,10 +185,13 @@ final class LetterMuseService {
     }
 
     /// Strips the quotation marks and stray whitespace models like to add.
+    /// Also drops a reply that came back in the wrong language, so the
+    /// caller shows its translated fallback instead.
     private static func cleaned(_ text: String) -> String? {
         let trimmed = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\"“”'"))
-        return trimmed.isEmpty ? nil : trimmed
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"“”'«»„"))
+        guard !trimmed.isEmpty, AppLanguage.isInAppLanguage(trimmed) else { return nil }
+        return trimmed
     }
 }

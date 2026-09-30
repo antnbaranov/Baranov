@@ -36,22 +36,23 @@ struct MailbagStatusBadge: View {
     let ram: Ram
     /// The sender's view of a ram at the gate: the letter was *left* there.
     var isOutgoing: Bool = false
+    var font: Font = .caption.weight(.medium)
 
     private var content: (text: LocalizedStringKey, tint: Color) {
         switch ram.status {
-        case .arrivedAtGate: (isOutgoing ? "Left at the Gate" : "At the Gate", .wax)
+        case .arrivedAtGate: (isOutgoing ? "Left at the gate" : "At the gate", .wax)
         case .delivered: ("Delivered", .wax)
-        case .atSea: ("At Sea", .accentColor)
-        case .waitingForHandoff: ("At the Port", .accentColor)
-        case .handedOff: ("Handed On", .secondary)
-        case .grazing: ("Ready to set out", .secondary)
-        case .walking: ("On the Way", .accentColor)
+        case .atSea: ("At sea", .accentColor)
+        case .waitingForHandoff: ("At the port", .accentColor)
+        case .handedOff: ("Handed on", .secondary)
+        case .grazing: ("Waiting for your first steps", .secondary)
+        case .walking: ("On the way", .accentColor)
         }
     }
 
     var body: some View {
         Text(content.text)
-            .font(.caption.weight(.medium))
+            .font(font)
             .foregroundStyle(content.tint)
             .lineLimit(1)
             .contentTransition(.opacity)
@@ -143,8 +144,10 @@ struct RouteProgressBar: View {
 struct MailbagRamRow: View {
     let ram: Ram
     let isOutgoing: Bool
-    /// The two smallest sheets: name, one line of route and a thin bar.
+    /// The smallest sheet: who it is to, the destination and a thin progress bar.
     var isSlim = false
+    /// The large deck card: bigger portrait and type, the same content.
+    var isCard = false
 
     private var counterpart: String {
         let name = isOutgoing ? ram.letter?.recipientName : ram.letter?.senderName
@@ -152,20 +155,58 @@ struct MailbagRamRow: View {
     }
 
     private var title: String {
+        // Someone else's letter I'm only carrying: whose, and for whom.
+        if ram.isGuest, let letter = ram.letter {
+            let sender = letter.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let recipient = letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sender.isEmpty, !recipient.isEmpty {
+                return String(localized: "\(sender)'s letter for \(recipient)", bundle: .appLanguage, locale: .appLanguage)
+            }
+        }
         if counterpart.isEmpty { return ram.name }
         return isOutgoing
-            ? String(localized: "To \(counterpart)")
-            : String(localized: "From \(counterpart)")
+            ? String(localized: "To \(counterpart)", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "From \(counterpart)", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private var originName: String {
         (ram.routeHistory.first?.cityName ?? ram.currentCity).mailbagShortName
     }
 
+    /// Who is actually carrying the letter right now, by name — the row's
+    /// portrait alone didn't say it.
+    private var carrierText: String {
+        let base: String
+        switch ram.status {
+        case .grazing, .walking:
+            base = String(localized: "Carried by \(ram.name)", bundle: .appLanguage, locale: .appLanguage)
+        case .waitingForHandoff:
+            base = String(localized: "\(ram.name) is waiting at the port", bundle: .appLanguage, locale: .appLanguage)
+        case .atSea:
+            base = String(localized: "\(ram.name) is aboard the packet", bundle: .appLanguage, locale: .appLanguage)
+        case .handedOff:
+            base = String(localized: "Someone else carries it now", bundle: .appLanguage, locale: .appLanguage)
+        case .arrivedAtGate, .delivered:
+            base = String(localized: "Brought by \(ram.name)", bundle: .appLanguage, locale: .appLanguage)
+        }
+        let extra = ram.passengerLetters.count
+        guard extra > 0, ram.status != .handedOff else { return base }
+        return String(localized: "\(base), with \(extra) more letters", bundle: .appLanguage, locale: .appLanguage)
+    }
+
     /// Where a leg ends short of the real destination: a port or border
     /// where the ram is handed on rather than walking further.
     private var handoffName: String? {
         ram.requiresHandoffAtLegEnd ? ram.legDestinationCity.mailbagShortName : nil
+    }
+
+    /// The other letters in the same bag, by recipient.
+    private var passengerText: String? {
+        let names = ram.passengerLetters
+            .map { $0.recipientName.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !names.isEmpty else { return nil }
+        return String(localized: "Also for \(names.formatted(.list(type: .and)))", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private func placeLine(_ symbol: String, _ text: String) -> some View {
@@ -177,7 +218,26 @@ struct MailbagRamRow: View {
     }
 
     var body: some View {
-        if isSlim { slimBody } else { fullBody }
+        if isSlim { slimBody } else if isCard { cardBody } else { fullBody }
+    }
+
+    /// The smallest sheet names only the receiver — the sender is usually
+    /// the person themselves, so "Anton's letter for" said nothing new.
+    private var slimTitle: String {
+        if ram.isGuest, let letter = ram.letter {
+            let recipient = letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !recipient.isEmpty { return recipient }
+        }
+        if isOutgoing, !counterpart.isEmpty { return counterpart }
+        return title
+    }
+
+    /// Destination, then the distance left while it is on the road.
+    private var slimPlaceLine: String {
+        let place = ram.targetCity.mailbagShortName
+        guard ram.isEnRoute else { return place }
+        let left = String(localized: "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) left", bundle: .appLanguage, locale: .appLanguage)
+        return "\(place) · \(left)"
     }
 
     private var slimBody: some View {
@@ -185,23 +245,72 @@ struct MailbagRamRow: View {
             RamPortraitView(name: ram.name, diameter: 32)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(title)
+                    Text(slimTitle)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     MailbagStatusBadge(ram: ram, isOutgoing: isOutgoing)
                 }
-                Text("\(originName) → \(ram.targetCity.mailbagShortName)")
+                // Where it is going, then how far is left; a thin bar below.
+                Text(slimPlaceLine)
                     .font(.footnote)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 if ram.isEnRoute {
                     ProgressView(value: min(max(ram.progress, 0), 1))
                         .tint(Color.accentColor)
+                        .padding(.top, 2)
                 }
             }
         }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The deck card: a large portrait and title, status underneath, then
+    /// the route and progress with room to breathe.
+    private var cardBody: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 14) {
+                RamPortraitView(name: ram.name, diameter: 60)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    MailbagStatusBadge(ram: ram, isOutgoing: isOutgoing,
+                                       font: .subheadline.weight(.medium))
+                }
+                Spacer(minLength: 0)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                placeLine("pawprint.fill", carrierText)
+                placeLine("circle", originName)
+                placeLine("mappin.and.ellipse", ram.targetCity.mailbagShortName)
+                if let handoffName {
+                    placeLine("arrow.triangle.swap", String(localized: "Handoff at \(handoffName)", bundle: .appLanguage, locale: .appLanguage))
+                }
+                if let passengerText {
+                    placeLine("envelope.fill", passengerText)
+                }
+            }
+
+            if ram.isEnRoute {
+                HStack(spacing: 10) {
+                    ProgressView(value: min(max(ram.progress, 0), 1))
+                        .tint(Color.accentColor)
+                    Text("\(DistanceFormatter.string(forMeters: ram.remainingSteps)) left")
+                        .font(.subheadline)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .fixedSize()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -219,12 +328,17 @@ struct MailbagRamRow: View {
                     Spacer(minLength: 4)
                     MailbagStatusBadge(ram: ram, isOutgoing: isOutgoing)
                 }
-                // One place per line — origin, destination and, when the
-                // journey is passed on, the handoff — so nothing is cut off.
+                // Who carries it, then one place per line — origin,
+                // destination and, when the journey is passed on, the
+                // handoff — so nothing is cut off.
+                placeLine("pawprint.fill", carrierText)
                 placeLine("circle", originName)
                 placeLine("mappin.and.ellipse", ram.targetCity.mailbagShortName)
                 if let handoffName {
-                    placeLine("arrow.triangle.swap", String(localized: "Handoff at \(handoffName)"))
+                    placeLine("arrow.triangle.swap", String(localized: "Handoff at \(handoffName)", bundle: .appLanguage, locale: .appLanguage))
+                }
+                if let passengerText {
+                    placeLine("envelope.fill", passengerText)
                 }
 
                 if ram.isEnRoute {
@@ -261,9 +375,9 @@ struct MailbagCollapsedBar: View {
     var body: some View {
         VStack(spacing: 10) {
             Button(action: onExpand) {
-                MailbagRamRow(ram: ram, isOutgoing: !canBreakSeal)
+                MailbagRamRow(ram: ram, isOutgoing: !canBreakSeal, isSlim: true)
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 10)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .buttonStyle(.plain)
@@ -344,6 +458,17 @@ struct MailbagCourierRow: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens the letter")
 
+            if isOutgoing, ram.status != .delivered, let message = ram.letterShareMessage {
+                ShareLink(item: message) {
+                    if ram.letter?.relayTicket != nil {
+                        Label("Share tracking link", systemImage: "square.and.arrow.up")
+                    } else {
+                        Label("Share code", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            }
+
             if canBreakSeal {
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -359,6 +484,10 @@ struct MailbagCourierRow: View {
         }
         .padding(.vertical, 4)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(action: onOpenBag) {
+                Label("Ram's Bag", systemImage: "bag")
+            }
+            .tint(.accentColor)
             if canCancel {
                 Button(role: .destructive) {
                     isCancelConfirmationPresented = true
@@ -371,7 +500,7 @@ struct MailbagCourierRow: View {
             Button(action: onOpenBag) {
                 Label("Ram's Bag", systemImage: "bag")
             }
-            if let message = ram.letter?.shareMessage(carrierName: carrierName) {
+            if let message = ram.letterShareMessage {
                 ShareLink(item: message) {
                     Label("Share Code", systemImage: "square.and.arrow.up")
                 }
@@ -403,44 +532,145 @@ extension String {
     }
 }
 
-// MARK: - Published (by code) letter row
+// MARK: - Held letter row
 
-/// A letter published through the relay: waiting for its recipient, or claimed.
-struct MailbagPublishedRow: View {
-    let published: PublishedLetter
+/// A letter sent by Shepherd ID or ear tag before the recipient's gate was
+/// known: its ram sets out on its own once they open the link.
+struct MailbagHeldRow: View {
+    let record: LetterTracker.Record
 
-    private var displayCode: String {
-        published.code.count == 6
-            ? "\(published.code.prefix(3))-\(published.code.dropFirst(3))" : published.code
+    private var ramName: String { record.ramName ?? "" }
+
+    private var shareMessage: String? {
+        LetterTracker.shared.heldLetter(for: record.letterID)?.awaitingGateShareMessage(ramName: ramName)
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: published.isClaimed ? "envelope.open.fill" : "envelope.fill")
-                .font(.body)
-                .foregroundStyle(published.isClaimed ? Color.green : Color.accentColor)
-                .frame(width: 44, height: 44)
-                .background(.thinMaterial, in: Circle())
+            RamPortraitView(name: ramName, diameter: 44)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("For \(published.recipientName)")
+                Text("For \(record.recipientName)")
                     .font(.body.weight(.semibold))
                     .lineLimit(1)
-                Text(published.isClaimed ? String(localized: "Picked up") : String(localized: "Code \(displayCode)"))
-                    .font(.subheadline.monospaced())
+                Text("\(ramName) sets out when \(record.recipientName) opens your link.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
 
             Spacer(minLength: 8)
 
-            if !published.isClaimed {
-                ShareLink(item: String(localized: "Claim my Baranov letter with this code: \(published.code)")) {
+            if let shareMessage {
+                ShareLink(item: shareMessage) {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Share Code")
+                .accessibilityLabel("Share tracking link")
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - A letter someone said is coming
+
+/// "A letter from Anton is on its way": known only from the link in the
+/// code message, so there is no progress bar — just who, which ram, where
+/// and roughly when.
+struct ExpectedLetterRow: View {
+    let letter: ExpectedLetter
+
+    private var title: String {
+        letter.senderName.isEmpty
+            ? String(localized: "A letter is on its way to you", bundle: .appLanguage, locale: .appLanguage)
+            : String(localized: "A letter from \(letter.senderName) is on its way", bundle: .appLanguage, locale: .appLanguage)
+    }
+
+    private var detail: String {
+        var parts: [String] = []
+        if !letter.ramName.isEmpty {
+            parts.append(String(localized: "Carried by \(letter.ramName)", bundle: .appLanguage, locale: .appLanguage))
+        }
+        if !letter.city.isEmpty {
+            parts.append(String(localized: "to \(letter.city.mailbagShortName)", bundle: .appLanguage, locale: .appLanguage))
+        }
+        if let expectedBy = letter.expectedBy {
+            parts.append(String(localized: "around \(expectedBy.formatted(.dateTime.month(.abbreviated).day().locale(.appLanguage)))", bundle: .appLanguage, locale: .appLanguage))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Where the ram is now, as the post office last heard. `nil` until the
+    /// relay has answered (a link-only card shows just the line above).
+    private var liveLine: String? {
+        if letter.deliveredAt != nil {
+            return String(localized: "Arrived. Bringing it into your mailbag…", bundle: .appLanguage, locale: .appLanguage)
+        }
+        guard letter.relayKnowsIt == true else { return nil }
+        if letter.awaitingGate == true || letter.status == "awaitingGate" {
+            return GateStore.shared.gate == nil
+                ? String(localized: "Ready to set out. Allow location so it knows where your gate is.", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "Ready to set out for your gate", bundle: .appLanguage, locale: .appLanguage)
+        }
+        guard let status = letter.relayStatus else { return nil }
+        let place = (letter.currentCity ?? "").mailbagShortName
+        let walker = letter.senderName.isEmpty
+            ? String(localized: "The ram", bundle: .appLanguage, locale: .appLanguage)
+            : letter.senderName
+        switch status {
+        case .waitingForHandoff:
+            return place.isEmpty
+                ? String(localized: "Waiting at the port", bundle: .appLanguage, locale: .appLanguage)
+                : String(localized: "Waiting at the port in \(place)", bundle: .appLanguage, locale: .appLanguage)
+        case .atSea:
+            return String(localized: "At sea", bundle: .appLanguage, locale: .appLanguage)
+        case .grazing where (letter.metersWalked ?? 0) == 0:
+            return String(localized: "Just set out", bundle: .appLanguage, locale: .appLanguage)
+        default:
+            let toGo = DistanceFormatter.string(forMeters: letter.metersToGo ?? 0)
+            return String(localized: "\(walker) is walking to your gate · \(toGo) to go", bundle: .appLanguage, locale: .appLanguage)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if letter.ramName.isEmpty {
+                Image(systemName: "envelope.badge.clock")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 44)
+            } else {
+                RamPortraitView(name: letter.ramName, diameter: 44)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                if let liveLine {
+                    Text(liveLine)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                if let progress: Double = letter.deliveredAt != nil ? Optional(1.0) : letter.progress {
+                    ProgressView(value: progress)
+                        .progressViewStyle(.linear)
+                        .padding(.top, 4)
+                        .accessibilityLabel("Journey")
+                        .accessibilityValue(Text(progress, format: .percent.precision(.fractionLength(0))))
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

@@ -64,9 +64,80 @@ struct NearbyCourier: Identifiable, Hashable, Sendable {
     }
 }
 
+/// "Anton wants to hand you Klaus": the ask that reaches a courier's phone
+/// when someone taps them and chooses Hand over. It travels as the context of
+/// a Multipeer invitation that is always declined — no session is opened for
+/// it. The token then pairs the two phones' hoofbeat relays, instead of a
+/// shake.
+struct HandoverRequest: Codable, Identifiable, Hashable, Sendable {
+    let token: String
+    let fromName: String
+    let ramName: String?
+    /// Where the letter is ultimately going, so the courier can decide by
+    /// direction, not just by who's asking. Optional: older builds omit it.
+    var destinationCity: String? = nil
+    var destinationLatitude: Double? = nil
+    var destinationLongitude: Double? = nil
+    /// Handed over at the gate to the person the letter is for.
+    var isDelivery: Bool? = nil
+    var id: String { token }
+}
+
+/// A moment worth pointing out while a courier is in range: someone whose
+/// trip matches one of your letters, or the very person a letter is for.
+struct CourierSuggestion: Identifiable, Hashable, Sendable {
+    enum Kind: Hashable, Sendable {
+        /// Their trip goes where the letter is going.
+        case goingYourWay
+        /// They are the letter's recipient and it has reached their town.
+        case deliver
+    }
+    let kind: Kind
+    let courier: NearbyCourier
+    let ramID: UUID
+    let ramName: String
+    let place: String
+    var id: String { "\(courier.id)|\(ramID)" }
+}
+
+/// Carries a non-`Sendable` peer id from a delegate callback to the main
+/// actor, where it is only ever used.
+private struct PeerBox: @unchecked Sendable {
+    let value: MCPeerID
+}
+
 @MainActor
 @Observable
 final class NearbyCourierService: NSObject {
+    /// A handover someone nearby asked us to accept. Cleared on answer or
+    /// after `requestLifetime`.
+    private(set) var incomingRequest: HandoverRequest?
+    /// A courier nearby worth handing a letter to right now.
+    private(set) var suggestion: CourierSuggestion?
+
+    /// Shows a suggestion unless the same one was shown in the last day —
+    /// a courier who lingers in range must not be announced every minute.
+    func suggest(_ suggestion: CourierSuggestion) {
+        guard self.suggestion == nil, incomingRequest == nil else { return }
+        var shown = UserDefaults.standard.dictionary(forKey: Self.shownSuggestionsKey) as? [String: Date] ?? [:]
+        let now = Date()
+        shown = shown.filter { now.timeIntervalSince($0.value) < 86_400 }
+        guard shown[suggestion.id] == nil else { return }
+        shown[suggestion.id] = now
+        UserDefaults.standard.set(shown, forKey: Self.shownSuggestionsKey)
+        self.suggestion = suggestion
+    }
+
+    func dismissSuggestion() {
+        suggestion = nil
+    }
+
+    private static let shownSuggestionsKey = "com.baranov.shownCourierSuggestions"
+
+    /// How long an unanswered request stays on screen. The sender's relay
+    /// waits a little longer than this.
+    static let requestLifetime: TimeInterval = 40
+
     private(set) var couriers: [NearbyCourier] = []
     private(set) var isRunning = false
 
@@ -75,6 +146,10 @@ final class NearbyCourierService: NSObject {
     @ObservationIgnored private var browser: MCNearbyServiceBrowser?
     @ObservationIgnored private var advertiser: MCNearbyServiceAdvertiser?
     @ObservationIgnored private var found: [String: NearbyCourier] = [:]
+    @ObservationIgnored private var peers: [String: MCPeerID] = [:]
+    /// Only exists to address invitations; never connects.
+    @ObservationIgnored private var requestSession: MCSession?
+    @ObservationIgnored private var requestExpiry: Task<Void, Never>?
 
     /// Start looking. Pass `announce` to also be seen by others.
     func start(announce: (name: String, tripCity: String, trip: RamCoordinate?)?) {
@@ -104,8 +179,42 @@ final class NearbyCourierService: NSObject {
         advertiser?.stopAdvertisingPeer()
         advertiser = nil
         found = [:]
+        peers = [:]
         couriers = []
         isRunning = false
+    }
+
+    /// Asks the courier with `courierID` to accept a handover. Returns
+    /// `false` if they are no longer in range.
+    @discardableResult
+    func requestHandover(to courierID: String, request: HandoverRequest) -> Bool {
+        guard let browser, let peer = peers[courierID],
+              let context = try? JSONEncoder().encode(request) else { return false }
+        let session = requestSession ?? MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .none)
+        requestSession = session
+        browser.invitePeer(peer, to: session, withContext: context, timeout: 5)
+        return true
+    }
+
+    /// Clears the incoming request, whatever the answer was.
+    func dismissIncomingRequest() {
+        requestExpiry?.cancel()
+        requestExpiry = nil
+        incomingRequest = nil
+    }
+
+    fileprivate func receive(_ request: HandoverRequest) {
+        incomingRequest = request
+        requestExpiry?.cancel()
+        requestExpiry = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(NearbyCourierService.requestLifetime))
+            guard !Task.isCancelled, self?.incomingRequest?.token == request.token else { return }
+            self?.incomingRequest = nil
+        }
+    }
+
+    fileprivate func remember(_ peer: MCPeerID) {
+        peers[peer.displayName] = peer
     }
 
     fileprivate func add(_ courier: NearbyCourier) {
@@ -115,6 +224,7 @@ final class NearbyCourierService: NSObject {
 
     fileprivate func remove(id: String) {
         found[id] = nil
+        peers[id] = nil
         publish()
     }
 
@@ -134,7 +244,11 @@ extension NearbyCourierService: MCNearbyServiceBrowserDelegate {
             tripLatitude: info?["la"].flatMap(Double.init),
             tripLongitude: info?["lo"].flatMap(Double.init)
         )
-        Task { @MainActor in self.add(courier) }
+        let boxed = PeerBox(value: peerID)
+        Task { @MainActor in
+            self.remember(boxed.value)
+            self.add(courier)
+        }
     }
 
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
@@ -148,10 +262,14 @@ extension NearbyCourierService: MCNearbyServiceBrowserDelegate {
 }
 
 extension NearbyCourierService: MCNearbyServiceAdvertiserDelegate {
-    /// Only ever advertising — refuse every session invitation.
+    /// Never opens a session. An invitation carrying a `HandoverRequest` is
+    /// someone asking to hand us a ram: surface it, then decline the
+    /// invitation itself — the actual transfer runs over the hoofbeat relay.
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID,
                                 withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
         invitationHandler(false, nil)
+        guard let context, let request = try? JSONDecoder().decode(HandoverRequest.self, from: context) else { return }
+        Task { @MainActor in self.receive(request) }
     }
 
     nonisolated func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {}

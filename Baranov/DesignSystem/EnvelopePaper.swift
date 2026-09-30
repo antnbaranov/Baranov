@@ -23,7 +23,7 @@ enum EnvelopePaper: String, Codable, CaseIterable, Identifiable, Sendable {
     /// "Expand the Pasture", like the wax colours. Heirloom Parchment is
     /// the one premium exception — same entitlement, just called out as
     /// the "rare" pick in the picker, alongside the rare wax colours.
-    var isIncludedFree: Bool { self != .parchment }
+    var isIncludedFree: Bool { true }
 
     var displayName: LocalizedStringKey {
         switch self {
@@ -170,6 +170,9 @@ struct PostcardView: View {
     var showsSeal: Bool = false
     /// A colour picked on the colour wheel; overrides the preset paper.
     var customHex: String? = nil
+    /// 0…1 while the sender holds the wax: a pool of wax gathers on the
+    /// postcard where the seal will land, so the hold shows what it does.
+    var sealPreview: Double = 0
 
     private var style: PaperStyle { PaperStyle(paper: paper, customHex: customHex) }
 
@@ -220,6 +223,17 @@ struct PostcardView: View {
                 WaxSealView(wax: wax, monogram: monogram, diameter: 46)
                     .padding(14)
                     .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if !showsSeal {
+                WaxBlobShape(unevenness: 0.11)
+                    .fill(wax.color.gradient)
+                    .frame(width: 46, height: 46)
+                    .scaleEffect(0.2 + 0.8 * sealPreview)
+                    .opacity(min(1, sealPreview * 4))
+                    .padding(14)
+                    .allowsHitTesting(false)
             }
         }
         .shadow(color: .black.opacity(0.16), radius: 12, x: 0, y: 7)

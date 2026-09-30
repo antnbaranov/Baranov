@@ -108,8 +108,10 @@ struct WaxSealView: View {
             SealMonogram(monogram: monogram, diameter: diameter)
         }
         .frame(width: diameter, height: diameter)
+        // Shimmer first, clip second: the highlight must be cut to the wax's
+        // own silhouette, or its band sweeps across the letter behind it.
+        .metallicShimmer(isActive: wax.hasShimmer)
         .clipShape(WaxBlobShape())
-        .metallicShimmer(isActive: wax.isRare)
         .accessibilityLabel("\(wax.displayName) wax seal, monogram \(monogram)")
     }
 }
@@ -161,6 +163,8 @@ struct WaxSealPressView: View {
     var monogram: String
     var diameter: CGFloat = 84
     var holdDuration: Double = 1.5
+    /// True while a hold is in progress (and through the stamp), false on release.
+    var onHoldChange: ((Bool) -> Void)? = nil
     var onSealed: () -> Void
 
     @State private var holdProgress: Double = 0
@@ -235,6 +239,7 @@ struct WaxSealPressView: View {
                     cancelHold()
                 }
         )
+        .onChange(of: isHolding) { _, holding in onHoldChange?(holding || isStamping) }
         .accessibilityLabel("Wax seal")
         .accessibilityHint("Touch and hold to seal the letter")
         .accessibilityAddTraits(.isButton)

@@ -5,9 +5,17 @@
 //  Live Activity + Dynamic Island for a ram on its journey.
 //
 //  Follows the pattern Apple uses for delivery/ride Live Activities: one
-//  glanceable hero number, a progress track with the traveller riding along it,
-//  and endpoints underneath. Standard system type styles and semantic
-//  foreground styles only, so Dynamic Type, Always-On and dark/light all work.
+//  glanceable hero number, a plain progress bar and endpoints underneath.
+//  The ram appears once, at the leading edge, never on the bar.
+//
+//  A Live Activity cannot run a free-standing animation loop, so the motion
+//  comes from three things the system does animate: the gait frame that
+//  advances with every update (`stride`), the distance and progress that
+//  transition between updates, and a walking clock that ticks by itself
+//  with no update at all (`Text(_:style: .timer)`).
+//
+//  Standard system type styles and semantic foreground styles only, so
+//  Dynamic Type, Always-On and dark/light all work.
 //
 import ActivityKit
 import SwiftUI
@@ -18,65 +26,45 @@ import WidgetKit
 struct BaranovLiveActivityView: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RamActivityAttributes.self) { context in
-            LockScreenLiveActivityView(attributes: context.attributes, state: context.state)
-                .activityBackgroundTint(.liveActivityBackground)
-                .activitySystemActionForegroundColor(.primary)
+            LockScreenLiveActivityView(attributes: context.attributes, state: context.state, isStale: context.isStale)
         } dynamicIsland: { context in
             DynamicIsland {
                 // Expanded: sprite left, hero distance right, name centred, track below.
                 DynamicIslandExpandedRegion(.leading) {
-                    RamSprite(pose: context.state.pose, height: 52)
+                    LiveRam(state: context.state, height: 48)
                         .padding(.leading, 4)
                         .accessibilityHidden(true)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(context.state.remainingDistance)
-                            .font(.system(.title2, design: .rounded, weight: .bold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text("to go")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.trailing, 4)
+                    DistanceStack(distance: context.state.remainingDistance, valueFont: .title2, unitFont: .caption)
+                        .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    VStack(spacing: 2) {
-                        Text(context.attributes.ramName)
-                            .font(.headline)
-                            .lineLimit(1)
-                        Label(context.state.statusLabel, systemImage: context.state.statusSymbol)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text(context.attributes.ramName)
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 6) {
-                        JourneyTrack(progress: context.state.progress, pose: context.state.pose, spriteHeight: 30)
+                    VStack(alignment: .leading, spacing: 6) {
+                        StatusRow(state: context.state)
+                        LiveTrack(state: context.state, isStale: context.isStale, height: 8)
                         RouteRow(from: context.attributes.fromCity,
                                  to: context.attributes.toCity,
                                  progress: context.state.progress)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 4)
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                RamSprite(pose: context.state.pose, height: 22)
+                LiveRam(state: context.state, height: 22)
                     .padding(.leading, 2)
                     .accessibilityHidden(true)
             } compactTrailing: {
-                Text(context.state.remainingDistance)
-                    .font(.system(.footnote, design: .rounded, weight: .semibold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .fixedSize()
+                CompactTrailing(state: context.state, isStale: context.isStale)
             } minimal: {
-                MinimalProgressRing(progress: context.state.progress, pose: context.state.pose)
+                MinimalProgressRing(state: context.state, isStale: context.isStale)
             }
             .keylineTint(.accentColor)
             .widgetURL(URL(string: "baranov://pasture"))
@@ -86,14 +74,25 @@ struct BaranovLiveActivityView: Widget {
 
 // MARK: - Background
 
-private extension Color {
-    /// Soft parchment in light mode, warm charcoal in dark mode, so the Lock Screen
-    /// card reads as a light, native card instead of the default near-black slab.
-    static let liveActivityBackground = Color(uiColor: UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.20, green: 0.18, blue: 0.16, alpha: 0.92)
-            : UIColor(red: 0.98, green: 0.96, blue: 0.92, alpha: 0.92)
-    })
+/// The card colors are chosen from the color scheme the Lock Screen is rendering the card in, read from
+/// the view's own environment, so the background and the `.primary` / `.secondary` text always come from
+/// the same scheme. A dynamic `UIColor` handed to `activityBackgroundTint` is resolved separately from the
+/// text and could land light behind white text (or dark behind black text).
+private enum CardBackground {
+    /// Soft parchment in light mode, warm charcoal in dark mode.
+    static func standard(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.20, green: 0.18, blue: 0.16)
+            : Color(red: 0.98, green: 0.96, blue: 0.92)
+    }
+
+    /// The same card warmed toward wax-seal gold, shown only once the ram has reached the gate or the
+    /// letter has been delivered: a quiet "arrived" cue rather than a new layout.
+    static func arrival(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.30, green: 0.21, blue: 0.10)
+            : Color(red: 0.99, green: 0.92, blue: 0.78)
+    }
 }
 
 // MARK: - Lock Screen / banner
@@ -101,19 +100,21 @@ private extension Color {
 struct LockScreenLiveActivityView: View {
     let attributes: RamActivityAttributes
     let state: RamActivityAttributes.ContentState
+    var isStale: Bool = false
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top) {
+            HStack(alignment: .center, spacing: 12) {
+                LiveRam(state: state, height: 46)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(attributes.ramName)
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Label(state.statusLabel, systemImage: state.statusSymbol)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    StatusRow(state: state)
                     Text(routeDescription(from: attributes.fromCity, to: attributes.toCity))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -122,23 +123,16 @@ struct LockScreenLiveActivityView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(state.remainingDistance)
-                        .font(.system(.title, design: .rounded, weight: .bold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                    Text("to go")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                DistanceStack(distance: state.remainingDistance, valueFont: .title, unitFont: .caption)
             }
 
-            JourneyTrack(progress: state.progress, pose: state.pose, spriteHeight: 38)
+            LiveTrack(state: state, isStale: isStale, height: 8)
+            StatsRow(state: state)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        .activityBackgroundTint(state.hasArrived ? CardBackground.arrival(colorScheme) : CardBackground.standard(colorScheme))
+        .activitySystemActionForegroundColor(colorScheme == .dark ? .white : .black)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             "\(attributes.ramName), \(state.statusLabel). \(state.remainingDistance) to go from \(attributes.fromCity) to \(attributes.toCity), \(state.percentComplete) percent complete."
@@ -148,50 +142,182 @@ struct LockScreenLiveActivityView: View {
 
 // MARK: - Building blocks
 
-/// The ram, drawn from the bundled sprite art for the current pose.
+/// The ram, drawn from the bundled sprite art. While walking, `stride` picks
+/// the gait frame, so every update the ram takes another step. The frame is
+/// laid out in a fixed box so swapping frames never shifts the layout.
 struct RamSprite: View {
     let pose: RamActivityPose
+    let stride: Int
     let height: CGFloat
 
+    /// The gait frame if it is bundled, otherwise the single run frame, so the
+    /// ram can never render as an empty box.
+    private var imageName: String {
+        let name = pose.assetName(stride: stride)
+        return UIImage(named: name) != nil ? name : "RamRun"
+    }
+
     var body: some View {
-        Image(pose.assetName)
+        Image(imageName)
             .resizable()
             .scaledToFit()
-            .frame(height: height)
+            .frame(width: height * pose.aspectRatio, height: height)
+            // A small hop on every other step, so the gait reads as a gait.
+            .offset(y: pose == .run && stride.isMultiple(of: 2) ? -height * 0.04 : 0)
+            .animation(.snappy(duration: 0.25), value: stride)
     }
 }
 
-/// A track with the ram standing on it, advancing left → right with progress.
+/// The ram for the Live Activity and Dynamic Island. A Live Activity cannot run
+/// a loop of its own, so every update is made to count: the gait advances one
+/// frame, the ram tips and hops with a bouncy spring, and every eighth step it
+/// leaps with a little sparkle. On arrival it stays mid-leap and celebrates.
+///
+/// The frame box is fixed at the widest sprite, so changing pose never nudges
+/// the text next to it.
+struct LiveRam: View {
+    let state: RamActivityAttributes.ContentState
+    let height: CGFloat
+    var showsExtras: Bool = true
+
+    private var pose: RamActivityPose { state.pose }
+    private var stride: Int { state.strideFrame }
+    private var isEvenStep: Bool { stride.isMultiple(of: 2) }
+
+    private var imageName: String {
+        let name = pose.assetName(stride: stride)
+        return UIImage(named: name) != nil ? name : "RamRun"
+    }
+
+    private var tilt: Double {
+        switch pose {
+        case .run: return isEvenStep ? -4 : 4
+        case .leap: return -8
+        case .idle: return 0
+        }
+    }
+
+    private var lift: CGFloat {
+        switch pose {
+        case .run: return isEvenStep ? -height * 0.08 : 0
+        case .leap: return -height * 0.12
+        case .idle: return 0
+        }
+    }
+
+    var body: some View {
+        Image(imageName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: height * RamActivityPose.widestAspectRatio, height: height)
+            .rotationEffect(.degrees(tilt), anchor: .bottom)
+            .offset(y: lift)
+            .overlay(alignment: .topTrailing) {
+                if showsExtras, pose == .leap {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: height * 0.32, weight: .semibold))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.tint)
+                        .offset(x: -height * 0.02, y: -height * 0.06)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .animation(.bouncy(duration: 0.45, extraBounce: 0.25), value: stride)
+            .animation(.bouncy(duration: 0.45, extraBounce: 0.25), value: pose)
+    }
+}
+
+/// A plain progress bar. The ram is not drawn on it; it already stands
+/// at the leading edge, so the bar keeps the full width for the distance.
 struct JourneyTrack: View {
     let progress: Double
-    let pose: RamActivityPose
-    let spriteHeight: CGFloat
-
-    private let trackHeight: CGFloat = 8
+    let height: CGFloat
 
     var body: some View {
         GeometryReader { geo in
-            let spriteWidth = spriteHeight * pose.aspectRatio
-            let travel = max(0, geo.size.width - spriteWidth)
-            let x = travel * min(max(progress, 0), 1)
-
-            ZStack(alignment: .bottomLeading) {
+            let clamped = min(max(progress, 0), 1)
+            ZStack(alignment: .leading) {
                 Capsule(style: .continuous)
                     .fill(.quaternary)
-                    .frame(height: trackHeight)
-
                 Capsule(style: .continuous)
                     .fill(.tint)
-                    .frame(width: max(trackHeight, x + spriteWidth / 2), height: trackHeight)
-
-                RamSprite(pose: pose, height: spriteHeight)
-                    .offset(x: x, y: -(trackHeight - 2))
+                    .frame(width: max(height, geo.size.width * clamped))
             }
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
-        .frame(height: spriteHeight + trackHeight - 2)
+        .frame(height: height)
         .animation(.smooth, value: progress)
         .accessibilityHidden(true)
+    }
+}
+
+/// Status label, weather and, while walking, a clock that counts up on its
+/// own. The clock is the one element that moves between updates.
+struct StatusRow: View {
+    let state: RamActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Label {
+                Text(state.displayLabel)
+            } icon: {
+                Image(systemName: state.displaySymbol)
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.bounce, value: state.strideFrame)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            if state.isWalking, state.isMovingNow, let since = state.walkingSince {
+                Text(since, style: .timer)
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 64, alignment: .leading)
+                    .accessibilityLabel("Walking time")
+            }
+            if let weatherSymbol = state.weatherSymbol {
+                Image(systemName: weatherSymbol)
+                    .font(.subheadline)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Current weather")
+            }
+        }
+    }
+}
+
+/// Splits "12.3 km" into ("12.3", "km") and "850 m" into ("850", "m").
+func splitDistance(_ distance: String) -> (value: String, unit: String) {
+    let parts = distance.split(separator: " ", maxSplits: 1).map(String.init)
+    guard parts.count == 2 else { return (distance, "") }
+    return (parts[0], parts[1])
+}
+
+/// The hero distance on two lines: the number, then its unit underneath.
+struct DistanceStack: View {
+    let distance: String
+    let valueFont: Font.TextStyle
+    let unitFont: Font.TextStyle
+
+    var body: some View {
+        let parts = splitDistance(distance)
+        VStack(alignment: .trailing, spacing: 0) {
+            Text(parts.value)
+                .font(.system(valueFont, weight: .bold))
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(parts.unit)
+                .font(.system(unitFont))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(distance) to go")
     }
 }
 
@@ -214,11 +340,12 @@ struct RouteRow: View {
             Label(routeText, systemImage: "mappin.and.ellipse")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
             Text("\(Int((min(max(progress, 0), 1) * 100).rounded()))%")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.system(.caption, weight: .semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .foregroundStyle(.primary)
@@ -229,20 +356,141 @@ struct RouteRow: View {
 
 /// Circular progress with the ram inside, for the minimal Dynamic Island.
 private struct MinimalProgressRing: View {
-    let progress: Double
-    let pose: RamActivityPose
+    let state: RamActivityAttributes.ContentState
+    var isStale: Bool = false
 
     var body: some View {
+        let progress = min(max(state.progress, 0), 1)
         ZStack {
-            Circle().stroke(.quaternary, lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: min(max(progress, 0), 1))
-                .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            RamSprite(pose: pose, height: 12)
+            if let range = state.liveRange(isStale: isStale) {
+                // Sweeps by itself between updates.
+                ProgressView(timerInterval: range, countsDown: false) {
+                    EmptyView()
+                } currentValueLabel: {
+                    EmptyView()
+                }
+                .progressViewStyle(.circular)
+                .tint(.accentColor)
+            } else {
+                Circle().stroke(.quaternary, lineWidth: 3)
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+            LiveRam(state: state, height: 12, showsExtras: false)
         }
         .padding(2)
         .accessibilityLabel("Journey \(Int((progress * 100).rounded())) percent complete")
+    }
+}
+
+// MARK: - Live (self-animating) pieces
+
+/// The progress bar. While the shepherd is walking it is a system timer bar
+/// (`ProgressView(timerInterval:)`), which the system slides forward every
+/// frame with no update at all; otherwise a plain static capsule.
+struct LiveTrack: View {
+    let state: RamActivityAttributes.ContentState
+    let isStale: Bool
+    let height: CGFloat
+
+    var body: some View {
+        if let range = state.liveRange(isStale: isStale) {
+            ProgressView(timerInterval: range, countsDown: false) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }
+            .progressViewStyle(.linear)
+            .tint(.accentColor)
+            .scaleEffect(x: 1, y: height / 4, anchor: .center)
+            .frame(height: height)
+            .accessibilityHidden(true)
+        } else {
+            JourneyTrack(progress: state.progress, height: height)
+        }
+    }
+}
+
+/// Steps walked and cadence, so the card shows more than one distance.
+struct StatsRow: View {
+    let state: RamActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let walked = state.stepsWalked {
+                Label {
+                    Text("\(walked.formatted()) steps")
+                        .contentTransition(.numericText())
+                } icon: {
+                    Image(systemName: "shoeprints.fill")
+                }
+            }
+            if state.isWalking, state.isMovingNow, let spm = state.stepsPerMinute, spm > 0 {
+                Label {
+                    Text("\(spm)/min")
+                        .contentTransition(.numericText())
+                } icon: {
+                    Image(systemName: "speedometer")
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .animation(.smooth, value: state.stepsWalked)
+    }
+}
+
+/// Compact trailing slot: while walking, a ring that sweeps on its own around
+/// the state icon; in every other state the icon plus the distance.
+struct CompactTrailing: View {
+    let state: RamActivityAttributes.ContentState
+    let isStale: Bool
+
+    var body: some View {
+        if let range = state.liveRange(isStale: isStale) {
+            ZStack {
+                ProgressView(timerInterval: range, countsDown: false) {
+                    EmptyView()
+                } currentValueLabel: {
+                    EmptyView()
+                }
+                .progressViewStyle(.circular)
+                .tint(.accentColor)
+                Image(systemName: state.displaySymbol)
+                    .font(.system(size: 9, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                    .symbolEffect(.bounce, value: state.strideFrame)
+            }
+            .frame(width: 22, height: 22)
+            .accessibilityLabel("\(state.remainingDistance) to go")
+        } else {
+            HStack(spacing: 3) {
+                Image(systemName: state.displaySymbol)
+                    .font(.system(.footnote, weight: .semibold))
+                    .contentTransition(.symbolEffect(.replace))
+                Text(state.remainingDistance)
+                    .font(.system(.footnote, weight: .semibold))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+            }
+            .fixedSize()
+        }
+    }
+}
+
+extension RamActivityAttributes.ContentState {
+    /// The self-running interval, only while walking and while the card is
+    /// still fresh and the end is ahead of us.
+    func liveRange(isStale: Bool) -> ClosedRange<Date>? {
+        guard !isStale, isWalking, isMovingNow,
+              let start = barStart, let end = barEnd, start < end, end > Date() else { return nil }
+        return start...end
     }
 }
 
@@ -253,19 +501,30 @@ private struct MinimalProgressRing: View {
 enum RamActivityPose {
     case idle, run, leap
 
-    var assetName: String {
+    /// Number of gait frames bundled in the widget (`RamStride0…6`).
+    static let strideFrameCount = 7
+
+    /// A walking ram takes seven steps, then leaps on the eighth.
+    static let walkCycleLength = 8
+
+    /// The widest sprite, used to reserve a fixed frame in the Live Activity.
+    static let widestAspectRatio: CGFloat = 313.0 / 202.0
+
+    func assetName(stride: Int) -> String {
         switch self {
         case .idle: return "RamIdle"
-        case .run: return "RamRun"
         case .leap: return "RamLeap"
+        case .run:
+            let beat = ((stride % Self.walkCycleLength) + Self.walkCycleLength) % Self.walkCycleLength
+            return "RamStride\(min(beat, Self.strideFrameCount - 1))"
         }
     }
 
-    /// Width / height of the bundled frame, so the track can reserve room.
+    /// Width / height of the bundled frame, so layouts can reserve room.
     var aspectRatio: CGFloat {
         switch self {
         case .idle: return 215.0 / 200.0
-        case .run: return 304.0 / 197.0
+        case .run: return 313.0 / 202.0
         case .leap: return 184.0 / 218.0
         }
     }
@@ -274,11 +533,47 @@ enum RamActivityPose {
 extension RamActivityAttributes.ContentState {
     var pose: RamActivityPose {
         switch statusSymbol {
-        case "figure.walk": return .run
+        case "figure.walk":
+            // Paused: the shepherd stopped, so the ram stands still.
+            if !isMovingNow { return .idle }
+            // Seven steps, then a happy leap, so the ram is never just a loop.
+            let beat = ((strideFrame % RamActivityPose.walkCycleLength) + RamActivityPose.walkCycleLength) % RamActivityPose.walkCycleLength
+            return beat == RamActivityPose.walkCycleLength - 1 ? .leap : .run
         case "flag.checkered", "checkmark.seal.fill": return .leap
         default: return .idle
         }
     }
 
+    var isWalking: Bool { statusSymbol == "figure.walk" }
+
+    /// Older builds never send `isMoving`; treat that as moving.
+    var isMovingNow: Bool { isMoving ?? true }
+
+    /// What the card says and shows. A walking ram whose shepherd has stopped
+    /// reads "Paused" with a pause glyph, so a still ram is never mistaken for
+    /// a frozen card.
+    var displayLabel: String {
+        isWalking && !isMovingNow ? String(localized: "Paused") : statusLabel
+    }
+
+    var displaySymbol: String {
+        isWalking && !isMovingNow ? "pause.circle.fill" : statusSymbol
+    }
+
+    var stepsWalked: Int? {
+        guard let totalSteps else { return nil }
+        return max(0, totalSteps - remainingSteps)
+    }
+
+    /// Gait frame for this update; advances every time the app pushes one.
+    var strideFrame: Int { stride ?? 0 }
+
     var percentComplete: Int { Int((min(max(progress, 0), 1) * 100).rounded()) }
+
+    /// True once the ram has reached the gate or the letter has been
+    /// delivered — the moment the Live Activity's card should feel warmer,
+    /// not just report a number.
+    var hasArrived: Bool {
+        statusSymbol == "flag.checkered" || statusSymbol == "checkmark.seal.fill"
+    }
 }

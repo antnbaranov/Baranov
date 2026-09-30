@@ -59,7 +59,7 @@ struct PassportStampView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.primary)
 
-                    Text(stamp.timestamp.formatted(.dateTime.day().month(.abbreviated)))
+                    Text(stamp.timestamp.formatted(.dateTime.day().month(.abbreviated).locale(.appLanguage)))
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -67,7 +67,7 @@ struct PassportStampView: View {
             .frame(width: 76, height: 76)
             .rotationEffect(.degrees(tiltDegrees))
 
-            Text(stamp.placeName)
+            Text(stamp.displayPlaceName)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
@@ -84,11 +84,11 @@ struct PassportStampView: View {
     }
 
     private var accessibilityDescription: String {
-        var description = "\(stamp.kind.caption) \(stamp.placeName), \(stamp.timestamp.formatted(date: .abbreviated, time: .omitted))"
+        var description = "\(stamp.kind.caption) \(stamp.displayPlaceName), \(stamp.timestamp.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: .appLanguage)))"
         if let carrierCredit {
-            description += ", carried by \(carrierCredit)"
+            description += String(localized: ", carried by \(carrierCredit)", bundle: .appLanguage, locale: .appLanguage)
         }
-        description += ", \(stamp.stepsAtStamp) steps into the journey"
+        description += String(localized: ", \(stamp.stepsAtStamp) steps into the journey", bundle: .appLanguage, locale: .appLanguage)
         return description
     }
 }

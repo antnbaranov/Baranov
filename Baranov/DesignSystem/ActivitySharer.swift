@@ -35,6 +35,6 @@ enum ActivitySharer {
 extension RamReelData {
     /// The caption that travels with a shared reel, ending in the App Store link.
     var shareMessage: String {
-        String(localized: "\(ramName) is \(personality.title). Narrated by \(voice?.name ?? String(localized: "a mystery guest")). Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)")
+        String(localized: "\(ramName) is \(personality.title). Narrated by \(voice?.name ?? String(localized: "a mystery guest", bundle: .appLanguage, locale: .appLanguage)). Made with Baranov, letters that walk: \(AppLinks.appStore.absoluteString)", bundle: .appLanguage, locale: .appLanguage)
     }
 }

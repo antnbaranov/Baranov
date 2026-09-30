@@ -27,7 +27,10 @@ struct ContentView: View {
     }
 
     private var needsOnboarding: Bool {
-        !hasCompletedOnboarding || carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        #if DEBUG
+        if CommandLine.arguments.contains("-demoMode") { return false }
+        #endif
+        return !hasCompletedOnboarding || carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -37,7 +40,11 @@ struct ContentView: View {
                     hasCompletedOnboarding = true
                 })
             } else {
+                // Rebuilt when the language changes: text that views build
+                // in code (not through `Text`) only re-reads the language
+                // when the view is made again.
                 RootView()
+                    .id(currentLocale.identifier)
             }
         }
         // A real background behind everything: while sheets scale the
@@ -64,6 +71,12 @@ struct ContentView: View {
     private func handleDeepLink(_ url: URL) {
         let host = url.host?.lowercased() ?? ""
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+
+        // "A letter is on its way to you" — from the link in a shared code.
+        if let expected = ExpectedLetter(url: url) {
+            ExpectedLetterStore.shared.add(expected)
+            return
+        }
 
         if host == "event" || path.hasPrefix("event") {
             let slug: String

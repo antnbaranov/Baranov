@@ -26,23 +26,23 @@ struct InAppEvent: Identifiable, Hashable, Sendable {
 
         switch self.slug {
         case "new-york", "newyork":
-            self.title = "Expedition to New York"
-            self.subtitle = "App Store In-App Event"
+            self.title = String(localized: "Expedition to New York", bundle: .appLanguage, locale: .appLanguage)
+            self.subtitle = String(localized: "App Store In-App Event", bundle: .appLanguage, locale: .appLanguage)
             self.destinationCity = "New York, NY"
             self.coordinate = RamCoordinate(latitude: 40.7128, longitude: -74.0060)
             self.symbolName = "building.2.crop.circle.fill"
-            self.eventDescription = "Dispatch your carrier ram toward the Atlantic coast and New York. Walk your daily steps to carry letters across provinces and borders, earn commemorative passport stamps, and join fellow shepherds along the route."
+            self.eventDescription = String(localized: "Dispatch your carrier ram toward the Atlantic coast and New York. Walk your daily steps to carry letters across provinces and borders, earn commemorative passport stamps, and join fellow shepherds along the route.", bundle: .appLanguage, locale: .appLanguage)
 
         default:
             let formattedName = cleanSlug
                 .replacingOccurrences(of: "-", with: " ")
                 .capitalized
-            self.title = "Expedition: \(formattedName)"
-            self.subtitle = "App Store In-App Event"
+            self.title = String(localized: "Expedition: \(formattedName)", bundle: .appLanguage, locale: .appLanguage)
+            self.subtitle = String(localized: "App Store In-App Event", bundle: .appLanguage, locale: .appLanguage)
             self.destinationCity = formattedName
             self.coordinate = nil
             self.symbolName = "map.circle.fill"
-            self.eventDescription = "A special postal expedition for \(formattedName). Lace up your walking shoes and carry your letters with the flock."
+            self.eventDescription = String(localized: "A special postal expedition for \(formattedName). Lace up your walking shoes and carry your letters with the flock.", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 

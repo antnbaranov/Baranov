@@ -4,6 +4,21 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Baranov Ram Transit Package</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.baranov.transit</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -16,22 +31,23 @@
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>baranov</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSMotionUsageDescription</key>
-	<string>Baranov uses your steps to walk your carrier rams toward their destinations.</string>
-	<key>NSHealthShareUsageDescription</key>
-	<string>Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations.</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
-	<key>NSCalendarsUsageDescription</key>
-	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
-	<key>NSContactsUsageDescription</key>
-	<string>Baranov suggests people from your contacts when you address a letter to someone.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_baranov-gate._tcp</string>
@@ -41,12 +57,30 @@
 		<string>_baranov-courier._tcp</string>
 		<string>_baranov-courier._udp</string>
 	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>Baranov suggests people from your contacts when you address a letter to someone.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Baranov uses your current location to set where a letter's journey starts.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Baranov uses the microphone so you can dictate text instead of typing it.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Baranov uses your steps to walk your carrier rams toward their destinations.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Baranov turns your speech into text when you use dictation.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
+	<key>TelemetryBaseURL</key>
+	<string>https://stellar-analysis-production-67fe.up.railway.app</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -54,6 +88,11 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -76,14 +115,14 @@
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.baranov.transit</string>
-			<key>UTTypeDescription</key>
-			<string>Baranov Ram Transit Package</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>Baranov Ram Transit Package</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.baranov.transit</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
@@ -93,37 +132,5 @@
 			</dict>
 		</dict>
 	</array>
-	<key>CFBundleDocumentTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeName</key>
-			<string>Baranov Ram Transit Package</string>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>com.baranov.transit</string>
-			</array>
-		</dict>
-	</array>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLName</key>
-			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>baranov</string>
-			</array>
-		</dict>
-	</array>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
-	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
-	<false/>
 </dict>
 </plist>

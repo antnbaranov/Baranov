@@ -104,4 +104,4 @@ Principles, in the order they were argued about: strict Apple HIG (system materi
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Privacy: [PRIVACY.md](PRIVACY.md).
+MIT — see [LICENSE](LICENSE). Privacy: [PRIVACY.md](PRIVACY.md) · Terms: [TERMS.md](TERMS.md).

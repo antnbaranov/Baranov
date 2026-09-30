@@ -23,6 +23,39 @@ final class TelemetryService: Sendable {
     /// The base URL of the ACIT3855 telemetry receiver.
     let baseURL: URL
 
+    /// The deployed receiver, from the `TelemetryBaseURL` Info.plist key —
+    /// the same key `Analytics` reads — so one setting points telemetry,
+    /// the letter relay, carrier presence and recalls at the same server.
+    /// Falls back to the local development receiver, which a real phone
+    /// can't reach: set the key before testing on a device.
+    /// Whether a real receiver is configured. Without one the app stays
+    /// fully usable — steps, handoffs, the packet, guests all live on the
+    /// phone — and simply skips every network round-trip instead of
+    /// hammering a localhost that isn't there.
+    static var isServerConfigured: Bool {
+        if let configured = Bundle.main.object(forInfoDictionaryKey: "TelemetryBaseURL") as? String,
+           let url = URL(string: configured.trimmingCharacters(in: .whitespacesAndNewlines)),
+           url.scheme != nil {
+            return true
+        }
+        // The localhost fallback only means something where localhost is
+        // the developer's Mac: the Simulator, during coursework.
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    static var configuredBaseURL: URL {
+        if let configured = Bundle.main.object(forInfoDictionaryKey: "TelemetryBaseURL") as? String,
+           let url = URL(string: configured.trimmingCharacters(in: .whitespacesAndNewlines)),
+           url.scheme != nil {
+            return url
+        }
+        return URL(string: "http://localhost:8080")!
+    }
+
     private let session: URLSession
     private let encoder: JSONEncoder
 
@@ -32,7 +65,7 @@ final class TelemetryService: Sendable {
     ///     development receiver used during coursework.
     ///   - session: The `URLSession` used for requests. Defaults to
     ///     `.shared`; inject a custom session for testing.
-    init(baseURL: URL = URL(string: "http://localhost:8080")!, session: URLSession = .shared) {
+    init(baseURL: URL = TelemetryService.configuredBaseURL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
 
@@ -113,6 +146,7 @@ final class TelemetryService: Sendable {
     // MARK: - Private networking
 
     private func post(_ payload: some Encodable, to path: String) async {
+        guard Self.isServerConfigured else { return }
         let url = baseURL.appendingPathComponent(path)
 
         var request = URLRequest(url: url)

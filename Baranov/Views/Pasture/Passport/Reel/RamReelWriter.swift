@@ -26,12 +26,12 @@ enum RamReelVoice: CaseIterable {
 
     var name: String {
         switch self {
-        case .natureDocumentary: String(localized: "Nature documentary")
-        case .sportsCommentator: String(localized: "Sports commentator")
-        case .noirDetective: String(localized: "Noir detective")
-        case .passiveAggressiveHR: String(localized: "Passive-aggressive HR")
-        case .medievalHerald: String(localized: "Medieval herald")
-        case .overexcitedGPS: String(localized: "Overexcited GPS")
+        case .natureDocumentary: String(localized: "Nature documentary", bundle: .appLanguage, locale: .appLanguage)
+        case .sportsCommentator: String(localized: "Sports commentator", bundle: .appLanguage, locale: .appLanguage)
+        case .noirDetective: String(localized: "Noir detective", bundle: .appLanguage, locale: .appLanguage)
+        case .passiveAggressiveHR: String(localized: "Passive-aggressive HR", bundle: .appLanguage, locale: .appLanguage)
+        case .medievalHerald: String(localized: "Medieval herald", bundle: .appLanguage, locale: .appLanguage)
+        case .overexcitedGPS: String(localized: "Overexcited GPS", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 
@@ -62,29 +62,29 @@ enum RamReelVoice: CaseIterable {
     fileprivate func fallback(name: String, distance: String) -> RamReelLines {
         switch self {
         case .natureDocumentary:
-            RamReelLines(intro: String(localized: "Here, in the wild, we observe \(name)."),
-                         fact: String(localized: "Over \(distance), the ram moves with quiet purpose."),
-                         closer: String(localized: "Truly, nature at its fluffiest."))
+            RamReelLines(intro: String(localized: "Here, in the wild, we observe \(name).", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "Over \(distance), the ram moves with quiet purpose.", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "Truly, nature at its fluffiest.", bundle: .appLanguage, locale: .appLanguage))
         case .sportsCommentator:
-            RamReelLines(intro: String(localized: "And here comes \(name) down the final stretch!"),
-                         fact: String(localized: "\(distance) on the board. The crowd is going wild!"),
-                         closer: String(localized: "Absolutely unbelievable scenes."))
+            RamReelLines(intro: String(localized: "And here comes \(name) down the final stretch!", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "\(distance) on the board. The crowd is going wild!", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "Absolutely unbelievable scenes.", bundle: .appLanguage, locale: .appLanguage))
         case .noirDetective:
-            RamReelLines(intro: String(localized: "The name was \(name). Trouble followed. Slowly."),
-                         fact: String(localized: "\(distance) of rain-slicked road. Nobody asked why."),
-                         closer: String(localized: "The letter got through. It always does."))
+            RamReelLines(intro: String(localized: "The name was \(name). Trouble followed. Slowly.", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "\(distance) of rain-slicked road. Nobody asked why.", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "The letter got through. It always does.", bundle: .appLanguage, locale: .appLanguage))
         case .passiveAggressiveHR:
-            RamReelLines(intro: String(localized: "Just circling back on \(name)'s performance."),
-                         fact: String(localized: "Per my last email, \(distance) has been walked. Great job, I guess."),
-                         closer: String(localized: "Kindly keep trotting. Best regards."))
+            RamReelLines(intro: String(localized: "Just circling back on \(name)'s performance.", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "Per my last email, \(distance) has been walked. Great job, I guess.", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "Kindly keep trotting. Best regards.", bundle: .appLanguage, locale: .appLanguage))
         case .medievalHerald:
-            RamReelLines(intro: String(localized: "Hear ye! Hear ye! Behold, \(name)!"),
-                         fact: String(localized: "\(distance) hath been trod upon the kingdom's roads!"),
-                         closer: String(localized: "Long live the ram. Long live the post."))
+            RamReelLines(intro: String(localized: "Hear ye! Hear ye! Behold, \(name)!", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "\(distance) hath been trod upon the kingdom's roads!", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "Long live the ram. Long live the post.", bundle: .appLanguage, locale: .appLanguage))
         case .overexcitedGPS:
-            RamReelLines(intro: String(localized: "Recalculating… oh! It is \(name)!"),
-                         fact: String(localized: "\(distance) travelled! Keep going! Keep going!"),
-                         closer: String(localized: "You have arrived. Please arrive again."))
+            RamReelLines(intro: String(localized: "Recalculating… oh! It is \(name)!", bundle: .appLanguage, locale: .appLanguage),
+                         fact: String(localized: "\(distance) travelled! Keep going! Keep going!", bundle: .appLanguage, locale: .appLanguage),
+                         closer: String(localized: "You have arrived. Please arrive again.", bundle: .appLanguage, locale: .appLanguage))
         }
     }
 }
@@ -135,10 +135,12 @@ enum RamReelWriter {
     private static func generated(voice: RamReelVoice, data: RamReelData, distance: String) async -> RamReelLines? {
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, *), LetterMuseService.isSupported, data.totalMeters > 0 else { return nil }
+        guard AppLanguage.code.hasPrefix("en") else { return nil }
         let session = LanguageModelSession(instructions: """
             You write the captions of a short, funny social video about a courier ram that delivers letters on foot. \
             Write in the voice of \(voice.style). Keep it warm, clever and family-friendly. \
-            Use only the facts given: never invent places, numbers, people or events. No emoji, no hashtags.
+            Use only the facts given: never invent places, numbers, people or events. No emoji, no hashtags. \
+            \(AppLanguage.modelInstruction)
             """)
         var facts = "Ram name: \(data.ramName). Distance walked: \(distance). Personality: \(data.personality.title)."
         if !data.places.isEmpty { facts += " Places it passed: \(data.places.suffix(3).joined(separator: ", "))." }
@@ -157,8 +159,13 @@ enum RamReelWriter {
                 fact: reel.fact.trimmingCharacters(in: .whitespacesAndNewlines),
                 closer: reel.closer.trimmingCharacters(in: .whitespacesAndNewlines)
             )
-            // A caption that came back empty falls back to the hand-made set.
-            return lines.intro.isEmpty || lines.fact.isEmpty || lines.closer.isEmpty ? nil : lines
+            // A caption that came back empty, or in the wrong language,
+            // falls back to the hand-made (translated) set.
+            let all = [lines.intro, lines.fact, lines.closer]
+            guard !all.contains(where: \.isEmpty),
+                  AppLanguage.isInAppLanguage(all.joined(separator: " "))
+            else { return nil }
+            return lines
         } catch {
             return nil
         }

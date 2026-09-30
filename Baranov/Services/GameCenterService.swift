@@ -24,6 +24,7 @@
 import GameKit
 import Observation
 import UIKit
+import SwiftUI
 
 enum GameCenterAuthState: Sendable {
     /// GameKit hasn't answered yet — show a neutral state, not "Sign in".
@@ -38,7 +39,7 @@ enum LeaderboardScope: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: LocalizedStringResource {
+    var title: LocalizedStringKey {
         switch self {
         case .everyone: "Everyone"
         case .friends: "Friends"
@@ -279,12 +280,12 @@ final class GameCenterService {
         let board: GKLeaderboard
         do {
             guard let found = try await GKLeaderboard.loadLeaderboards(IDs: [Self.lettersDeliveredLeaderboardID]).first else {
-                boardMessage = "The shepherds' table isn't set up in Game Center yet."
+                boardMessage = String(localized: "The shepherds' table isn't set up in Game Center yet.", bundle: .appLanguage, locale: .appLanguage)
                 return
             }
             board = found
         } catch {
-            boardMessage = "Couldn't reach Game Center. Pull to try again."
+            boardMessage = String(localized: "Couldn't reach Game Center. Pull to try again.", bundle: .appLanguage, locale: .appLanguage)
             return
         }
         boardMessage = nil

@@ -48,12 +48,12 @@ enum JourneyStampKind: String, Codable, Hashable, Sendable {
     /// The small line printed under a stamp's place name.
     var caption: String {
         switch self {
-        case .setOut: return "Set out"
-        case .town: return "Passed through"
-        case .water: return "Crossed"
-        case .landmark: return "Passed"
-        case .handoff: return "Handed over"
-        case .arrival: return "Arrived"
+        case .setOut: return String(localized: "Set out", bundle: .appLanguage, locale: .appLanguage)
+        case .town: return String(localized: "Passed through", bundle: .appLanguage, locale: .appLanguage)
+        case .water: return String(localized: "Crossed", bundle: .appLanguage, locale: .appLanguage)
+        case .landmark: return String(localized: "Passed", bundle: .appLanguage, locale: .appLanguage)
+        case .handoff: return String(localized: "Handed over", bundle: .appLanguage, locale: .appLanguage)
+        case .arrival: return String(localized: "Arrived", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 }
@@ -99,6 +99,21 @@ struct JourneyStamp: Identifiable, Codable, Hashable, Sendable {
         self.carrierName = carrierName
         self.timestamp = timestamp
         self.weather = weather
+    }
+
+    /// `placeName` as it should read on screen. Handoff stamps are stored
+    /// with a fixed English label ("Handed to Klaus", "Handed on") because
+    /// code parses them back; this shows them in the app's language instead.
+    var displayPlaceName: String {
+        guard kind == .handoff else { return placeName }
+        if placeName == "Handed on" {
+            return String(localized: "Handed on", bundle: .appLanguage, locale: .appLanguage)
+        }
+        if placeName.hasPrefix("Handed to ") {
+            let carrier = String(placeName.dropFirst("Handed to ".count))
+            return String(localized: "Handed to \(carrier)", bundle: .appLanguage, locale: .appLanguage)
+        }
+        return placeName
     }
 }
 
