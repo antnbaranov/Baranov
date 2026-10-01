@@ -60,6 +60,17 @@ final class NameProfile {
         nameEditLockedUntil = stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
     }
 
+    // MARK: - Erase
+
+    /// "Delete all data & reset": back to no extra names, a full set of
+    /// edits and no lock. The saved copies go with `UserDefaults`
+    /// (`AppDataEraser`).
+    func eraseAll() {
+        aliases = Array(repeating: "", count: Self.maxNames - 1)
+        editCount = 0
+        nameEditLockedUntil = nil
+    }
+
     // MARK: - Reading
 
     /// The main name: the shepherd name.

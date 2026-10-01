@@ -32,6 +32,12 @@ final class GateStore {
         }
     }
 
+    /// "Delete all data & reset": forgets the gate in memory (the saved copy
+    /// goes with the rest of `UserDefaults`).
+    func eraseAll() {
+        gate = nil
+    }
+
     /// Takes the phone's town as the gate if there isn't one yet.
     func adoptIfNeeded(coordinate: CLLocationCoordinate2D?, city: String?) {
         guard gate == nil, let coordinate else { return }

@@ -16,6 +16,10 @@ struct ContentView: View {
     @AppStorage(AppAppearance.storageKey) private var appAppearanceRawValue = AppAppearance.system.rawValue
 
     @State private var presentedInAppEvent: InAppEvent?
+    /// "Delete all data & reset" runs from Settings; while it does, the whole
+    /// window shows a progress screen, and when it is done the emptied
+    /// `UserDefaults` sends the app back to onboarding.
+    @State private var eraser = AppDataEraser.shared
 
     private var appAppearance: AppAppearance {
         AppAppearance(rawValue: appAppearanceRawValue) ?? .system
@@ -35,7 +39,9 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if needsOnboarding {
+            if eraser.isErasing {
+                ErasingDataView()
+            } else if needsOnboarding {
                 OnboardingView(onFinished: {
                     hasCompletedOnboarding = true
                 })

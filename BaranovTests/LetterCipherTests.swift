@@ -73,7 +73,7 @@ struct LetterCipherTests {
     @Test func receivingCodesAvoidAmbiguousCharacters() {
         for _ in 0..<200 {
             let code = Letter.generateReceivingCode()
-            #expect(code.count == 9)
+            #expect(code.count == 14)
             #expect(!code.contains("0") && !code.contains("O") && !code.contains("1") && !code.contains("I") && !code.contains("L"))
         }
     }

@@ -117,6 +117,28 @@ final class LetterTracker {
         prune()
     }
 
+    // MARK: - Erase
+
+    /// "Delete all data & reset": forgets every tracked and held letter in
+    /// memory. The saved copies go with `UserDefaults` and the files
+    /// (`AppDataEraser`), and the next `RootView` configures this again.
+    func eraseAll() {
+        arrivalRetryTask?.cancel()
+        arrivalRetryTask = nil
+        records = []
+        held = [:]
+        lastReports = [:]
+        lastSetOutAttempt = [:]
+        reportedDeliveries = []
+        arrivalReportFailed = false
+        rerunRequested = false
+        flock = nil
+        relay = nil
+        onCollected = { _ in }
+        onOpened = { _ in }
+        onSetOut = { _, _ in }
+    }
+
     // MARK: - Setup
 
     /// Called once by `RootView` when a server is configured.

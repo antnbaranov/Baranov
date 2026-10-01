@@ -193,6 +193,16 @@ final class ExpectedLetterStore {
         prune()
     }
 
+    /// "Delete all data & reset": forgets every expected letter in memory.
+    /// The saved copies go with `UserDefaults` (`AppDataEraser`).
+    func eraseAll() {
+        letters = []
+        pendingOpened = []
+        relay = nil
+        isOnPhone = { _ in false }
+        onDelivered = { _, _ in false }
+    }
+
     /// Called once by `RootView` when a server is configured. `isOnPhone`
     /// says whether a letter already landed here some other way;
     /// `onDelivered` puts a delivered package in the mailbag and returns

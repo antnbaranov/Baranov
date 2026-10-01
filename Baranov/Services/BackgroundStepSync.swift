@@ -115,6 +115,14 @@ final class BackgroundStepSync {
         }
     }
 
+    /// "Delete all data & reset": no ram is walking any more, so HealthKit
+    /// has no reason to wake the app, and no baseline is kept.
+    func eraseAll() {
+        setWalking(false)
+        clearBaseline()
+        hasOfferedResumePoint = false
+    }
+
     // MARK: - Baseline
 
     /// Called by `FlockViewModel` whenever real steps land on the walking

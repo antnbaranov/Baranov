@@ -1072,17 +1072,6 @@ struct ComposeLetterView: View {
             guard !newValue.isEmpty else { return }
             messageBody = newValue
         }
-        .fullScreenCover(isPresented: $showsDoodle) {
-            if let base = doodleBase {
-                DoodleEditorView(image: base, backdrop: paperStyle.color) { edited in
-                    // An untouched blank sheet is no drawing at all.
-                    if attachedPhoto != nil || edited !== base { attachedPhoto = edited }
-                    showsDoodle = false
-                } onCancel: {
-                    showsDoodle = false
-                }
-            }
-        }
     }
 
     /// The "write here" invitation shown on an empty, unfocused page.
@@ -1119,12 +1108,14 @@ struct ComposeLetterView: View {
 
     /// The optional drawing that rides with the letter.
     @State private var attachedPhoto: UIImage?
-    @State private var doodleBase: UIImage?
-    @State private var showsDoodle = false
-
     private func openDoodle() {
-        doodleBase = attachedPhoto ?? UIImage.blankPaper()
-        showsDoodle = true
+        isMessageFocused = false
+        let base = attachedPhoto ?? UIImage.blankPaper()
+        // Its own window, not a cover over this page — see `DoodleWindow`.
+        DoodleWindow.shared.present(image: base, backdrop: paperStyle.color) { edited in
+            // An untouched blank sheet is no drawing at all.
+            if attachedPhoto != nil || edited !== base { attachedPhoto = edited }
+        }
     }
 
     /// The one-line spark: a quiet quote with a shuffle button.

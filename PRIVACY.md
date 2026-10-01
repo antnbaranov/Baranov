@@ -1,114 +1,66 @@
-# Privacy
+# Privacy Policy
 
-_Last updated: September 29, 2026_
+_Last updated: September 30, 2026_
 
-Baranov is a slow post. It is built so that the people carrying your letter
-cannot read it, and so that we can't either. There are no accounts, no ads,
-and no tracking across other apps or websites.
+Baranov (“The Slow Ram Post”) is designed around the principles of intentional communication and digital privacy. It is engineered so that neither the couriers carrying your letter nor we as the developers can read your private messages. There are no advertising identifiers, no third-party tracking across apps or websites, and no traditional user accounts.
 
-## What stays on your phone
+Baranov is operated by Anton Baranov.
 
-Your name (the one you type at onboarding), your rams, your letters, your
-drafts, your journey passport, and the letter codes for letters you wrote
-(kept in the iOS Keychain). Also the private key behind your profile code.
+## 1. What Stays on Your Device
 
-Steps come from CoreMotion and HealthKit (including Apple Watch) and are used
-to move your rams. Contacts and Calendar are read only on your phone, only to
-suggest people and destinations when you address a letter, and are never
-uploaded. Dictation uses iOS speech recognition, which is handled by Apple.
-Any text written by the on-device model (Apple Intelligence) is generated on
-your phone.
+The vast majority of your data never leaves your device:
 
-## What leaves your phone
+- **Your Profile & Keychain:** Your chosen display name, active rams, letters, drafts, travel log / journey passport, and cryptographic keys (stored securely in the iOS Keychain).
+- **Health & Motion Data (HealthKit & CoreMotion):** Step counts and walking activity from your iPhone and Apple Watch are accessed solely on-device to advance your rams along their routes. This data is never uploaded to any remote server or shared with third parties.
+- **Contacts & Calendar:** Accessed strictly on-device to suggest recipients and destination events when you address a letter. We never copy, store, or upload your address book.
+- **Dictation & On-Device AI:** Voice dictation is processed via Apple’s native speech recognition framework. On-device text assistance is powered entirely locally by Apple Intelligence models on supported devices.
 
-**A ram you hand off.** When you hand a ram to someone by AirDrop or a shake, it
-goes directly to their phone. The letter inside is ciphertext only
-(ChaCha20-Poly1305, see `Services/LetterCipher.swift`). The letter code that
-opens it never travels with the ram. You share it with the recipient yourself,
-or, if you send to someone's profile code, it is sealed to their phone's
-public key first. An **open postcard** is the exception: it is plain text, and
-anyone who carries it can read it. Baranov asks you to choose this each time.
+## 2. What Is Transmitted and Stored
 
-**The letter relay.** When a server is configured, every letter you send goes
-through the relay so the recipient can follow it and receive it at their gate.
-The server stores: the ciphertext, a one-way lookup id derived from the letter
-code (never the code), the sender name and recipient name as typed, the ram's
-name, the name and coordinates of the journey's starting point, and, if you
-address it to a Shepherd ID, the sealed key for that recipient. While the ram
-walks, the phone carrying it reports how far it has come and its position
-along the route, rounded to about 1 km. When it reaches the gate, the relay
-keeps the letter (still sealed) until the recipient's phone collects it, and
-the sender is told when it was collected and when it was opened, never where
-the recipient is. An **open postcard** is stored as plain text, like it travels.
+When interacting with other users or using networked features, minimal data is transmitted under strict privacy safeguards:
 
-**Your gate and Shepherd ID.** Your Shepherd ID is registered with the relay as
-a public key and a hashed inbox token. Your gate — the town letters to you walk
-to, rounded to about 1 km — is stored under it so senders' rams know where to
-go; you can move it in Profile. Letters on the relay do not expire
-automatically; you can ask for one to be removed (see Contact).
+- **Direct Ram Hand-Offs (AirDrop & Local Sharing):** When you pass a ram directly to another device, the message payload is protected with ChaCha20-Poly1305 end-to-end encryption. The decryption key never travels with the courier ram. Only the intended recipient can unlock it. (Exception: If you deliberately choose to send an Open Postcard, the card travels as unencrypted plain text, visible to anyone carrying it).
+- **The Letter Relay:** When letters travel over the network, our relay server temporarily facilitates transit. The relay processes:
+  - The encrypted ciphertext (or plain text for open postcards).
+  - A one-way cryptographic lookup identifier derived from the letter code (never the code itself).
+  - Sender and recipient display names as entered.
+  - Ram name and approximate journey coordinates rounded to approximately 1 km (coarse location).
+  - For Shepherd ID deliveries: the recipient’s public sealing key.
+- **Letter Retention & Expiration:** Uncollected letters stored on the relay automatically expire and are permanently purged from the server after 60 days. Once a recipient collects a letter, it is removed from active server transit.
+- **Shepherd ID & Gate:** Your Shepherd ID consists of a public key and a hashed inbox token. Your designated “Gate” (the approximate town or region where your letters arrive) is stored with coarse accuracy (~1 km). You can update your Gate or reset your Shepherd ID at any time in Profile Settings.
+- **Letter Recalls:** If you recall a sent letter before delivery, a one-way hashed recall token is retained on the relay for up to 60 days to verify cancellation.
+- **Carrier Location Sharing (Off by Default):** If you enable “Share location with senders,” your device periodically posts an approximate position rounded to ~1 km along with your courier name while actively carrying another user’s ram. This information is automatically discarded after 30 minutes of inactivity or immediately when toggled off.
+- **Push Notifications:** If permitted, your device’s Apple Push Notification service (APNs) token is linked to your Shepherd ID to alert you of incoming rams, deliveries, and letter opens. You can revoke notification permissions at any time in iOS Settings.
+- **Anonymous Product Metrics (Opt-Out):** To improve reliability, the app aggregates basic anonymous usage stats (e.g., batches of steps walked, letters sent/opened, paywall impressions). These events are keyed to a random, rotating installation ID, never linked to your identity, Apple ID, or contacts, and never include message content. You can disable anonymous telemetry at any time in Baranov’s Settings.
+- **Diagnostic Logs:** Debug logs remain local to your device. They are transmitted only if you explicitly choose to export or send them for troubleshooting, and you can review the contents prior to sending.
 
-**Push notifications.** If you allow notifications, your phone's Apple push
-token is stored with your Shepherd ID so the relay can tell you when a ram is
-sent your way, reaches your gate, or when a letter you sent is opened. Turning
-notifications off in Settings stops these pushes. Pushes are delivered by Apple
-Push Notification service.
+## 3. Third-Party Services and Apple Frameworks
 
-**Take it back.** If you ask for a handed-on letter back, the relay stores a
-one-way hash of a recall token and the letter id for up to 60 days.
+We partner exclusively with trusted infrastructure providers necessary for app functionality:
 
-**Sharing your position (off by default).** If you turn on "Share my location
-with senders" in Settings, while you carry someone else's ram your phone posts
-a position rounded to about 1 km, your carrier name and the ram ids. It is
-forgotten when you carry nothing, when you turn the switch off, or after 30
-minutes. Senders can look up only ram ids they already hold.
+- **In-App Purchases (RevenueCat & Apple StoreKit):** Subscriptions and in-app purchases are processed securely by Apple. We use RevenueCat to validate receipts and manage subscription states. RevenueCat receives an anonymous app user identifier and transaction receipts. For details, refer to [RevenueCat’s Privacy Policy](https://www.revenuecat.com/privacy).
+- **Apple Platform Services:** Routing, MapKit visuals, Look Around previews, weather context, and Game Center integrations are provided directly by Apple and governed by [Apple’s Privacy Policy](https://www.apple.com/legal/privacy/).
 
-**Anonymous usage stats (on by default, can be turned off).** The app counts
-things like steps walked (in batches), letters sent and opened, and whether
-the paywall was viewed. Each count is tied to a random ID created on your
-phone, never to your name, Apple ID, contacts or exact location, and never
-includes letter text. Turn it off any time in Settings; queued stats are then
-deleted.
+## 4. Data Control and Deletion Rights
 
-**Course telemetry.** This app is part of the BCIT ACIT3855 distributed
-systems coursework. Builds pointed at the course receiver post anonymous hop
-and flock-metric events: a per-install ID, a ram ID, step counts, the number
-of active rams and letters delivered, and timestamps. No names, no positions
-and no letter contents. The same "Share anonymous usage stats" switch in
-Settings turns these off.
+You have complete control over your data:
 
-**Logs you choose to send.** The app keeps a small log on your phone to help fix
-bugs. It is sent only if you tap "Send logs to developer", and you review the
-email before it goes out.
+- **Device Permissions:** You can grant or revoke access to Location, Health, Motion, Contacts, Calendar, Microphone, or Speech Recognition at any time via iOS Settings.
+- **Data Deletion:** Deleting the Baranov app removes all local data, drafts, keys, and cached letters from your device.
+- **Server Data Purge:** You can reset your Shepherd ID and flush active relay records directly within the app settings. To request manual removal of any orphaned relay entries or registered public keys, contact us at the email below.
 
-## Apple and RevenueCat
+## 5. Children’s Privacy
 
-- **Purchases** are handled by Apple and by RevenueCat. RevenueCat receives an
-  anonymous app-user ID, purchase receipts, and a few subscriber attributes
-  (your carrier name as you typed it, letters delivered, steps walked, active
-  rams) so the dashboard can show usage next to revenue.
-  RevenueCat's privacy policy: https://www.revenuecat.com/privacy
-- **Maps, routing, Look Around, weather and Game Center** are Apple services.
-  Requests for those are governed by Apple's privacy policy.
+Baranov is not directed toward children under the age of 13. We do not knowingly collect or solicit personal information from children.
 
-## Your choices
+## 6. Updates to This Policy
 
-Revoke Location, Motion, Health, Contacts, Calendar, Microphone or Speech
-Recognition any time in iOS Settings. Turn off usage stats and location
-sharing in Baranov's Settings. Manage or cancel subscriptions in your Apple
-ID settings. Deleting the app removes everything stored on your phone; to
-have server-side items removed (a relay letter, a registered profile code),
-contact us.
+We may update this Privacy Policy from time to time to reflect operational or legal updates. Material changes will be highlighted within the app or noted with a revised date at the top of this page.
 
-## Children
+## 7. Contact Us
 
-Baranov is not directed at children under 13, and we do not knowingly
-collect their data.
+If you have questions, feedback, or data requests regarding this Privacy Policy, please contact:
 
-## Changes
+Anton Baranov
 
-If this policy changes we will update the date above and, for material
-changes, tell you in the app.
-
-## Contact
-
-antnbaranov@icloud.com, or open an issue on this repository.
+Email: antnbaranov@icloud.com

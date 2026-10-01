@@ -106,6 +106,7 @@ final class NotificationManager: NSObject {
     /// Registers with APNs when the system allows notifications. The token
     /// comes back through `AppDelegate`.
     func registerForRemoteIfAuthorized(forceUpload: Bool = false) async {
+        guard !AppDataEraser.shared.isErasing else { return }
         let settings = await center.notificationSettings()
         authorization = settings.authorizationStatus
         switch settings.authorizationStatus {
@@ -115,6 +116,44 @@ final class NotificationManager: NSObject {
             break
         }
         await uploadIfPossible(force: forceUpload)
+    }
+
+    // MARK: - Home Screen quick action
+
+    /// "Don't delete us!": one friendly note from the ram, `delay` seconds
+    /// from now. Asks for permission once if it never was asked, and does
+    /// nothing if notifications are off (in iOS or in Baranov's Settings).
+    /// Tapping the action again replaces the pending note rather than adding one.
+    func scheduleQuickActionNote(after delay: TimeInterval = 60) async {
+        await requestAuthorizationIfNeeded()
+        let settings = await center.notificationSettings()
+        authorization = settings.authorizationStatus
+        guard isEnabledByPerson, isSystemAuthorized else { return }
+        let content = UNMutableNotificationContent()
+        content.title = String(localized: "A note from your ram", bundle: .appLanguage, locale: .appLanguage)
+        content.body = String(localized: "Thanks for staying. Your ram is still out there, walking.", bundle: .appLanguage, locale: .appLanguage)
+        content.sound = .default
+        content.userInfo = ["kind": "quickAction"]
+        let request = UNNotificationRequest(
+            identifier: "quickaction-dont-delete-us",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        )
+        try? await center.add(request)
+    }
+
+    // MARK: - Erase
+
+    /// "Delete all data & reset": gives the APNs registration back, and
+    /// clears every pending and delivered notification and the badge. The
+    /// relay drops the token on its side (`LetterRelayService.deleteUserData`).
+    func prepareForErase() {
+        UIApplication.shared.unregisterForRemoteNotifications()
+        center.removeAllPendingNotificationRequests()
+        center.removeAllDeliveredNotifications()
+        Task { try? await center.setBadgeCount(0) }
+        tappedRamID = nil
+        tappedLetterID = nil
     }
 
     // MARK: - Device token
@@ -134,7 +173,8 @@ final class NotificationManager: NSObject {
     /// switch changes. Called on every relay tick; costs nothing when
     /// nothing changed.
     func uploadIfPossible(force: Bool = false) async {
-        guard TelemetryService.isServerConfigured,
+        guard !AppDataEraser.shared.isErasing,
+              TelemetryService.isServerConfigured,
               let token = UserDefaults.standard.string(forKey: deviceTokenKey),
               let address = RecipientKeyring.myAddress,
               let inboxToken = AddressKeychain.inboxToken else { return }

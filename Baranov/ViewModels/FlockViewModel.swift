@@ -411,12 +411,32 @@ final class FlockViewModel {
         }
     }
 
+    /// Set by `eraseAll()`: once the person has deleted their data, this
+    /// instance must never write a flock back to disk, whatever late
+    /// pedometer or watch callback still holds a reference to it.
+    @ObservationIgnored private var isErased = false
+
+    /// "Delete all data & reset": takes every Live Activity off the Lock
+    /// Screen, empties the flock and stops all writes. The files themselves
+    /// are removed by `AppDataEraser`.
+    func eraseAll() {
+        isErased = true
+        pendingSave?.cancel()
+        pendingSave = nil
+        endAllLiveActivities()
+        liveWeatherSymbols.removeAll()
+        liftAttempts.removeAll()
+        selectedRamId = nil
+        activeRams = []
+        store?.clear()
+    }
+
     private func persist() {
-        guard let store else { return }
+        guard let store, !isErased else { return }
         pendingSave?.cancel()
         pendingSave = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled, let self else { return }
+            guard !Task.isCancelled, let self, !self.isErased else { return }
             store.save(FlockStore.Snapshot(
                 activeRams: self.activeRams,
                 selectedRamId: self.selectedRamId,

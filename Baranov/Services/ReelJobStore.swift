@@ -91,6 +91,15 @@ final class ReelJobStore {
         data = nil
     }
 
+    /// "Delete all data & reset": stops any reel and forgets it, including the
+    /// cached map. The video itself lives in `tmp`, which `AppDataEraser` empties.
+    func eraseAll() {
+        cancel()
+        suppressesOverlay = false
+        builtMap = nil
+        builtMapKey = nil
+    }
+
     /// Clears a finished or failed reel so the card goes back to "Make and share".
     func dismissResult() {
         guard !isRunning else { return }

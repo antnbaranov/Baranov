@@ -176,16 +176,17 @@ struct LetterDetailView: View {
         Group {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 20) {
                         envelopeSection
-                        travelLog
-                        handoffSection
 
                         if isRevealed, let letter {
                             LetterPaperCard(letter: letter, ram: liveRam, paper: paperStyle)
                                 .id("letter")
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
+
+                        travelLog
+                        handoffSection
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
@@ -229,7 +230,7 @@ struct LetterDetailView: View {
                 // hold the ear tag. Anyone else types it (from the message the sender
                 // sent), even when the phone happens to have it stored from a link.
                 if enteredCode.isEmpty, let known = letter?.receivingCode,
-                   liveRam.isSentByThisPhone || (letter.map(RecipientKeyring.isAddressedToMe) ?? false) {
+                   liveRam.isSentByThisPhone || liveRam.addressedToThisPhone || (letter.map(RecipientKeyring.isAddressedToMe) ?? false) {
                     enteredCode = known
                     holdsCode = true
                 }

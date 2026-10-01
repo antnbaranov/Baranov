@@ -51,6 +51,12 @@ final class RamColorStore {
         }
     }
 
+    /// "Delete all data & reset": every ram is white again, with no wait.
+    /// The saved copy goes with `UserDefaults` (`AppDataEraser`).
+    func eraseAll() {
+        entriesByName = [:]
+    }
+
     private static func key(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }

@@ -64,6 +64,14 @@ actor Analytics {
         set { UserDefaults.standard.set(newValue, forKey: Self.consentKey) }
     }
 
+    /// "Delete all data & reset": drops every queued event and the saved queue.
+    func eraseAll() {
+        queue.removeAll()
+        pendingSteps = 0
+        lastStepFlush = Date()
+        try? FileManager.default.removeItem(at: queueURL)
+    }
+
     func setEnabled(_ on: Bool) {
         isEnabled = on
         if !on { queue.removeAll(); pendingSteps = 0; persist() }

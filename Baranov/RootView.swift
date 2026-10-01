@@ -141,6 +141,28 @@ struct RootView: View {
         #if DEBUG
         if CommandLine.arguments.contains("-demoMode") {
             let previewModel = FlockViewModel.preview
+            if CommandLine.arguments.contains("-screenshotLetterOpen") || CommandLine.arguments.contains("-screenshotLetterOpened") {
+                if var ram = previewModel.activeRams.first {
+                    ram.status = .delivered
+                    ram.stepsWalked = ram.totalStepsRequired
+                    ram.addressedToThisPhone = true
+                    ram.letter = Letter(
+                        senderName: "Anton",
+                        recipientName: "Marta",
+                        messageBody: "By the time this reaches you, the leaves will have turned. Miss you.",
+                        isSealed: false,
+                        receivingCode: "KLAU-SRAM"
+                    )
+                    previewModel.activeRams = [ram]
+                }
+            } else if CommandLine.arguments.contains("-screenshotLetterGate") || CommandLine.arguments.contains("-screenshotLetterArrival") {
+                if var ram = previewModel.activeRams.first {
+                    ram.status = .arrivedAtGate
+                    ram.stepsWalked = ram.totalStepsRequired
+                    ram.addressedToThisPhone = true
+                    previewModel.activeRams = [ram]
+                }
+            }
             FlockStore.default.save(FlockStore.Snapshot(activeRams: previewModel.activeRams, selectedRamId: previewModel.selectedRamId, savedAt: Date()))
             _flockViewModel = State(initialValue: previewModel)
         } else {
@@ -316,7 +338,7 @@ struct RootView: View {
                 consumePendingAppAction()
                 nearbyCouriers.start(announce: nil)
                 #if DEBUG
-                if CommandLine.arguments.contains("-screenshotLetter") {
+                if CommandLine.arguments.contains("-screenshotLetter") || CommandLine.arguments.contains("-screenshotLetterOpen") || CommandLine.arguments.contains("-screenshotLetterOpened") || CommandLine.arguments.contains("-screenshotLetterGate") || CommandLine.arguments.contains("-screenshotLetterArrival") {
                     letterRam = flockViewModel.activeRams.first
                 } else if CommandLine.arguments.contains("-screenshotPasture") || CommandLine.arguments.contains("-screenshotPassport") {
                     isPasturePresented = true
@@ -527,17 +549,32 @@ struct RootView: View {
     /// The letter sheet, built outside `body` so the compiler type-checks
     /// it on its own.
     private func letterDetailSheet(for ram: Ram) -> some View {
-        LetterDetailView(
-            ram: ram,
-            prefilledCode: proximityCode,
-            onShakeHandoff: { triggerManualHoofbeat() }
+        #if DEBUG
+        if CommandLine.arguments.contains("-screenshotLetterArrival") {
+            return AnyView(
+                LetterArrivalView(ram: ram)
+                    .presentationDragIndicator(.visible)
+                    .environment(flockViewModel)
+                    .environment(entitlementService)
+                    .environment(locationService)
+                    .environment(\.locale, currentLocale)
+                    .preferredColorScheme(appAppearance.colorScheme)
+            )
+        }
+        #endif
+        return AnyView(
+            LetterDetailView(
+                ram: ram,
+                prefilledCode: proximityCode,
+                onShakeHandoff: { triggerManualHoofbeat() }
+            )
+            .presentationDragIndicator(.visible)
+            .environment(flockViewModel)
+            .environment(entitlementService)
+            .environment(locationService)
+            .environment(\.locale, currentLocale)
+            .preferredColorScheme(appAppearance.colorScheme)
         )
-        .presentationDragIndicator(.visible)
-        .environment(flockViewModel)
-        .environment(entitlementService)
-        .environment(locationService)
-        .environment(\.locale, currentLocale)
-        .preferredColorScheme(appAppearance.colorScheme)
     }
 
     /// Decodes an AirDropped `RamTransitPackage` and hands it to the flock,

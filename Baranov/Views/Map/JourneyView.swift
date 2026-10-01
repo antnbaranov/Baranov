@@ -392,6 +392,11 @@ struct JourneyView: View {
         let own: [Ram] = flockViewModel.ownRams
         let active: [Ram] = flockViewModel.activeRams
 
+        #if DEBUG
+        if CommandLine.arguments.contains("-screenshotLetterOpen") || CommandLine.arguments.contains("-screenshotLetterOpened") {
+            return active.first
+        }
+        #endif
         if let id = selectedRamId, let ram = sentRams.first(where: { $0.id == id }) { return ram }
         // The person's own ram first: guests ride along on its steps.
         if let ram = own.first(where: { $0.status == .walking }) { return ram }
@@ -1192,7 +1197,11 @@ struct JourneyView: View {
             return
         }
         while !Task.isCancelled {
-            previewProgress = RoutePreviewClock.progress(at: .now)
+            // Hold still while the drawing editor is open (see
+            // `DoodleActivity`): no state change, no map re-evaluation.
+            if !DoodleActivity.isOpen {
+                previewProgress = RoutePreviewClock.progress(at: .now)
+            }
             try? await Task.sleep(for: .milliseconds(33))
         }
     }

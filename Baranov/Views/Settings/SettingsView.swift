@@ -36,6 +36,15 @@ struct SettingsView: View {
     @State private var isSendLogsPresented = false
     @AppStorage(Analytics.consentKey) private var sharesUsageStats = true
     @State private var notificationsDeniedAlertPresented = false
+    @State private var isDeleteConfirmationPresented = false
+    @State private var deleteTick = 0
+    @State private var deleteConfirmationText = ""
+
+    /// The word the person has to type before "Delete Everything" works.
+    private var canConfirmDelete: Bool {
+        deleteConfirmationText.trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare("delete") == .orderedSame
+    }
 
     #if DEBUG
     @State private var debugCode = ""
@@ -248,6 +257,17 @@ struct SettingsView: View {
                 }
             }
             #endif
+
+            Section {
+                Button(role: .destructive) {
+                    isDeleteConfirmationPresented = true
+                } label: {
+                    Label("Delete All Data & Reset", systemImage: "trash")
+                        .foregroundStyle(.red)
+                }
+            } footer: {
+                Text("Permanently deletes all letters, courier rams, and cryptographic keys from the Keychain, and unregisters your Shepherd ID from the relay. This action cannot be undone.")
+            }
         }
         .listStyle(.insetGrouped)
         .sheet(isPresented: $isSendLogsPresented) { SendLogsSheet() }
@@ -262,6 +282,22 @@ struct SettingsView: View {
         .onChange(of: notificationsEnabled) { _, _ in
             NotificationCenter.default.post(name: RamNotificationService.preferencesChanged, object: nil)
         }
+        .alert("Delete All Data?", isPresented: $isDeleteConfirmationPresented) {
+            TextField("Type delete to confirm", text: $deleteConfirmationText)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Delete Everything", role: .destructive) {
+                eraseEverything()
+            }
+            .disabled(!canConfirmDelete)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently wipe your letters, journey passport, courier rams, and reset your Shepherd ID. This data cannot be recovered.")
+        }
+        .onChange(of: isDeleteConfirmationPresented) { _, isPresented in
+            if !isPresented { deleteConfirmationText = "" }
+        }
+        .sensoryFeedback(.warning, trigger: deleteTick)
         .alert("Notifications Off", isPresented: $notificationsDeniedAlertPresented) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -272,6 +308,14 @@ struct SettingsView: View {
         } message: {
             Text("Baranov isn't allowed to send notifications. Turn them on in Settings if you change your mind.")
         }
+    }
+
+    /// Hands over to `AppDataEraser`, which outlives this screen: the first
+    /// thing it does is replace the whole root, Settings included.
+    private func eraseEverything() {
+        deleteTick += 1
+        let flock = flockViewModel
+        Task { await AppDataEraser.shared.eraseEverything(flock: flock) }
     }
 
     private func requestNotificationAuthorization() async {

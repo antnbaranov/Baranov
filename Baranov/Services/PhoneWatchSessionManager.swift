@@ -65,6 +65,16 @@ final class PhoneWatchSessionManager: NSObject, WCSessionDelegate {
 
     var onStepsReceived: ((Int) -> Void)?
 
+    /// "Delete all data & reset": stops listening for steps and tells the
+    /// watch the ram it was showing is gone.
+    func eraseAll() {
+        onStepsReceived = nil
+        UserDefaults(suiteName: "group.com.baranov")?.removeObject(forKey: "com.baranov.watchState")
+        if WCSession.isSupported(), WCSession.default.activationState == .activated {
+            try? WCSession.default.updateApplicationContext(["erased": Date().timeIntervalSince1970])
+        }
+    }
+
     // MARK: - WCSessionDelegate
 
     nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}

@@ -43,6 +43,84 @@ enum DoodleInk: CaseIterable, Identifiable {
     }
 }
 
+/// Whether the drawing editor is on screen. The map behind the compose
+/// page animates its route preview ~30 times a second, and every tick
+/// re-evaluates the whole map view; while someone is drawing that work
+/// competes with the first frames of the editor and the drawing itself,
+/// which is what made opening it freeze. The map's preview clock reads
+/// this and holds still while it is set.
+@MainActor
+enum DoodleActivity {
+    static var isOpen = false
+}
+
+/// Hosts the drawing editor in its own full-screen window above the app,
+/// the same approach as `HoofbeatOverlayWindow`. Presenting it as a
+/// `fullScreenCover` from inside the compose page — itself a panel over
+/// the map, often with the keyboard still up — left the presentation
+/// stalled on a black screen until the app was backgrounded and brought
+/// back. A window of its own has no presentation to wait for: it is on
+/// screen the moment it is created.
+@MainActor
+final class DoodleWindow {
+    static let shared = DoodleWindow()
+
+    private var window: UIWindow?
+
+    func present(image: UIImage, backdrop: Color, onDone: @escaping @MainActor (UIImage) -> Void) {
+        guard window == nil else { return }
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+
+        let overlay = UIWindow(windowScene: scene)
+        overlay.windowLevel = UIWindow.Level.normal + 3
+        overlay.backgroundColor = UIColor(backdrop)
+
+        let host = UIHostingController(rootView: DoodleWindowRoot(
+            image: image,
+            backdrop: backdrop,
+            onDone: { [weak self] edited in
+                onDone(edited)
+                self?.dismiss()
+            },
+            onCancel: { [weak self] in self?.dismiss() }
+        ))
+        host.view.backgroundColor = UIColor(backdrop)
+        overlay.rootViewController = host
+        overlay.alpha = 0
+        overlay.isHidden = false
+        window = overlay
+        DoodleActivity.isOpen = true
+        UIView.animate(withDuration: 0.2) { overlay.alpha = 1 }
+    }
+
+    private func dismiss() {
+        guard let overlay = window else { return }
+        DoodleActivity.isOpen = false
+        UIView.animate(withDuration: 0.2, animations: { overlay.alpha = 0 }) { [weak self] _ in
+            overlay.isHidden = true
+            overlay.rootViewController = nil
+            if self?.window === overlay { self?.window = nil }
+        }
+    }
+}
+
+private struct DoodleWindowRoot: View {
+    let image: UIImage
+    let backdrop: Color
+    let onDone: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    @AppStorage(AppLanguagePickerView.storageKey) private var languageCode = Locale.current.language.languageCode?.identifier ?? "en"
+    @AppStorage(AppAppearance.storageKey) private var appearanceRaw = AppAppearance.system.rawValue
+
+    var body: some View {
+        DoodleEditorView(image: image, backdrop: backdrop, onDone: onDone, onCancel: onCancel)
+            .environment(\.locale, Locale(identifier: languageCode))
+            .preferredColorScheme((AppAppearance(rawValue: appearanceRaw) ?? .system).colorScheme)
+    }
+}
+
 struct DoodleStroke: Identifiable {
     let id = UUID()
     var points: [CGPoint]          // normalised to the picture's width (x) and height (y)
