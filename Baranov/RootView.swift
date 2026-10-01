@@ -124,6 +124,8 @@ struct RootView: View {
     /// to auto-fill "Your Name".
     @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("com.baranov.carrierDisplayName") private var carrierDisplayName = ""
+    /// Profile's "Open to carry" switch: while on, nearby shepherds see this phone from the main map too.
+    @AppStorage("com.baranov.openToCarry") private var openToCarry = false
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
 
     private var currentLocale: Locale {
@@ -252,6 +254,7 @@ struct RootView: View {
                     relay: hoofbeatRelay,
                     nearby: nearbyCouriers,
                     onRetry: { triggerManualHoofbeat() },
+                    onConfirm: { confirmHandoverTap() },
                     onAccept: { request in acceptHandover(request) },
                     directionHint: { request in
                         guard let latitude = request.destinationLatitude,
@@ -297,13 +300,11 @@ struct RootView: View {
             .onChange(of: nearbyCouriers.couriers) { _, couriers in
                 suggestCourierMoments(couriers)
             }
+            .onChange(of: openToCarry) { syncNearby() }
             .onChange(of: scenePhase) { old, phase in
                 syncNearbyRadar()
                 if phase == .active {
-                    // Just browsing here; Profile layers in this device's
-                    // own name/trip (its "Open to carry" toggle) while
-                    // it's the one on screen.
-                    nearbyCouriers.start(announce: nil)
+                    syncNearby()
                 } else {
                     nearbyCouriers.stop()
                 }
@@ -336,7 +337,7 @@ struct RootView: View {
             }
             .task {
                 consumePendingAppAction()
-                nearbyCouriers.start(announce: nil)
+                syncNearby()
                 #if DEBUG
                 if CommandLine.arguments.contains("-screenshotLetter") || CommandLine.arguments.contains("-screenshotLetterOpen") || CommandLine.arguments.contains("-screenshotLetterOpened") || CommandLine.arguments.contains("-screenshotLetterGate") || CommandLine.arguments.contains("-screenshotLetterArrival") {
                     letterRam = flockViewModel.activeRams.first
@@ -391,7 +392,8 @@ struct RootView: View {
                 Task { await receiveTransitFile(at: url) }
             }
             .onOpenURL { url in
-                guard url.scheme?.caseInsensitiveCompare("baranov") != .orderedSame else { return }
+                guard url.scheme?.caseInsensitiveCompare("baranov") != .orderedSame,
+                      !ExpectedLetter.isLink(url) else { return }
                 Task { await receiveTransitFile(at: url) }
             }
             .sheet(isPresented: $isSharingInvitePresented) {
@@ -653,6 +655,37 @@ struct RootView: View {
     /// enough room to tap within a few seconds of each other.
     private func triggerManualHoofbeat() {
         hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate())
+    }
+
+    /// Starts (or restarts) nearby discovery for the main map: always browsing, and announcing this phone
+    /// only when "Open to carry" is on, so couriers appear without Profile having to be open.
+    private func syncNearby() {
+        let trimmed = carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty
+            ? String(localized: "Courier", bundle: .appLanguage, locale: .appLanguage)
+            : trimmed
+        if openToCarry {
+            let trip = KnownCarrierDirectory().carriers.first { $0.name.hasPrefix("You (") || $0.name == name }
+            nearbyCouriers.baseline = (name: name, tripCity: trip?.destinationCity ?? "", trip: trip?.destinationCoordinate)
+        } else {
+            nearbyCouriers.baseline = nil
+        }
+        nearbyCouriers.startWithBaseline()
+    }
+
+    /// The tap alternative to shaking, from the "Hand Over Now" button. While
+    /// this phone is already waiting for a partner's shake it confirms that
+    /// exchange (pairing by who the partner is, not by when they shook);
+    /// when idle it counts as the shake itself.
+    private func confirmHandoverTap() {
+        switch hoofbeatRelay.phase {
+        case .searching:
+            hoofbeatRelay.confirmHandover()
+        case .idle:
+            shakeDetector.simulateShake()
+        case .connecting, .exchanging, .finished, .failed:
+            break
+        }
     }
 
     /// The ram a shake should offer: one already waiting at a border first,

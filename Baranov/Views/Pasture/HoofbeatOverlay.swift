@@ -31,6 +31,10 @@ struct HoofbeatOverlay: View {
     var onDismiss: (() -> Void)? = nil
     /// Re-triggers the hoofbeat after a failure.
     var onRetry: (() -> Void)? = nil
+    /// The tap alternative to shaking: "I'm ready, hand over now".
+    var onConfirm: (() -> Void)? = nil
+    /// The person already tapped it and is waiting for the other phone.
+    var isConfirmed: Bool = false
 
     private var hasSpriteArt: Bool {
         guard let first = RamSpriteFrameSets.gallopWithEnvelope.first else { return false }
@@ -54,11 +58,20 @@ struct HoofbeatOverlay: View {
         return false
     }
 
+    /// Looking for a shake partner (not waiting on a request's Accept): the
+    /// one state where tapping can stand in for the second shake.
+    private var showConfirm: Bool {
+        guard onConfirm != nil, case .searching = phase else { return false }
+        return !awaitingAcceptance && !answeringRequest
+    }
+
     var body: some View {
         Group {
             if phase.isActive {
                 if showRetry {
                     failedCard
+                } else if showConfirm {
+                    waitingCard
                 } else {
                     statusPill
                 }
@@ -99,8 +112,47 @@ struct HoofbeatOverlay: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    /// A failed handoff: what happened, what to do instead, and a retry as
-    /// big as the Accept button on the request card.
+    /// Two big side-by-side buttons, laid out like the request card's
+    /// "Not now" / "Accept" pair: a quiet one on the left, the main one on
+    /// the right.
+    private func actionRow(
+        cancelTitle: LocalizedStringKey = "Cancel",
+        primaryTitle: LocalizedStringKey,
+        primaryIcon: String? = nil,
+        primaryDisabled: Bool = false,
+        onCancel: (() -> Void)?,
+        onPrimary: (() -> Void)?
+    ) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                onCancel?()
+            } label: {
+                Text(cancelTitle)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+
+            Button {
+                onPrimary?()
+            } label: {
+                Group {
+                    if let primaryIcon {
+                        Label(primaryTitle, systemImage: primaryIcon)
+                    } else {
+                        Text(primaryTitle)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(primaryDisabled)
+        }
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+    }
+
+    /// A failed handoff: what happened, what to do instead, and Cancel /
+    /// Try Again as big as the request card's buttons.
     private var failedCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
@@ -117,26 +169,40 @@ struct HoofbeatOverlay: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                if let onDismiss {
-                    Button {
-                        onDismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 32, height: 32)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Dismiss")
-                }
             }
-            if let onRetry {
-                Button(action: onRetry) {
-                    Label("Retry", systemImage: "arrow.clockwise")
+            actionRow(primaryTitle: "Try Again", primaryIcon: "arrow.clockwise",
+                      onCancel: onDismiss, onPrimary: onRetry)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 16)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    /// Waiting for the other person's shake, with a tap to stand in for it.
+    private var waitingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                icon
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(isConfirmed
+                         ? LocalizedStringKey("Ready. Waiting for the other phone to tap or shake too.")
+                         : LocalizedStringKey("Not shaking? Tap Hand Over Now, and ask them to tap too."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+                Spacer(minLength: 0)
             }
+            actionRow(primaryTitle: isConfirmed ? "Waiting…" : "Hand Over Now",
+                      primaryIcon: isConfirmed ? nil : "hand.tap",
+                      primaryDisabled: isConfirmed,
+                      onCancel: onDismiss, onPrimary: onConfirm)
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -212,6 +278,12 @@ struct HoofbeatOverlay: View {
 
 #Preview("Searching") {
     HoofbeatOverlay(phase: .searching, successTick: 0, onDismiss: {}, onRetry: {})
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color(.systemGroupedBackground))
+}
+
+#Preview("Waiting for a shake") {
+    HoofbeatOverlay(phase: .searching, successTick: 0, partnerName: "Marcel", onDismiss: {}, onConfirm: {})
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color(.systemGroupedBackground))
 }

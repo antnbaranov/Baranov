@@ -20,7 +20,9 @@
 //  gate) the card simply disappears: it's hidden for any letter already
 //  here.
 //
-//  baranov://expect?id=<letter UUID>&from=<sender>&ram=<ram>&city=<town>&by=<unix seconds>&code=<ear tag>
+//  https://antnbaranov.github.io/l/<ear tag>?id=<letter UUID>&from=<sender>&ram=<ram>&city=<town>&by=<unix seconds>
+//  (a letter with no ear tag uses /l/expect). It is a universal link, so
+//  messengers make it tappable; the old baranov://expect?... form still opens.
 //
 
 import Foundation
@@ -121,14 +123,30 @@ struct ExpectedLetter: Codable, Identifiable, Hashable, Sendable {
 
     // MARK: - Link
 
+    /// The legacy custom-scheme host, still read.
     static let host = "expect"
+    /// The universal-link host and path prefix (`applinks:antnbaranov.github.io`).
+    static let universalHost = "antnbaranov.github.io"
+    private static let universalPrefix = "l"
 
-    /// The link that goes into the shared message. With `code`, the
-    /// recipient's phone can follow the letter at the post office.
+    /// Whether `url` is one of ours: a universal link or the old scheme.
+    static func isLink(_ url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "https": return url.host?.lowercased() == universalHost && url.pathComponents.dropFirst().first == universalPrefix
+        case "baranov": return url.host?.lowercased() == host
+        default: return false
+        }
+    }
+
+    /// The link that goes into the shared message: a real https universal
+    /// link, so iMessage, Telegram and WhatsApp render it as tappable. With
+    /// `code`, the recipient's phone can follow the letter at the post office.
     static func link(letterID: UUID, senderName: String, ramName: String, city: String, expectedBy: Date?, code: String? = nil) -> URL? {
         var components = URLComponents()
-        components.scheme = "baranov"
-        components.host = host
+        components.scheme = "https"
+        components.host = universalHost
+        let usableCode = code.flatMap { LetterCode.isUsableKey($0) ? LetterCode.normalize($0) : nil }
+        components.path = "/\(universalPrefix)/\(usableCode ?? host)"
         var items = [
             URLQueryItem(name: "id", value: letterID.uuidString),
             URLQueryItem(name: "from", value: String(senderName.prefix(40))),
@@ -138,22 +156,21 @@ struct ExpectedLetter: Codable, Identifiable, Hashable, Sendable {
         if let expectedBy {
             items.append(URLQueryItem(name: "by", value: String(Int(expectedBy.timeIntervalSince1970))))
         }
-        if let code, LetterCode.isUsableKey(code) {
-            items.append(URLQueryItem(name: "code", value: LetterCode.normalize(code)))
-        }
         components.queryItems = items
         return components.url
     }
 
     /// Reads an `expect` link; `nil` for anything else or anything malformed.
     init?(url: URL, now: Date = Date()) {
-        guard url.scheme?.lowercased() == "baranov", url.host?.lowercased() == Self.host,
+        guard Self.isLink(url),
               let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return nil }
         func value(_ name: String) -> String? {
             items.first { $0.name == name }?.value?.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         guard let rawID = value("id"), let id = UUID(uuidString: rawID) else { return nil }
-        let code = value("code").flatMap { LetterCode.isUsableKey($0) ? LetterCode.normalize($0) : nil }
+        // The ear tag rides in the path of a universal link, in `code=` of the old scheme.
+        let pathCode = url.scheme?.lowercased() == "https" ? url.pathComponents.last : nil
+        let code = (pathCode ?? value("code")).flatMap { LetterCode.isUsableKey($0) ? LetterCode.normalize($0) : nil }
         self.init(
             letterID: id,
             senderName: value("from") ?? "",

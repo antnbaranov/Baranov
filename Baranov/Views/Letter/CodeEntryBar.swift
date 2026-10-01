@@ -17,8 +17,11 @@
 //  Letters sent to this person's Shepherd ID become incoming cards on their
 //  own (`LetterInbox`); those need no typing at all.
 //
-//  Results appear as one compact card just above the field. System
-//  materials and semantic styles only.
+//  There is no floating result card: a followed letter appears as the top
+//  card under Incoming (`ExpectedLetterStore` inserts it at index 0), and a
+//  letter already at the gate opens the wax-seal ritual straight away. Only
+//  a one-line status sits inside the bar. System materials and semantic
+//  styles only.
 //
 
 import SwiftUI
@@ -70,23 +73,51 @@ struct CodeEntryBar: View {
         return .none
     }
 
-    private var hasResult: Bool {
-        if outcome != .none { return true }
-        if case .idle = relayLookup { return false }
-        return true
+    /// One quiet line inside the bar; never a separate card.
+    private var statusLine: (text: String, symbol: String)? {
+        if case .onTheWay(let ram) = outcome {
+            return (String(localized: "\(DistanceFormatter.string(forMeters: ram.remainingSteps)) left — still walking.", bundle: .appLanguage, locale: .appLanguage), "figure.walk")
+        }
+        switch relayLookup {
+        case .idle, .looking:
+            return nil
+        case .failed(let message):
+            return (message, "exclamationmark.triangle")
+        case .following(let senderName, let arrived):
+            return (arrived
+                    ? String(localized: "\(senderName)'s letter has arrived", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "A letter from \(senderName) is on the way", bundle: .appLanguage, locale: .appLanguage),
+                    arrived ? "envelope.fill" : "envelope.badge.clock")
+        }
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            resultCard
+        VStack(alignment: .leading, spacing: 6) {
+            if let statusLine {
+                Label { Text(LocalizedStringKey(statusLine.text)) } icon: { Image(systemName: statusLine.symbol) }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
             field
         }
+        .padding(8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onChange(of: focusRequest) { isFocused = true }
         .onChange(of: isFocused) { _, focused in
             onFocusChange(focused)
             if focused { onNeedsRoom() }
         }
-        .onChange(of: hasResult) { _, has in if has { onNeedsRoom() } }
+        .onChange(of: statusLine?.text) { _, text in if text != nil { onNeedsRoom() } }
+        .onChange(of: outcome) { _, new in
+            // A letter already on this phone, at the gate: the code is the
+            // key, so the ritual starts without a second button.
+            if case .atGate(let ram) = new {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                onOpen(ram, normalized)
+                code = ""
+            }
+        }
         .task(id: normalized) { await lookUpLetterCode() }
         .sensoryFeedback(.error, trigger: failTick)
     }
@@ -117,93 +148,6 @@ struct CodeEntryBar: View {
         }
     }
 
-    // MARK: - Result
-
-    @ViewBuilder private var resultCard: some View {
-        switch outcome {
-        case .none:
-            claimCard
-
-        case .onTheWay(let ram):
-            VStack(alignment: .leading, spacing: 6) {
-                header(for: ram)
-                ProgressView(value: ram.progress).tint(Color.accentColor)
-                Text("\(DistanceFormatter.string(forMeters: ram.remainingSteps)) left — still walking.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .card()
-
-        case .atGate(let ram):
-            VStack(alignment: .leading, spacing: 8) {
-                header(for: ram)
-                Button {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    onOpen(ram, normalized)
-                    code = ""
-                } label: {
-                    Label("Break the Seal", systemImage: "seal.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(ShareCodeGlassButtonStyle(tint: Color.wax, expands: true))
-            }
-            .card()
-        }
-    }
-
-    @ViewBuilder private var claimCard: some View {
-        switch relayLookup {
-        case .idle:
-            EmptyView()
-        case .looking:
-            ProgressView("Looking for your letter…")
-                .font(.caption)
-                .card()
-        case .failed(let message):
-            note(LocalizedStringKey(message), symbol: "exclamationmark.triangle")
-        case .following(let senderName, let arrived):
-            VStack(alignment: .leading, spacing: 4) {
-                Label(
-                    arrived
-                        ? String(localized: "\(senderName)'s letter has arrived", bundle: .appLanguage, locale: .appLanguage)
-                        : String(localized: "A letter from \(senderName) is on the way", bundle: .appLanguage, locale: .appLanguage),
-                    systemImage: arrived ? "envelope.fill" : "envelope.badge.clock"
-                )
-                .font(.subheadline.weight(.semibold))
-                Text(arrived
-                     ? "It's coming into your mailbag now. The seal opens with a long press."
-                     : "It's under Incoming. It lands in your mailbag when the ram reaches the gate.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .card()
-        }
-    }
-
-    private func note(_ text: LocalizedStringKey, symbol: String) -> some View {
-        Label(text, systemImage: symbol)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card()
-    }
-
-    private func header(for ram: Ram) -> some View {
-        HStack(spacing: 10) {
-            RamPortraitView(name: ram.name, diameter: 32)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(ram.letter.map { String(localized: "Letter from \($0.senderName)", bundle: .appLanguage, locale: .appLanguage) } ?? ram.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("\(ram.currentCity) → \(ram.targetCity)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
     /// Looks the letter up at the relay once the whole code is typed — unless
     /// it is already on this phone, in which case the local card answers.
     private func lookUpLetterCode() async {
@@ -230,14 +174,6 @@ struct CodeEntryBar: View {
             relayLookup = .failed((error as? LocalizedError)?.errorDescription ?? String(localized: "Something went wrong.", bundle: .appLanguage, locale: .appLanguage))
             failTick += 1
         }
-    }
-}
-
-private extension View {
-    func card() -> some View {
-        padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

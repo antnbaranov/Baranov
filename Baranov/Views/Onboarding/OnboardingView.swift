@@ -827,7 +827,7 @@ private struct OceanPage: View {
     var body: some View {
         OnboardingPageLayout(
             title: "No road crosses an ocean.",
-            text: "Your ram walks to a port and boards a packet — it crosses on its own. Shake phones with someone crossing sooner and it hops to their phone instead."
+            text: "Your ram walks to a port and boards a packet — it crosses on its own. Shake phones with someone crossing sooner, or tap Hand Over Now on both, and it hops to their phone instead."
         ) {
             VStack(spacing: 14) {
                 ZStack {
@@ -859,11 +859,20 @@ private struct OceanPage: View {
                 }
                 .frame(height: 190)
 
-                HStack(spacing: 8) {
-                    Image(systemName: showsHandover ? "checkmark.circle.fill" : "iphone.radiowaves.left.and.right")
-                    Text(showsHandover ? "Handed over. Nice shake." : "Shake phones or AirDrop to hand off")
+                // Shaking is the gesture, but not everyone can or wants to:
+                // the pill is the same hand-off as a button, just like the
+                // "Hand Over Now" button in the real flow.
+                Button { handOver() } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: showsHandover ? "checkmark.circle.fill" : "iphone.radiowaves.left.and.right")
+                        Text(showsHandover ? "Handed over. Nice one." : "Shake or tap to hand off")
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Capsule(style: .continuous))
                 }
+                .buttonStyle(.plain)
                 .onboardingPill()
+                .accessibilityHint("Tap if you'd rather not shake your phone.")
                 .contentTransition(.opacity)
                 .animation(.snappy, value: showsHandover)
 
@@ -898,16 +907,19 @@ private struct OceanPage: View {
     }
 
     private func startShakeDetection() {
-        shakeDetector.onShake = { _ in
-            shakeCount += 1
-            crossed.toggle()
-            showsHandover = true
-            Task {
-                try? await Task.sleep(for: .seconds(2.5))
-                showsHandover = false
-            }
-        }
+        shakeDetector.onShake = { _ in handOver() }
         shakeDetector.start()
+    }
+
+    /// The hand-off, whether it came from a real shake or a tap.
+    private func handOver() {
+        shakeCount += 1
+        crossed.toggle()
+        showsHandover = true
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            showsHandover = false
+        }
     }
 
     private func phone(label: LocalizedStringKey, isShaking: Bool) -> some View {

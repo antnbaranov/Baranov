@@ -151,6 +151,19 @@ final class NearbyCourierService: NSObject {
     @ObservationIgnored private var requestSession: MCSession?
     @ObservationIgnored private var requestExpiry: Task<Void, Never>?
 
+    /// What this phone shares while it is open to carry: a first name and one trip city.
+    typealias Announcement = (name: String, tripCity: String, trip: RamCoordinate?)
+
+    /// Whatever the person's "Open to carry" setting says this phone should announce while the app is
+    /// open — kept here so the main map and Profile restart discovery with the same payload, and
+    /// nearby shepherds can find this phone without Profile having to be on screen.
+    @ObservationIgnored var baseline: Announcement?
+
+    /// Restarts discovery with the baseline announcement.
+    func startWithBaseline() {
+        start(announce: baseline)
+    }
+
     /// Set once the Nearby explainer has been answered (either button).
     nonisolated static let introSeenKey = "com.baranov.nearbyIntroSeen"
 

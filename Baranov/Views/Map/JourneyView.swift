@@ -69,6 +69,10 @@ struct JourneyView: View {
     @Environment(SavedCourierStore.self) private var savedCouriers
     /// The courier whose card is open on the map (see `NearbyCourierCard`).
     @State private var selectedNearbyCourier: NearbyCourier?
+    /// Discovery waits for the Nearby explainer (iOS's Local Network prompt follows it); the map offers it
+    /// in place, so nobody has to open Profile to switch couriers on.
+    @AppStorage(NearbyCourierService.introSeenKey) private var nearbyIntroSeen = false
+    @State private var nearbyPromptHidden = false
     @Environment(EntitlementService.self) private var entitlementService
     @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
@@ -1453,6 +1457,15 @@ struct JourneyView: View {
                         }
                     },
                     onClose: { withAnimation(.snappy) { selectedNearbyCourier = nil } }
+                )
+                .padding(.top, 8)
+            } else if !nearbyIntroSeen, !nearbyPromptHidden {
+                NearbyDiscoveryPrompt(
+                    onTurnOn: {
+                        withAnimation(.snappy) { nearbyIntroSeen = true }
+                        nearbyCouriers.startWithBaseline()
+                    },
+                    onNotNow: { withAnimation(.snappy) { nearbyPromptHidden = true } }
                 )
                 .padding(.top, 8)
             }

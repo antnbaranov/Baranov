@@ -32,6 +32,7 @@ final class HoofbeatOverlayWindow {
         relay: HoofbeatRelay,
         nearby: NearbyCourierService,
         onRetry: @escaping @MainActor () -> Void,
+        onConfirm: @escaping @MainActor () -> Void = {},
         onAccept: @escaping @MainActor (HandoverRequest) -> Void,
         directionHint: @escaping @MainActor (HandoverRequest) -> Bool? = { _ in nil },
         onSuggestion: @escaping @MainActor (CourierSuggestion) -> Void = { _ in }
@@ -50,6 +51,7 @@ final class HoofbeatOverlayWindow {
             relay: relay,
             nearby: nearby,
             onRetry: onRetry,
+            onConfirm: onConfirm,
             onAccept: onAccept,
             directionHint: directionHint,
             onSuggestion: onSuggestion,
@@ -82,6 +84,7 @@ private struct HoofbeatOverlayRoot: View {
     let relay: HoofbeatRelay
     let nearby: NearbyCourierService
     let onRetry: @MainActor () -> Void
+    let onConfirm: @MainActor () -> Void
     let onAccept: @MainActor (HandoverRequest) -> Void
     let directionHint: @MainActor (HandoverRequest) -> Bool?
     let onSuggestion: @MainActor (CourierSuggestion) -> Void
@@ -130,7 +133,9 @@ private struct HoofbeatOverlayRoot: View {
                         awaitingAcceptance: relay.isAwaitingAcceptance,
                         answeringRequest: relay.isByRequest && !relay.isAwaitingAcceptance,
                         onDismiss: { relay.reset() },
-                        onRetry: { onRetry() }
+                        onRetry: { onRetry() },
+                        onConfirm: { onConfirm() },
+                        isConfirmed: relay.isManuallyConfirmed
                     )
                 }
                 .padding(.top, 4)

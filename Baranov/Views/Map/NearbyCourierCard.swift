@@ -28,6 +28,9 @@ struct NearbyCourierCard: View {
     let onClose: () -> Void
 
     @State private var saveTick = 0
+    /// Set the instant Hand over is tapped, so there is feedback before the
+    /// host swaps this card for the handover banner.
+    @State private var isConnecting = false
 
     private var subtitle: LocalizedStringKey {
         courier.tripCity.isEmpty ? "Open to carry" : "Heading to \(courier.tripCity)"
@@ -36,6 +39,17 @@ struct NearbyCourierCard: View {
     private var canWriteLetter: Bool {
         onSendLetter != nil && courier.tripLatitude != nil && courier.tripLongitude != nil
             && !courier.tripCity.isEmpty
+    }
+
+    /// Shows "Connecting…" first, then starts the handover a beat later so
+    /// the state is actually seen before the card goes away.
+    private func startHandOver() {
+        guard !isConnecting, let onHandOver else { return }
+        isConnecting = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(600))
+            onHandOver()
+        }
     }
 
     var body: some View {
@@ -58,19 +72,38 @@ struct NearbyCourierCard: View {
                 .accessibilityLabel("Close")
             }
 
-            HStack(spacing: 10) {
-                if let onHandOver {
-                    Button(action: onHandOver) {
-                        Label("Hand over", systemImage: "hand.wave")
+            // Hand over is the main action, so it gets the whole row and
+            // can never wrap; Write and Save sit quietly underneath.
+            if onHandOver != nil {
+                Button(action: startHandOver) {
+                    Group {
+                        if isConnecting {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("Connecting…")
+                            }
+                        } else {
+                            Label("Hand over", systemImage: "arrow.left.arrow.right")
+                        }
                     }
-                    .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .padding(.vertical, 4)
                 }
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+                .disabled(isConnecting)
+            }
 
+            HStack(spacing: 10) {
                 if canWriteLetter, let onSendLetter {
                     Button(action: onSendLetter) {
                         Label("Write", systemImage: "envelope")
+                            .lineLimit(1)
                     }
                     .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+                    .disabled(isConnecting)
+                } else {
+                    Spacer(minLength: 0)
                 }
 
                 Button {
@@ -80,7 +113,7 @@ struct NearbyCourierCard: View {
                     Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(isSaved ? Color.accentColor : Color.primary)
-                        .frame(width: 48, height: 48)
+                        .frame(width: 44, height: 44)
                         .liquidGlass(in: Circle(), fallbackMaterial: .regularMaterial)
                         .contentShape(Circle())
                 }
@@ -89,7 +122,7 @@ struct NearbyCourierCard: View {
             }
 
             if onHandOver != nil {
-                Text("Ask \(courier.name) to shake too.")
+                Text("Tap to hand over or shake phones together.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -99,6 +132,7 @@ struct NearbyCourierCard: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 16)
         .sensoryFeedback(.selection, trigger: saveTick)
+        .sensoryFeedback(.impact(weight: .light), trigger: isConnecting) { _, now in now }
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
@@ -118,5 +152,50 @@ struct NearbyCourierMarker: View {
         .buttonStyle(.plain)
         .accessibilityLabel(Text(courier.name))
         .accessibilityHint(Text("Shows save and hand over options"))
+    }
+}
+
+/// Shown on the main map until nearby discovery has been switched on once: the same explanation Profile
+/// gives, in place. Turning it on lets iOS show its Local Network prompt; "Not now" only hides this
+/// until the next launch.
+struct NearbyDiscoveryPrompt: View {
+    let onTurnOn: () -> Void
+    let onNotNow: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "wave.3.forward")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .frame(width: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Find shepherds nearby")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("See couriers close to you right here on the map, and hand a ram over without the internet. iOS will ask to let Baranov find devices on your local network.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(spacing: 10) {
+                Button(action: onNotNow) {
+                    Text("Not now").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button(action: onTurnOn) {
+                    Text("Turn On").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .buttonBorderShape(.capsule)
+            .controlSize(.large)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 16)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

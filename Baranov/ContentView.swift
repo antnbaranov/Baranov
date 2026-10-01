@@ -60,7 +60,7 @@ struct ContentView: View {
         .environment(\.locale, currentLocale)
         .preferredColorScheme(appAppearance.colorScheme)
         .onOpenURL { url in
-            if url.scheme?.caseInsensitiveCompare("baranov") == .orderedSame {
+            if url.scheme?.caseInsensitiveCompare("baranov") == .orderedSame || ExpectedLetter.isLink(url) {
                 handleDeepLink(url)
             }
         }

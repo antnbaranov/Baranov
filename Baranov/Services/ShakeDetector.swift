@@ -82,11 +82,11 @@ final class ShakeDetector {
         onShake?(now)
     }
 
-    #if DEBUG
-    /// Simulator escape hatch — there's no accelerometer there, so the
-    /// hoofbeat flow would otherwise be untestable outside a real device.
+    /// The tap alternative to a physical shake: reports a shake at this
+    /// instant, through the same debounce and `onShake` path a real one
+    /// takes. Used by the on-screen "Hand over" buttons, and it makes the
+    /// hoofbeat flow testable in the simulator, which has no accelerometer.
     func simulateShake() {
         registerShake()
     }
-    #endif
 }

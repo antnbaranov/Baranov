@@ -100,7 +100,15 @@ final class HoofbeatRelay: NSObject {
     /// peer that refused, a Wi-Fi hiccup) left the HUD on "Meeting …"
     /// forever, because the search timeout only ever fired while still
     /// searching.
-    static let connectTimeout: TimeInterval = 15
+    ///
+    /// This is a HARD cap, measured from the first moment the relay shows
+    /// "Meeting …" and never re-armed by retries, repeated invitations or
+    /// session callbacks — each of those used to restart the clock.
+    static let connectTimeout: TimeInterval = 18
+
+    /// How long a phone that was confirmed with a tap keeps looking: the
+    /// other person still has to notice and tap too.
+    static let confirmedSearchTimeout: TimeInterval = 15
 
     /// How many times a failed connection to the same partner is retried
     /// before giving up. MultipeerConnectivity often fails the first
@@ -133,6 +141,12 @@ final class HoofbeatRelay: NSObject {
     /// True while this phone asked a nearby courier to accept a handover
     /// and is waiting for their answer, rather than for a shake.
     private(set) var isAwaitingAcceptance = false
+
+    /// True once the person tapped "Hand over now" instead of shaking. A
+    /// confirmed phone pairs with its named partner (or any phone that was
+    /// confirmed the same way) regardless of how far apart the two shake
+    /// instants are.
+    private(set) var isManuallyConfirmed = false
 
     /// True when this exchange was agreed by request and Accept, on either
     /// side. On the accepting phone it lets the HUD say "Connecting…"
@@ -170,6 +184,14 @@ final class HoofbeatRelay: NSObject {
     private var activePeer: MCPeerID?
     private var peerName = ""
 
+    /// Every phone the browser has reported this exchange, whether or not
+    /// it was eligible at the time, so a tap can re-evaluate them at once.
+    private struct SeenPeer {
+        let peer: MCPeerID
+        let info: [String: String]?
+    }
+    private var seenPeers: [String: SeenPeer] = [:]
+
     // Transfer state — one flag per fact, so each packet is idempotent.
     private var peerHandshakeSeen = false
     private var peerHasLetter = false
@@ -182,6 +204,7 @@ final class HoofbeatRelay: NSObject {
     private var didConclude = false
 
     private var timeoutTask: Task<Void, Never>?
+    private var connectDeadlineTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var stallTask: Task<Void, Never>?
     private var settleTask: Task<Void, Never>?
@@ -234,6 +257,8 @@ final class HoofbeatRelay: NSObject {
         myShakeAt = shakenAt
         outgoingPackage = package
         invitedPeers = []
+        seenPeers = [:]
+        isManuallyConfirmed = false
         resetTransferState()
 
         // No transport encryption: `.required` with no identity is the
@@ -248,11 +273,9 @@ final class HoofbeatRelay: NSObject {
         session.delegate = self
         self.session = session
 
-        var discoveryInfo = ["s": String(shakenAt.timeIntervalSince1970)]
-        if let pairingToken { discoveryInfo["t"] = pairingToken }
         let advertiser = MCNearbyServiceAdvertiser(
             peer: localPeerID,
-            discoveryInfo: discoveryInfo,
+            discoveryInfo: discoveryInfo(),
             serviceType: Self.serviceType
         )
         advertiser.delegate = self
@@ -276,6 +299,71 @@ final class HoofbeatRelay: NSObject {
             self?.watchdogFired()
         }
         trace("begin, offering \(package?.ram.name ?? "nothing")")
+    }
+
+    /// What this phone publishes while it is armed: the shake instant, the
+    /// pairing token of a requested handover, and `m` once the person
+    /// tapped instead of shaking.
+    private func discoveryInfo() -> [String: String] {
+        var info = ["s": String(myShakeAt.timeIntervalSince1970)]
+        if let pairingToken { info["t"] = pairingToken }
+        if isManuallyConfirmed { info["m"] = "1" }
+        return info
+    }
+
+    /// The tap alternative to the second shake. Shaking only pairs two
+    /// phones whose shakes land within `matchWindow` of each other, which
+    /// is exactly what fails when one person is slower than the other. A
+    /// confirmed phone drops that requirement: it re-advertises itself as
+    /// deliberately ready, re-checks every phone already seen, and pairs
+    /// with the named partner (or any other confirmed phone) at once.
+    /// Only meaningful while looking for a shake partner; a requested
+    /// handover is confirmed by the other person's Accept instead.
+    func confirmHandover() {
+        guard case .searching = phase, pairingToken == nil, !isManuallyConfirmed else { return }
+        trace("manual confirm")
+        isManuallyConfirmed = true
+        myShakeAt = Date()
+        invitedPeers = []
+        connectAttempts = [:]
+
+        advertiser?.stopAdvertisingPeer()
+        advertiser?.delegate = nil
+        let fresh = MCNearbyServiceAdvertiser(
+            peer: localPeerID,
+            discoveryInfo: discoveryInfo(),
+            serviceType: Self.serviceType
+        )
+        fresh.delegate = self
+        fresh.startAdvertisingPeer()
+        advertiser = fresh
+
+        armTimeout(Self.confirmedSearchTimeout)
+
+        for seen in Array(seenPeers.values) {
+            consider(peerID: seen.peer, info: seen.info)
+        }
+        browser?.stopBrowsingForPeers()
+        browser?.startBrowsingForPeers()
+    }
+
+    /// Starts the hard "Meeting …" deadline unless one is already running.
+    /// Deliberately not restartable: a retried invite, a repeated
+    /// invitation or a `.connecting` callback must not buy more time.
+    private func armConnectDeadline() {
+        guard connectDeadlineTask == nil else { return }
+        connectDeadlineTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(HoofbeatRelay.connectTimeout))
+            guard !Task.isCancelled else { return }
+            self?.connectDeadlineFired()
+        }
+    }
+
+    private func connectDeadlineFired() {
+        connectDeadlineTask = nil
+        guard case .connecting = phase, activePeer == nil, !didConclude else { return }
+        trace("connect deadline fired in \(phase)")
+        timeOut()
     }
 
     private func watchdogFired() {
@@ -319,6 +407,7 @@ final class HoofbeatRelay: NSObject {
         partnerName = nil
         pairingToken = nil
         isAwaitingAcceptance = false
+        isManuallyConfirmed = false
         phase = .idle
     }
 
@@ -337,6 +426,10 @@ final class HoofbeatRelay: NSObject {
     }
 
     private func teardownTransport() {
+        connectDeadlineTask?.cancel()
+        connectDeadlineTask = nil
+        seenPeers = [:]
+
         advertiser?.stopAdvertisingPeer()
         advertiser?.delegate = nil
         advertiser = nil
@@ -391,6 +484,8 @@ final class HoofbeatRelay: NSObject {
         guard phase.isActive, !didConclude else { return }
         trace("failed in \(phase): \(reason)")
         timeoutTask?.cancel()
+        connectDeadlineTask?.cancel()
+        connectDeadlineTask = nil
         watchdogTask?.cancel()
         stallTask?.cancel()
         teardownTransport()
@@ -401,6 +496,9 @@ final class HoofbeatRelay: NSObject {
     // MARK: - Pairing
 
     private func consider(peerID: MCPeerID, info: [String: String]?) {
+        if peerID.displayName != localPeerID.displayName {
+            seenPeers[peerID.displayName] = SeenPeer(peer: peerID, info: info)
+        }
         guard case .searching = phase, activePeer == nil, let session, let browser else { return }
         guard peerID.displayName != localPeerID.displayName else { return }
         guard !invitedPeers.contains(peerID.displayName) else { return }
@@ -409,9 +507,17 @@ final class HoofbeatRelay: NSObject {
         // token; a shake pairs only with another shake inside the window.
         guard info?["t"] == pairingToken else { return }
         if pairingToken == nil {
-            guard let stamp = info?["s"], let seconds = TimeInterval(stamp) else { return }
-            let theirShake = Date(timeIntervalSince1970: seconds)
-            guard abs(theirShake.timeIntervalSince(myShakeAt)) <= Self.matchWindow else { return }
+            if isManuallyConfirmed || info?["m"] == "1" {
+                // A tap on either side replaces the timing check, so the
+                // person we meant to hand over to is the proof instead.
+                if let partnerName, !partnerName.isEmpty,
+                   Self.friendlyName(peerID.displayName)
+                    .caseInsensitiveCompare(partnerName) != .orderedSame { return }
+            } else {
+                guard let stamp = info?["s"], let seconds = TimeInterval(stamp) else { return }
+                let theirShake = Date(timeIntervalSince1970: seconds)
+                guard abs(theirShake.timeIntervalSince(myShakeAt)) <= Self.matchWindow else { return }
+            }
         }
 
         // Deterministic tie-break: exactly one of the two devices invites,
@@ -438,6 +544,7 @@ final class HoofbeatRelay: NSObject {
         connectAttempts[peerID.displayName, default: 0] += 1
         phase = .connecting(peerName: Self.friendlyName(peerID.displayName))
         armTimeout(Self.connectTimeout)
+        armConnectDeadline()
         browser.invitePeer(peerID, to: session, withContext: nil, timeout: 12)
     }
 
@@ -478,6 +585,8 @@ final class HoofbeatRelay: NSObject {
 
         timeoutTask?.cancel()
         timeoutTask = nil
+        connectDeadlineTask?.cancel()
+        connectDeadlineTask = nil
         phase = .exchanging(peerName: peerName)
 
         // If the exchange stalls, give up cleanly. Nothing was marked handed
@@ -677,6 +786,7 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
             case .searching, .connecting:
                 self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxedPeer.value.displayName))
                 self.armTimeout(HoofbeatRelay.connectTimeout)
+                self.armConnectDeadline()
                 boxedHandler.value(true, session)
             default:
                 boxedHandler.value(false, nil)
@@ -712,6 +822,7 @@ extension HoofbeatRelay: MCSessionDelegate {
                 switch self.phase {
                 case .searching, .connecting:
                     self.phase = .connecting(peerName: HoofbeatRelay.friendlyName(boxed.value.displayName))
+                    self.armConnectDeadline()
                 default:
                     break
                 }

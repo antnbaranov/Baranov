@@ -165,11 +165,10 @@ struct ProfileView: View {
             }
             .onDisappear {
                 discovery.stop()
-                // Stop advertising this device once Profile isn't open to
-                // read it — browsing (what fills this screen's and the
-                // main map's courier markers) keeps running for as long
-                // as the app is active.
-                nearby.start(announce: nil)
+                // Discovery keeps running for as long as the app is active
+                // (it fills the main map's courier markers too); refresh it
+                // with the latest "Open to carry" settings on the way out.
+                restartNearby()
             }
             .onChange(of: openToCarry) { restartNearby() }
             .task {
@@ -181,11 +180,12 @@ struct ProfileView: View {
     }
 
     private func restartNearby() {
-        nearby.start(announce: openToCarry
-                     ? (name: displayName,
-                        tripCity: registeredTrips.first?.destinationCity ?? "",
-                        trip: registeredTrips.first?.destinationCoordinate)
-                     : nil)
+        nearby.baseline = openToCarry
+            ? (name: displayName,
+               tripCity: registeredTrips.first?.destinationCity ?? "",
+               trip: registeredTrips.first?.destinationCoordinate)
+            : nil
+        nearby.startWithBaseline()
     }
 
     private func refreshTrips() async {
@@ -388,7 +388,7 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Open to carry")
                         .font(.subheadline.weight(.medium))
-                    Text("Nearby senders see your name and first trip while this screen is open. Never your position.")
+                    Text("Nearby senders see your name and first trip while Baranov is open. Never your position.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
