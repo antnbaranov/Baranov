@@ -79,14 +79,15 @@ struct ShepherdAvatarView: View {
             Image(uiImage: customImage).resizable().scaledToFill()
         } else if UIImage(named: selection) != nil {
             // Illustrated presets are portrait busts on a white ground. Anchor to the top
-            // and nudge down so the head keeps some air above it instead of being clipped.
+            // and keep a small nudge down so the head has a little air above it without
+            // pushing the shoulders out of the frame.
             ZStack(alignment: .top) {
                 Color.white
                 Image(selection)
                     .resizable()
                     .scaledToFill()
                     .frame(width: size, height: size, alignment: .top)
-                    .offset(y: size * 0.09)
+                    .offset(y: size * 0.03)
             }
             .frame(width: size, height: size)
             .clipped()

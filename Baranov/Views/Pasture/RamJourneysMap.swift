@@ -103,6 +103,7 @@ struct RamJourneysMap: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button {
                 dismissPasture()
+                NotificationCenter.default.post(name: .composeLetterRequested, object: nil)
             } label: {
                 Label("Send a letter", systemImage: "paperplane.fill")
             }

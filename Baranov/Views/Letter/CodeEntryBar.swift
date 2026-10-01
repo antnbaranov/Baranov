@@ -131,18 +131,32 @@ struct CodeEntryBar: View {
             TextField("An ear tag from a friend?", text: $code)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
+                .keyboardType(.asciiCapable)
                 .focused($isFocused)
                 .submitLabel(.done)
+                .accessibilityLabel("Ear tag")
+                .accessibilityHint("Twelve letters and digits. Dashes are added for you, and you can paste a whole message.")
                 .onChange(of: code) { _, new in
-                    let formatted = LetterCode.format(new)
+                    // Typing "abcd" then "e" gives "ABCD-E"; pasting a whole message pulls out the tag in it.
+                    let formatted = LetterCode.extract(from: new) ?? LetterCode.format(new)
                     if formatted != new { code = formatted }
                 }
             if !code.isEmpty {
+                if !LetterCode.isComplete(code) {
+                    Text("\(min(normalized.count, LetterCode.length))/\(LetterCode.length)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
                 Button { code = "" } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .padding(.trailing, -8)
                 .accessibilityLabel("Clear")
             }
         }
@@ -191,7 +205,7 @@ struct NativeFieldRow<Content: View>: View {
             content
         }
         .padding(.horizontal, 8)
-        .frame(minHeight: 36)
+        .frame(minHeight: 44)
         .background(Color(uiColor: .tertiarySystemFill),
                     in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }

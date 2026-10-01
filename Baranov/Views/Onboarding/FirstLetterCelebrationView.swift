@@ -30,6 +30,9 @@ extension Notification.Name {
     /// Posted by the compose sheet each time a letter is dispatched;
     /// `RootView` decides whether it's the first.
     static let firstLetterDispatched = Notification.Name("com.baranov.firstLetterDispatched")
+    /// Something outside the map (the passport's "Send a letter") wants the
+    /// panel on its first page, the compose form, not the mailbag.
+    static let composeLetterRequested = Notification.Name("com.baranov.composeLetterRequested")
     /// A tracked letter just left; `userInfo["message"]` is the tracking
     /// message for the recipient. `RootView` offers the share sheet.
     static let letterReadyToShare = Notification.Name("com.baranov.letterReadyToShare")

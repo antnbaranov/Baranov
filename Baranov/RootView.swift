@@ -654,7 +654,31 @@ struct RootView: View {
     /// real shake would.  The `matchWindow` (4 s) gives both people
     /// enough room to tap within a few seconds of each other.
     private func triggerManualHoofbeat() {
-        hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate())
+        // One courier in range: ask them directly, so their phone shows Accept / Not now and they never
+        // have to shake. Otherwise listen for a shake as before.
+        if let courier = soleNearbyCourier() {
+            handOver(to: courier, ram: handoffRam(for: courier.name))
+            return
+        }
+        nearbyCouriers.requestAccess {
+            hoofbeatRelay.begin(shakenAt: Date(), offering: handoffCandidate())
+        }
+    }
+
+    private func soleNearbyCourier() -> NearbyCourier? {
+        nearbyCouriers.couriers.count == 1 ? nearbyCouriers.couriers.first : nil
+    }
+
+    /// Who "Hand Over Now" should send a request to: the courier this exchange is about, or the only one
+    /// in range. `nil` when it is ambiguous — then the phones pair by tapping on both sides instead.
+    private func requestTarget() -> NearbyCourier? {
+        if let name = hoofbeatRelay.partnerName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+           let match = nearbyCouriers.couriers.first(where: {
+               $0.name.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare(name) == .orderedSame
+           }) {
+            return match
+        }
+        return soleNearbyCourier()
     }
 
     /// Starts (or restarts) nearby discovery for the main map: always browsing, and announcing this phone
@@ -680,7 +704,14 @@ struct RootView: View {
     private func confirmHandoverTap() {
         switch hoofbeatRelay.phase {
         case .searching:
-            hoofbeatRelay.confirmHandover()
+            if !hoofbeatRelay.isByRequest, let courier = requestTarget() {
+                // Turn the wait for a shake into a request they can Accept.
+                let ram = handoffRam(for: courier.name)
+                hoofbeatRelay.reset()
+                handOver(to: courier, ram: ram)
+            } else {
+                hoofbeatRelay.confirmHandover()
+            }
         case .idle:
             shakeDetector.simulateShake()
         case .connecting, .exchanging, .finished, .failed:
@@ -745,6 +776,13 @@ struct RootView: View {
     /// Sends a courier in range a request to take `ram` (or to meet, with
     /// nothing to give), and arms the relay to pair on its token.
     private func handOver(to courier: NearbyCourier, ram: Ram?) {
+        // The card shows "Connecting…" from here until the handover has really begun, which may include
+        // the first-time Local Network explainer.
+        nearbyCouriers.beginHandover(courierID: courier.id)
+        nearbyCouriers.requestAccess { startHandover(to: courier, ram: ram) }
+    }
+
+    private func startHandover(to courier: NearbyCourier, ram: Ram?) {
         let token = String(UUID().uuidString.prefix(8))
         let trimmed = carrierDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = HandoverRequest(
@@ -763,6 +801,7 @@ struct RootView: View {
         } else {
             hoofbeatRelay.begin(shakenAt: Date(), offering: offering, partnerName: courier.name)
         }
+        nearbyCouriers.handoverDidStart()
     }
 
     // MARK: - Couriers worth pointing out

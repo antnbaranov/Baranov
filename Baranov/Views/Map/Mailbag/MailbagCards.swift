@@ -76,7 +76,8 @@ struct RouteProgressBar: View {
     let ram: Ram
     var showsPlaces: Bool = false
 
-    private let markerDiameter: CGFloat = 26
+    @ScaledMetric(relativeTo: .caption) private var markerDiameter: CGFloat = 26
+    @ScaledMetric(relativeTo: .caption) private var endpointDiameter: CGFloat = 18
 
     private var progress: CGFloat { CGFloat(min(max(ram.progress, 0), 1)) }
     private var originName: String { ram.routeHistory.first?.cityName ?? ram.currentCity }
@@ -103,7 +104,7 @@ struct RouteProgressBar: View {
                         .position(x: inset + travel, y: markerDiameter / 2)
 
                     Image(systemName: "pawprint.fill")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(width: markerDiameter, height: markerDiameter)
                         .background(Color.accentColor, in: Circle())
@@ -129,9 +130,10 @@ struct RouteProgressBar: View {
 
     private func endpoint(systemImage: String) -> some View {
         Image(systemName: systemImage)
-            .font(.system(size: 9, weight: .semibold))
+            .font(.caption2.weight(.semibold))
+            .imageScale(.small)
             .foregroundStyle(.secondary)
-            .frame(width: 18, height: 18)
+            .frame(width: endpointDiameter, height: endpointDiameter)
             .background(.thinMaterial, in: Circle())
     }
 }

@@ -28,9 +28,10 @@ struct NearbyCourierCard: View {
     let onClose: () -> Void
 
     @State private var saveTick = 0
-    /// Set the instant Hand over is tapped, so there is feedback before the
-    /// host swaps this card for the handover banner.
-    @State private var isConnecting = false
+    /// True from the tap on Hand over until the handover has really begun
+    /// (or the person declined to allow nearby access). Driven by the host
+    /// from real state, not a timer.
+    var isConnecting: Bool = false
 
     private var subtitle: LocalizedStringKey {
         courier.tripCity.isEmpty ? "Open to carry" : "Heading to \(courier.tripCity)"
@@ -39,17 +40,6 @@ struct NearbyCourierCard: View {
     private var canWriteLetter: Bool {
         onSendLetter != nil && courier.tripLatitude != nil && courier.tripLongitude != nil
             && !courier.tripCity.isEmpty
-    }
-
-    /// Shows "Connecting…" first, then starts the handover a beat later so
-    /// the state is actually seen before the card goes away.
-    private func startHandOver() {
-        guard !isConnecting, let onHandOver else { return }
-        isConnecting = true
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(600))
-            onHandOver()
-        }
     }
 
     var body: some View {
@@ -75,7 +65,7 @@ struct NearbyCourierCard: View {
             // Hand over is the main action, so it gets the whole row and
             // can never wrap; Write and Save sit quietly underneath.
             if onHandOver != nil {
-                Button(action: startHandOver) {
+                Button { onHandOver?() } label: {
                     Group {
                         if isConnecting {
                             HStack(spacing: 8) {
@@ -155,9 +145,9 @@ struct NearbyCourierMarker: View {
     }
 }
 
-/// Shown on the main map until nearby discovery has been switched on once: the same explanation Profile
-/// gives, in place. Turning it on lets iOS show its Local Network prompt; "Not now" only hides this
-/// until the next launch.
+/// Shown the first time someone tries to hand over to a person nearby: the same explanation Profile gives,
+/// at the moment it matters. Turning it on lets iOS show its Local Network prompt right after; "Not now"
+/// starts nothing.
 struct NearbyDiscoveryPrompt: View {
     let onTurnOn: () -> Void
     let onNotNow: () -> Void
@@ -196,6 +186,32 @@ struct NearbyDiscoveryPrompt: View {
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.horizontal, 16)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+}
+
+/// How many couriers are in Bluetooth range right now. Their pins on the map are only roughly placed (nearby
+/// discovery knows who is close, not where), so this says it in words and opens the first one.
+struct NearbyRangeBadge: View {
+    let count: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Label {
+                Text("^[\(count) courier](inflect: true) in range")
+            } icon: {
+                Image(systemName: "person.2.wave.2")
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(.regularMaterial, in: Capsule(style: .continuous))
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Shows the closest courier")
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

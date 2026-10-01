@@ -126,6 +126,13 @@ private struct HoofbeatOverlayRoot: View {
                         )
                     }
 
+                    if nearby.isAskingForAccess {
+                        NearbyDiscoveryPrompt(
+                            onTurnOn: { nearby.grantAccess() },
+                            onNotNow: { nearby.declineAccess() }
+                        )
+                    }
+
                     HoofbeatOverlay(
                         phase: relay.phase,
                         successTick: relay.successTick,
@@ -135,7 +142,13 @@ private struct HoofbeatOverlayRoot: View {
                         onDismiss: { relay.reset() },
                         onRetry: { onRetry() },
                         onConfirm: { onConfirm() },
-                        isConfirmed: relay.isManuallyConfirmed
+                        isConfirmed: relay.isManuallyConfirmed,
+                        failure: relay.failure,
+                        onOpenSettings: {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
                     )
                 }
                 .padding(.top, 4)
@@ -146,6 +159,7 @@ private struct HoofbeatOverlayRoot: View {
                 }
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: nearby.incomingRequest)
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: nearby.suggestion)
+                .animation(.spring(response: 0.4, dampingFraction: 0.85), value: nearby.isAskingForAccess)
             }
             .environment(\.locale, Locale(identifier: languageCode))
             .preferredColorScheme((AppAppearance(rawValue: appearanceRaw) ?? .system).colorScheme)

@@ -35,6 +35,10 @@ struct HoofbeatOverlay: View {
     var onConfirm: (() -> Void)? = nil
     /// The person already tapped it and is waiting for the other phone.
     var isConfirmed: Bool = false
+    /// Why a failed handoff failed; picks the advice and whether Settings is offered.
+    var failure: HoofbeatFailure = .other
+    /// Opens this app's page in Settings (Local Network lives there).
+    var onOpenSettings: (() -> Void)? = nil
 
     private var hasSpriteArt: Bool {
         guard let first = RamSpriteFrameSets.gallopWithEnvelope.first else { return false }
@@ -151,8 +155,25 @@ struct HoofbeatOverlay: View {
         .controlSize(.large)
     }
 
-    /// A failed handoff: what happened, what to do instead, and Cancel /
-    /// Try Again as big as the request card's buttons.
+    /// What to do about the failure, in words.
+    private var failureAdvice: LocalizedStringKey {
+        switch failure {
+        case .localNetworkDenied:
+            "Baranov needs Local Network access to find nearby phones. Turn it on in Settings, then try again."
+        case .noShake:
+            "Nobody answered. Make sure Baranov is open on their phone and that Bluetooth and Wi‑Fi are on, then try again."
+        case .notAccepted:
+            "They may not have seen the request. Make sure Baranov is open on their phone, then try again."
+        case .unreachable:
+            "The phones found each other but couldn't connect. Move a little closer and check Bluetooth and Wi‑Fi, then try again."
+        case .other:
+            "The sender has to send the ram first. Or be the receiver instead: add the sender's ID as a code in the letter sheet."
+        }
+    }
+
+    /// A failed handoff: what happened, what to do about it, and Cancel /
+    /// Try Again (or Open Settings when only Settings can fix it) as big
+    /// as the request card's buttons.
     private var failedCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
@@ -163,15 +184,29 @@ struct HoofbeatOverlay: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("The sender has to send the ram first. Or be the receiver instead: add the sender's ID as a code in the letter sheet.")
+                    Text(failureAdvice)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
             }
-            actionRow(primaryTitle: "Try Again", primaryIcon: "arrow.clockwise",
-                      onCancel: onDismiss, onPrimary: onRetry)
+            if failure == .localNetworkDenied, let onOpenSettings {
+                actionRow(primaryTitle: "Open Settings", primaryIcon: "gearshape",
+                          onCancel: onDismiss, onPrimary: onOpenSettings)
+                if let onRetry {
+                    Button(action: onRetry) {
+                        Label("Try Again", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .controlSize(.large)
+                }
+            } else {
+                actionRow(primaryTitle: "Try Again", primaryIcon: "arrow.clockwise",
+                          onCancel: onDismiss, onPrimary: onRetry)
+            }
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))

@@ -113,11 +113,7 @@ struct ProfileView: View {
                         isSaved: savedCouriers.isSaved(name: courier.name),
                         onToggleSave: { savedCouriers.toggle(courier, at: locationService.currentCoordinate) },
                         onHandOver: onHandOver.map { handOver in
-                            {
-                                selectedCourier = nil
-                                dismiss()
-                                handOver(courier)
-                            }
+                            { handOver(courier) }
                         },
                         onSendLetter: onSendLetter.map { sendLetter in
                             {
@@ -126,7 +122,8 @@ struct ProfileView: View {
                                 sendLetter(courier)
                             }
                         },
-                        onClose: { withAnimation(.snappy) { selectedCourier = nil } }
+                        onClose: { withAnimation(.snappy) { selectedCourier = nil } },
+                        isConnecting: nearby.handoverCourierID == courier.id
                     )
                     .padding(.top, 8)
                 }
@@ -146,6 +143,12 @@ struct ProfileView: View {
                 Button("Cancel", role: .cancel) { pendingCourierRemoval = nil }
             } message: { saved in
                 Text("You won't see \(saved.name) as a saved courier anymore. Their trip note and first-met details go with them.")
+            }
+            .onChange(of: nearby.handoverStartedTick) {
+                // The handover has really begun; the banner is the only thing left to see.
+                guard selectedCourier != nil else { return }
+                selectedCourier = nil
+                dismiss()
             }
             .onChange(of: nearby.couriers) { _, couriers in
                 if let selected = selectedCourier, !couriers.contains(selected) {

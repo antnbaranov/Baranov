@@ -52,6 +52,15 @@ enum LetterCode {
             .joined(separator: "-")
     }
 
+    /// Finds a grouped code (`XXXX-XXXX-XXXX`, with dashes, spaces or dots between the groups) inside
+    /// longer text, so pasting the whole message a friend sent — "Your ear tag, if the app asks: …" —
+    /// fills the field with just the tag.
+    static func extract(from text: String) -> String? {
+        let pattern = #"(?<![A-Za-z0-9])[A-Za-z0-9]{4}[-\s.][A-Za-z0-9]{4}[-\s.][A-Za-z0-9]{4}(?![A-Za-z0-9])"#
+        guard let range = text.range(of: pattern, options: .regularExpression) else { return nil }
+        return format(String(text[range]))
+    }
+
     static func isComplete(_ raw: String) -> Bool {
         normalize(raw).count == length
     }

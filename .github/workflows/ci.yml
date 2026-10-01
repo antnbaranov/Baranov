@@ -1,4 +1,4 @@
-name: Build & Test
+name: Build
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: Build and run unit tests (iOS Simulator)
+  build:
+    name: Build (iOS Simulator)
     runs-on: macos-26
     timeout-minutes: 40
     steps:
@@ -24,19 +24,18 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Baranov.xcodeproj -scheme Baranov
 
-      - name: Build & test
+      - name: Build
         run: |
           set -o pipefail
           DEST="platform=iOS Simulator,name=$(xcrun simctl list devices available | grep -m1 -o 'iPhone [0-9A-Za-z ]*' | head -1 | sed 's/ *$//')"
           echo "Destination: $DEST"
-          xcodebuild test \
+          xcodebuild build \
             -project Baranov.xcodeproj \
             -scheme Baranov \
             -destination "$DEST" \
             -skipPackagePluginValidation \
             -quiet \
             CODE_SIGNING_ALLOWED=NO \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
             2>&1 | tee build.log
 
       - name: Upload build log

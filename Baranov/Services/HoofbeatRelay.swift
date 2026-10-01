@@ -72,6 +72,19 @@ enum HoofbeatPhase: Equatable, Sendable {
     }
 }
 
+/// Why a handoff failed, so the HUD can say what to do about it.
+enum HoofbeatFailure: Equatable, Sendable {
+    /// iOS refused Local Network access; only Settings can fix it.
+    case localNetworkDenied
+    /// Nobody armed their phone the same way in time.
+    case noShake
+    /// A requested handover that was never accepted.
+    case notAccepted
+    /// The phones found each other but the link never came up.
+    case unreachable
+    case other
+}
+
 /// Ferries a non-`Sendable` MultipeerConnectivity object from a delegate
 /// callback (arbitrary queue) onto the main actor. Safe here because each
 /// boxed value is used on exactly one actor after the hop, and the
@@ -147,6 +160,9 @@ final class HoofbeatRelay: NSObject {
     /// confirmed the same way) regardless of how far apart the two shake
     /// instants are.
     private(set) var isManuallyConfirmed = false
+
+    /// What went wrong, while `phase` is `.failed`.
+    private(set) var failure: HoofbeatFailure = .other
 
     /// True when this exchange was agreed by request and Accept, on either
     /// side. On the accepting phone it lets the HUD say "Connecting…"
@@ -259,6 +275,7 @@ final class HoofbeatRelay: NSObject {
         invitedPeers = []
         seenPeers = [:]
         isManuallyConfirmed = false
+        failure = .other
         resetTransferState()
 
         // No transport encryption: `.required` with no identity is the
@@ -408,6 +425,7 @@ final class HoofbeatRelay: NSObject {
         pairingToken = nil
         isAwaitingAcceptance = false
         isManuallyConfirmed = false
+        failure = .other
         phase = .idle
     }
 
@@ -452,21 +470,26 @@ final class HoofbeatRelay: NSObject {
     private func timeOut() {
         trace("timeout in \(phase)")
         let reason: String
+        let kind: HoofbeatFailure
         switch phase {
         case .searching where isAwaitingAcceptance:
+            kind = .notAccepted
             if let partnerName, !partnerName.isEmpty {
                 reason = String(localized: "\(partnerName) didn't accept. Nothing changed.", bundle: .appLanguage, locale: .appLanguage)
             } else {
                 reason = String(localized: "No one accepted. Nothing changed.", bundle: .appLanguage, locale: .appLanguage)
             }
         case .searching:
+            kind = .noShake
             reason = String(localized: "No one shook back nearby.", bundle: .appLanguage, locale: .appLanguage)
         case let .connecting(name):
+            kind = .unreachable
             reason = String(localized: "Couldn't reach \(name). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage)
         default:
             return
         }
         teardownTransport()
+        failure = kind
         phase = .failed(reason: reason)
         autoDismiss(after: 15.0)
     }
@@ -480,8 +503,9 @@ final class HoofbeatRelay: NSObject {
         }
     }
 
-    private func fail(_ reason: String) {
+    private func fail(_ reason: String, kind: HoofbeatFailure = .other) {
         guard phase.isActive, !didConclude else { return }
+        failure = kind
         trace("failed in \(phase): \(reason)")
         timeoutTask?.cancel()
         connectDeadlineTask?.cancel()
@@ -570,7 +594,8 @@ final class HoofbeatRelay: NSObject {
             restartDiscovery()
             phase = .searching
         } else {
-            fail(String(localized: "Couldn't reach \(Self.friendlyName(name)). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage))
+            fail(String(localized: "Couldn't reach \(Self.friendlyName(name)). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage),
+                 kind: .unreachable)
         }
     }
 
@@ -759,7 +784,8 @@ extension HoofbeatRelay: MCNearbyServiceBrowserDelegate {
         didNotStartBrowsingForPeers error: any Error
     ) {
         Task { @MainActor [weak self] in
-            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage))
+            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage),
+                       kind: .localNetworkDenied)
         }
     }
 }
@@ -799,7 +825,8 @@ extension HoofbeatRelay: MCNearbyServiceAdvertiserDelegate {
         didNotStartAdvertisingPeer error: any Error
     ) {
         Task { @MainActor [weak self] in
-            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage))
+            self?.fail(String(localized: "Local network access is off for Baranov.", bundle: .appLanguage, locale: .appLanguage),
+                       kind: .localNetworkDenied)
         }
     }
 }

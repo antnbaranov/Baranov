@@ -69,10 +69,6 @@ struct JourneyView: View {
     @Environment(SavedCourierStore.self) private var savedCouriers
     /// The courier whose card is open on the map (see `NearbyCourierCard`).
     @State private var selectedNearbyCourier: NearbyCourier?
-    /// Discovery waits for the Nearby explainer (iOS's Local Network prompt follows it); the map offers it
-    /// in place, so nobody has to open Profile to switch couriers on.
-    @AppStorage(NearbyCourierService.introSeenKey) private var nearbyIntroSeen = false
-    @State private var nearbyPromptHidden = false
     @Environment(EntitlementService.self) private var entitlementService
     @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
@@ -631,6 +627,15 @@ struct JourneyView: View {
                 guard newCount > oldCount, trackedRam != nil else { return }
                 withAnimation {
                     panelPage = .mailbag
+                    panelDetent = .dockMedium
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .composeLetterRequested)) { _ in
+                // "Send a letter" from the passport: the compose page, not
+                // whichever page the panel was last left on.
+                mailbagPath.removeAll()
+                withAnimation {
+                    panelPage = .compose
                     panelDetent = .dockMedium
                 }
             }
@@ -1320,10 +1325,22 @@ struct JourneyView: View {
             // deterministic way Profile's own map places them, inside the
             // in-range ring around you.
             if let here = locationService.currentCoordinate {
+                // The ring is the honest part: "somewhere in here". The pins inside it are placed for
+                // legibility, so they get a dashed halo instead of looking surveyed.
+                if !nearbyCouriers.couriers.isEmpty {
+                    MapCircle(center: here, radius: 100)
+                        .foregroundStyle(.tint.opacity(0.10))
+                        .stroke(.tint.opacity(0.6), lineWidth: 1)
+                }
                 ForEach(nearbyCouriers.couriers) { courier in
                     Annotation(courier.name, coordinate: courier.placed(around: here)) {
                         NearbyCourierMarker(courier: courier, diameter: 34) {
                             withAnimation(.snappy) { selectedNearbyCourier = courier }
+                        }
+                        .background {
+                            Circle()
+                                .strokeBorder(.tint.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [3, 3]))
+                                .frame(width: 46, height: 46)
                         }
                     }
                     .annotationTitles(.visible)
@@ -1445,10 +1462,7 @@ struct JourneyView: View {
                     isSaved: savedCouriers.isSaved(name: courier.name),
                     onToggleSave: { savedCouriers.toggle(courier, at: locationService.currentCoordinate) },
                     onHandOver: onHandOverToNearby.map { handOver in
-                        {
-                            withAnimation(.snappy) { selectedNearbyCourier = nil }
-                            handOver(courier)
-                        }
+                        { handOver(courier) }
                     },
                     onSendLetter: onSendLetterToNearby.map { sendLetter in
                         {
@@ -1456,19 +1470,20 @@ struct JourneyView: View {
                             sendLetter(courier)
                         }
                     },
-                    onClose: { withAnimation(.snappy) { selectedNearbyCourier = nil } }
+                    onClose: { withAnimation(.snappy) { selectedNearbyCourier = nil } },
+                    isConnecting: nearbyCouriers.handoverCourierID == courier.id
                 )
                 .padding(.top, 8)
-            } else if !nearbyIntroSeen, !nearbyPromptHidden {
-                NearbyDiscoveryPrompt(
-                    onTurnOn: {
-                        withAnimation(.snappy) { nearbyIntroSeen = true }
-                        nearbyCouriers.startWithBaseline()
-                    },
-                    onNotNow: { withAnimation(.snappy) { nearbyPromptHidden = true } }
-                )
+            } else if let closest = nearbyCouriers.couriers.first {
+                NearbyRangeBadge(count: nearbyCouriers.couriers.count) {
+                    withAnimation(.snappy) { selectedNearbyCourier = closest }
+                }
                 .padding(.top, 8)
             }
+        }
+        .onChange(of: nearbyCouriers.handoverStartedTick) {
+            // The handover has really begun: the banner takes over from the card.
+            withAnimation(.snappy) { selectedNearbyCourier = nil }
         }
         .onChange(of: nearbyCouriers.couriers) { _, couriers in
             if let selected = selectedNearbyCourier, !couriers.contains(selected) {

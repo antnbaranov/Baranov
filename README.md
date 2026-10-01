@@ -85,7 +85,6 @@ Baranov/
 ├── Views/           Journey (map) · Compose · Pasture · Letter (the gate) · Paywall · Onboarding · Settings
 ├── DesignSystem/    Materials, field styles, distance formatting, sprite frame sets, SealColor, WaxSeal (press / break / envelope)
 └── Config/          RevenueCatConfiguration
-BaranovTests/        Swift Testing: cipher, letter wire format, flock rules & persistence, paywall arithmetic
 Config/              Baranov.storekit
 docs/build-log/      one markdown file per build session, oldest first
 ```

@@ -164,6 +164,57 @@ final class NearbyCourierService: NSObject {
         start(announce: baseline)
     }
 
+    // MARK: Asking at the moment of intent
+
+    /// The courier a tapped "Hand over" is being set up for. The card shows "Connecting…" for exactly
+    /// as long as this is set: from the tap until the handover has really begun (or was refused).
+    private(set) var handoverCourierID: String?
+    /// Bumped when a handover has actually begun, so the card that started it can close.
+    private(set) var handoverStartedTick = 0
+    /// The Local Network explainer is on screen, waiting for an answer.
+    private(set) var isAskingForAccess = false
+    @ObservationIgnored private var accessAction: (() -> Void)?
+
+    /// Whether the person has already been through the Local Network explainer.
+    var hasAccess: Bool { UserDefaults.standard.bool(forKey: Self.introSeenKey) }
+
+    /// Runs `action` straight away if nearby access was already offered; otherwise explains it first, so
+    /// iOS's Local Network prompt arrives right after someone tapped Hand over, not at launch.
+    func requestAccess(then action: @escaping () -> Void) {
+        if hasAccess {
+            action()
+        } else {
+            accessAction = action
+            isAskingForAccess = true
+        }
+    }
+
+    /// "Turn On" on the explainer: remember it, start discovery (iOS asks now) and carry on with the tap.
+    func grantAccess() {
+        UserDefaults.standard.set(true, forKey: Self.introSeenKey)
+        isAskingForAccess = false
+        start(announce: baseline)
+        let action = accessAction
+        accessAction = nil
+        action?()
+    }
+
+    /// "Not now": nothing starts, and the card goes back to its normal state.
+    func declineAccess() {
+        isAskingForAccess = false
+        accessAction = nil
+        handoverCourierID = nil
+    }
+
+    func beginHandover(courierID: String) {
+        handoverCourierID = courierID
+    }
+
+    func handoverDidStart() {
+        handoverCourierID = nil
+        handoverStartedTick += 1
+    }
+
     /// Set once the Nearby explainer has been answered (either button).
     nonisolated static let introSeenKey = "com.baranov.nearbyIntroSeen"
 

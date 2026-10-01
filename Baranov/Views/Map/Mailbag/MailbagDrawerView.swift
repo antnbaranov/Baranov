@@ -409,8 +409,11 @@ struct MailbagDrawerView: View {
                                     Button { searchText = "" } label: {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundStyle(.secondary)
+                                            .frame(width: 44, height: 44)
+                                            .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
+                                    .padding(.trailing, -8)
                                     .accessibilityLabel("Clear")
                                 }
                             }
