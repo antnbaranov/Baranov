@@ -71,6 +71,8 @@
 	<string>Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Baranov only reads your step count from Health. It does not write or change any Health data.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

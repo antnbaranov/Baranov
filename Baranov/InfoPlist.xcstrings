@@ -2387,6 +2387,347 @@
         }
       }
     },
+    "NSHealthUpdateUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov liest nur deine Schrittzahl aus Health. Es werden keine Health-Daten geschrieben oder geändert."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov only reads your step count from Health. It does not write or change any Health data."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov только считывает количество шагов из «Здоровья» и ничего не записывает и не изменяет."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov only reads your step count from Health. It does not write or change any Health data."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov only reads your step count from Health. It does not write or change any Health data."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov only reads your step count from Health. It does not write or change any Health data."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov лише зчитує твою кількість кроків із «Здоров'я». Він не записує та не змінює жодних даних «Здоров'я»."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lit uniquement ton nombre de pas depuis Santé. Il n'écrit ni ne modifie aucune donnée Santé."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lit uniquement ton nombre de pas depuis Santé. Il n'écrit ni ne modifie aucune donnée Santé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov solo lee tu recuento de pasos de Salud. No escribe ni modifica ningún dato de Salud."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov solo lee tu recuento de pasos de Salud. No escribe ni modifica ningún dato de Salud."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov legge solo il tuo conteggio dei passi da Salute. Non scrive né modifica alcun dato di Salute."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov apenas lê sua contagem de passos do Saúde. Ele não grava nem altera nenhum dado do Saúde."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov apenas lê a tua contagem de passos do Saúde. Não escreve nem altera quaisquer dados do Saúde."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovはヘルスケアから歩数のみを読み取ります。ヘルスケアデータの書き込みや変更は一切行いません。"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov仅从“健康”中读取您的步数，不会写入或更改任何“健康”数据。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov僅從「健康」讀取你的步數，不會寫入或變更任何「健康」資料。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov僅從「健康」讀取你的步數，不會寫入或變更任何「健康」資料。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 건강 앱에서 걸음 수만 읽습니다. 어떠한 건강 데이터도 기록하거나 변경하지 않습니다."
+          }
+        },
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يقرأ بارانوف عدد خطواتك فقط من الصحة. لا يكتب أو يغير أي بيانات صحية."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов чете само броя на стъпките ви от Health. Той не записва и не променя никакви здравни данни."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov samo čita vaš broj koraka iz Health. Ne piše niti mijenja nikakve zdravstvene podatke."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov només llegeix el vostre recompte de passos a Salut. No escriu ni modifica cap dada de salut."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov čte pouze váš počet kroků ze Zdraví. Nezapisuje ani nemění žádná zdravotní data."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov læser kun dit skridttælling fra Health. Det skriver eller ændrer ikke nogen sundhedsdata."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov διαβάζει μόνο τον αριθμό των βημάτων σας από το Health. Δεν γράφει ούτε αλλάζει δεδομένα Υγείας."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov loeb teie sammude arvu ainult Tervisest. See ei kirjuta ega muuda terviseandmeid."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure urratsen zenbaketa bakarrik irakurtzen du Osasunetik. Ez du idazten edo aldatzen Osasun-daturik."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lukee vain askelmääräsi Terveydestä. Se ei kirjoita tai muuta terveystietoja."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ní léann Baranov ach do chéim chomhaireamh ó Sláinte. Ní scríobhann sé ná ní athraíonn sé aon sonraí Sláinte."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov só le o teu reconto de pasos desde Saúde. Non escribe nin modifica ningún dato de saúde."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב קורא רק את ספירת הצעדים שלך מבריאות. זה לא כותב או משנה שום נתוני בריאות."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव केवल स्वास्थ्य से आपके कदमों की गिनती पढ़ता है। यह कोई स्वास्थ्य डेटा नहीं लिखता या बदलता नहीं है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov čita samo vaš broj koraka iz Zdravlja. Ne upisuje niti mijenja zdravstvene podatke."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov csak a lépésszámodat olvassa ki az Egészségből. Nem ír és nem módosít semmilyen egészségügyi adatot."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov hanya membaca jumlah langkah Anda dari Kesehatan. Itu tidak menulis atau mengubah data Kesehatan apa pun."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov les aðeins skrefatöluna þína úr Health. Það skrifar ekki eða breytir neinum heilsufarsgögnum."
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი მხოლოდ კითხულობს თქვენს ნაბიჯების რაოდენობას Health-დან. ის არ წერს და არ ცვლის ჯანმრთელობის მონაცემებს."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов сіздің қадамдарыңызды Денсаулықтан ғана оқиды. Ол ешбір денсаулық деректерін жазбайды немесе өзгертпейді."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas tik skaito jūsų žingsnių skaičių iš sveikatos. Ji nerašo ir nekeičia jokių sveikatos duomenų."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs tikai nolasa tavu soļu skaitu no Health. Tas neraksta un nemaina nekādus veselības datus."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов само ти го чита бројот на чекори од Здравје. Не запишува или менува никакви податоци за здравство."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov hanya membaca kiraan langkah anda daripada Kesihatan. Ia tidak menulis atau mengubah sebarang data Kesihatan."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov jaqra biss l-għadd tal-passi tiegħek mis-Saħħa. Ma tikteb jew tibdel xi dejta tas-Saħħa."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov leser kun skritttellingen din fra Health. Den skriver eller endrer ikke helsedata."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov leest alleen uw stappentelling van Gezondheid. Er worden geen gezondheidsgegevens geschreven of gewijzigd."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov odczytuje tylko liczbę kroków ze stanu zdrowia. Nie zapisuje ani nie zmienia żadnych danych dotyczących zdrowia."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov citește doar numărul de pași din Sănătate. Nu scrie și nu modifică date de sănătate."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov len číta váš počet krokov zo Zdravia. Nezapisuje ani nemení žiadne zdravotné údaje."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bere samo vaše število korakov iz Health. Ne piše ali spreminja nobenih zdravstvenih podatkov."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lexon vetëm numrin tuaj të hapave nga Health. Ai nuk shkruan ose ndryshon asnjë të dhënë shëndetësore."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов само чита ваш број корака из Здравља. Не пише нити мења никакве здравствене податке."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov läser bara ditt stegräkning från Health. Den skriver eller ändrar inte någon hälsodata."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov อ่านเฉพาะการนับก้าวของคุณจาก Health มันไม่ได้เขียนหรือเปลี่ยนแปลงข้อมูลสุขภาพใด ๆ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov yalnızca Sağlık'tan adım sayınızı okur. Herhangi bir Sağlık verisini yazmaz veya değiştirmez."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov chỉ đọc số bước của bạn từ Sức khỏe. Nó không viết hoặc thay đổi bất kỳ dữ liệu Sức khỏe nào."
+          }
+        }
+      }
+    },
     "NSHealthShareUsageDescription": {
       "extractionState": "manual",
       "localizations": {
