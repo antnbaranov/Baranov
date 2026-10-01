@@ -208,6 +208,13 @@ final class JourneyCameraController {
             try? await Task.sleep(for: .milliseconds(1_300))
             guard !Task.isCancelled else { return }
 
+            #if DEBUG
+            if CommandLine.arguments.contains("-screenshotMap") {
+                self.isFlyingOver = false
+                return
+            }
+            #endif
+
             // Down onto the departure vertex, into the tilted follow view.
             self.move(to: arrival, animation: .easeInOut(duration: 1.2))
             try? await Task.sleep(for: .milliseconds(1_250))
@@ -255,14 +262,15 @@ final class JourneyCameraController {
             minLat = min(minLat, point.latitude); maxLat = max(maxLat, point.latitude)
             minLon = min(minLon, point.longitude); maxLon = max(maxLon, point.longitude)
         }
-        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2)
         let corner1 = CLLocation(latitude: minLat, longitude: minLon)
         let corner2 = CLLocation(latitude: maxLat, longitude: maxLon)
         let diagonal = corner1.distance(from: corner2)
 
-        // ~1.6× the diagonal keeps the polyline clear of the sheet and the
-        // top chrome; floor at 2.5 km so short legs still get a real shot.
-        let distance = max(2_500, diagonal * 1.6)
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let multiplier: Double = isPad ? 1.6 : 3.0
+        let distance = max(2_500, diagonal * multiplier)
+        let centerLon = isPad ? (minLon + maxLon) / 2 : ((minLon + maxLon) / 2 - 12.0)
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: centerLon)
         return MapCamera(centerCoordinate: center, distance: distance, heading: 0, pitch: 0)
     }
 

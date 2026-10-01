@@ -1,12 +1,13 @@
 import SwiftUI
 import UIKit
 
-/// The four illustrated guild presets. `rawValue` is the asset-catalog name.
+/// The five illustrated guild presets. `rawValue` is the asset-catalog name.
 enum ShepherdPreset: String, CaseIterable, Identifiable, Sendable {
     case wanderer = "shepherd_anton"
     case redhead = "shepherd_redhead"
     case english = "shepherd_english"
     case asian = "shepherd_asian"
+    case african = "shepherd_african"
 
     var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum ShepherdPreset: String, CaseIterable, Identifiable, Sendable {
         case .redhead: "Redhead Shepherdess"
         case .english: "British Shepherd"
         case .asian: "Eastern Wanderer"
+        case .african: "African Shepherd"
         }
     }
 
@@ -26,6 +28,7 @@ enum ShepherdPreset: String, CaseIterable, Identifiable, Sendable {
         case .redhead: String(localized: "Every letter is a step toward someone's home", bundle: .appLanguage, locale: .appLanguage)
         case .english: String(localized: "Slow but sure — the letter will arrive", bundle: .appLanguage, locale: .appLanguage)
         case .asian: String(localized: "A journey of a thousand miles begins with a single step", bundle: .appLanguage, locale: .appLanguage)
+        case .african: String(localized: "Whoever walks slowly gets far", bundle: .appLanguage, locale: .appLanguage)
         }
     }
 }

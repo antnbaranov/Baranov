@@ -397,7 +397,15 @@ final class GameCenterService {
                 .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
             return friends
         } catch {
-            if requestingAccess, friendsAccess != .authorized { friendsAccess = .denied }
+            // Only a real refusal is "denied". Any other failure (offline,
+            // the prompt dismissed) must not send the player to Settings —
+            // there is nothing to switch on there — so it stays retryable.
+            if let gkError = error as? GKError,
+               gkError.code == .friendListDenied || gkError.code == .friendListRestricted {
+                friendsAccess = .denied
+            } else if friendsAccess != .authorized {
+                friendsAccess = .notDetermined
+            }
             return friends
         }
     }

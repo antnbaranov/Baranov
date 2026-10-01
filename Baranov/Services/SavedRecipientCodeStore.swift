@@ -84,7 +84,7 @@ private extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension SavedRecipientCodeStore {
     /// A couple of illustrative saved codes for SwiftUI canvas previews —
     /// never seeded into the real running app.
@@ -97,4 +97,3 @@ extension SavedRecipientCodeStore {
         return store
     }
 }
-#endif

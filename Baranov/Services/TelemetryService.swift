@@ -145,8 +145,16 @@ final class TelemetryService: Sendable {
 
     // MARK: - Private networking
 
+    /// Course telemetry follows the same "Share anonymous usage stats"
+    /// switch in Settings as `Analytics`: off means nothing is sent. The
+    /// letter relay and carrier presence are features, not telemetry, and
+    /// don't go through here.
+    static var isAllowedByPerson: Bool {
+        UserDefaults.standard.object(forKey: Analytics.consentKey) as? Bool ?? true
+    }
+
     private func post(_ payload: some Encodable, to path: String) async {
-        guard Self.isServerConfigured else { return }
+        guard Self.isServerConfigured, Self.isAllowedByPerson else { return }
         let url = baseURL.appendingPathComponent(path)
 
         var request = URLRequest(url: url)

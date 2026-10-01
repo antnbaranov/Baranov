@@ -35,6 +35,8 @@ struct CodeEntryBar: View {
     var onOpen: (Ram, String) -> Void
     /// The bar wants more room: it was focused, or a result appeared.
     var onNeedsRoom: () -> Void = {}
+    /// The field gained or lost the cursor.
+    var onFocusChange: (Bool) -> Void = { _ in }
 
     @State private var relayLookup: RelayLookup = .idle
     @State private var failTick = 0
@@ -80,7 +82,10 @@ struct CodeEntryBar: View {
             field
         }
         .onChange(of: focusRequest) { isFocused = true }
-        .onChange(of: isFocused) { _, focused in if focused { onNeedsRoom() } }
+        .onChange(of: isFocused) { _, focused in
+            onFocusChange(focused)
+            if focused { onNeedsRoom() }
+        }
         .onChange(of: hasResult) { _, has in if has { onNeedsRoom() } }
         .task(id: normalized) { await lookUpLetterCode() }
         .sensoryFeedback(.error, trigger: failTick)
@@ -88,19 +93,28 @@ struct CodeEntryBar: View {
 
     // MARK: - Field
 
+    /// The same native-style field as the Archive search: leading icon,
+    /// the field, a clear button once something is typed.
     private var field: some View {
-        TextField("An ear tag from a friend?", text: $code)
-            .textInputAutocapitalization(.characters)
-            .autocorrectionDisabled()
-            .focused($isFocused)
-            .submitLabel(.done)
-            .onChange(of: code) { _, new in
-                let formatted = LetterCode.format(new)
-                if formatted != new { code = formatted }
+        NativeFieldRow(symbol: "key.fill") {
+            TextField("An ear tag from a friend?", text: $code)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .focused($isFocused)
+                .submitLabel(.done)
+                .onChange(of: code) { _, new in
+                    let formatted = LetterCode.format(new)
+                    if formatted != new { code = formatted }
+                }
+            if !code.isEmpty {
+                Button { code = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear")
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 14)
-            .background(.thinMaterial, in: Capsule())
+        }
     }
 
     // MARK: - Result
@@ -131,9 +145,7 @@ struct CodeEntryBar: View {
                     Label("Break the Seal", systemImage: "seal.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .tint(Color.wax)
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: Color.wax, expands: true))
             }
             .card()
         }
@@ -226,5 +238,25 @@ private extension View {
         padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+/// An input row in the look of the system search field: a quiet fill, a
+/// continuous 10 pt corner, a leading symbol. Shared by the ear tag field
+/// and the Archive search so the two read as one control.
+struct NativeFieldRow<Content: View>: View {
+    let symbol: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol)
+                .foregroundStyle(.secondary)
+            content
+        }
+        .padding(.horizontal, 8)
+        .frame(minHeight: 36)
+        .background(Color(uiColor: .tertiarySystemFill),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }

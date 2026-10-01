@@ -24,6 +24,12 @@ extension Ram {
     /// way" link.
     var letterShareMessage: String? {
         guard let letter else { return nil }
+        return shareMessage(for: letter)
+    }
+
+    /// The same message for any one letter in this ram's bag — its own or a
+    /// passenger — so grouped letters each get their own code to share.
+    func shareMessage(for letter: Letter) -> String? {
         if let tracked = letter.trackingShareMessage(ramName: name, city: targetCity, expectedBy: expectedArrival) {
             return tracked
         }
@@ -38,6 +44,61 @@ extension Ram {
         ) else { return message }
         return message + "\n\n" + String(localized: "Follow it in Baranov: \(link.absoluteString)", bundle: .appLanguage, locale: .appLanguage)
     }
+}
+
+extension Ram {
+    /// Whether this phone wrote the letter on this ram: the display name
+    /// matches the sender, or the phone holds the receiving code (only the
+    /// writer, or a recipient who has already opened it, does).
+    var isSentByThisPhone: Bool {
+        guard let letter else { return false }
+        return isSentByThisPhone(letter)
+    }
+
+    /// The same test for one letter in the bag (own or passenger).
+    func isSentByThisPhone(_ letter: Letter) -> Bool {
+        guard !addressedToThisPhone, !isGuest else { return false }
+        let saved = (UserDefaults.standard.string(forKey: "com.baranov.carrierDisplayName") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let effective = saved.isEmpty ? String(localized: "A Shepherd", bundle: .appLanguage, locale: .appLanguage) : saved
+        if letter.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+            .caseInsensitiveCompare(effective) == .orderedSame { return true }
+        return letter.receivingCode != nil && status != .arrivedAtGate
+    }
+
+    /// What the sender can always share for their own letter: the code
+    /// message or tracking link when the phone holds a code, and for an
+    /// open postcard (which has no code) a plain "on its way" link, so
+    /// every letter of mine has a share button.
+    var senderShareMessage: String? {
+        guard let letter else { return nil }
+        return senderShareMessage(for: letter)
+    }
+
+    func senderShareMessage(for letter: Letter) -> String? {
+        guard isSentByThisPhone(letter) else { return nil }
+        if let message = shareMessage(for: letter) { return message }
+        guard let link = ExpectedLetter.link(
+            letterID: letter.id, senderName: letter.senderName, ramName: name,
+            city: targetCity, expectedBy: expectedArrival
+        ) else { return nil }
+        return String(localized: "\(letter.senderName) sent you a postcard. \(name) is walking it to \(targetCity). Follow it in Baranov: \(link.absoluteString)", bundle: .appLanguage, locale: .appLanguage)
+    }
+
+    /// One entry per extra letter in the bag that this phone may share.
+    var passengerShares: [PassengerShare] {
+        passengerLetters.compactMap { passenger in
+            senderShareMessage(for: passenger).map {
+                PassengerShare(id: passenger.id, recipient: passenger.recipientName, message: $0)
+            }
+        }
+    }
+}
+
+struct PassengerShare: Identifiable {
+    let id: UUID
+    let recipient: String
+    let message: String
 }
 
 extension Letter {

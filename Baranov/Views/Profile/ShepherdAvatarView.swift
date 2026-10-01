@@ -78,7 +78,18 @@ struct ShepherdAvatarView: View {
         if selection == ShepherdIdentityKeys.customSelection, let customImage {
             Image(uiImage: customImage).resizable().scaledToFill()
         } else if UIImage(named: selection) != nil {
-            Image(selection).resizable().scaledToFill()
+            // Illustrated presets are portrait busts on a white ground. Anchor to the top
+            // and nudge down so the head keeps some air above it instead of being clipped.
+            ZStack(alignment: .top) {
+                Color.white
+                Image(selection)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size, alignment: .top)
+                    .offset(y: size * 0.09)
+            }
+            .frame(width: size, height: size)
+            .clipped()
         } else {
             // Safe fallback if an asset is missing from the catalog.
             Image(systemName: "figure.walk")

@@ -188,7 +188,15 @@ struct RamSelectorCard: View {
             Button("Cancel", role: .cancel) {}
             Button("Save") {
                 if let slot = namingSlot {
-                    slotNames.nameOnce(slot: slot, to: slotNameDraft)
+                    let previousName = openSlotNames[slot]
+                    if slotNames.nameOnce(slot: slot, to: slotNameDraft), let previousName {
+                        // A color already chosen under the suggested name
+                        // moves with the ram to the name the person gave.
+                        RamColorStore.shared.rename(
+                            from: previousName,
+                            to: slotNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
+                    }
                 }
             }
         } message: {

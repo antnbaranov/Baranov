@@ -22,6 +22,6 @@ struct BaranovHomeWidget: Widget {
         }
         .configurationDisplayName("Baranov")
         .description("See your ram's journey at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

@@ -68,3 +68,70 @@ enum RamSpriteFrameSets {
         UIImage(named: name) != nil
     }
 }
+
+// MARK: - Colored rams
+
+/// Per-color variants of every sequence above. The pink, brown and green
+/// art uses the same numbering as the white ram with a color prefix
+/// ("pink_ram_goes4", "green_object-7"), so each sequence is the white
+/// one's numbers with the prefix added, keeping only the frames that
+/// exist in the asset catalog. A color with no art at all falls back to
+/// the white sequence, so a missing frame can never leave a blank ram.
+extension RamSpriteFrameSets {
+    private struct ColoredSet: Sendable {
+        let walk: [String]
+        let face: String
+        let running: [String]
+        let leap: [String]
+        let idle: [String]
+        let rearUp: [String]
+
+        init(color: RamColor) {
+            func frames(_ prefix: String, _ numbers: [Int]) -> [String] {
+                numbers.map { "\(color.rawValue)_\(prefix)\($0)" }.filter { UIImage(named: $0) != nil }
+            }
+            walk = frames("ram_goes", Array(0...15))
+            face = "\(color.rawValue)_ram_goes16"
+            running = frames("object-", Array(2...8))
+            leap = frames("object-", Array(10...16))
+            idle = frames("object-", [11, 12])
+            rearUp = frames("object-", Array(13...16))
+        }
+    }
+
+    private static let coloredSets: [RamColor: ColoredSet] = Dictionary(
+        uniqueKeysWithValues: RamColor.allCases.filter { $0 != .white }.map { ($0, ColoredSet(color: $0)) }
+    )
+
+    private static func pick(_ colored: [String]?, orWhite white: [String]) -> [String] {
+        guard let colored, !colored.isEmpty else { return white }
+        return colored
+    }
+
+    static func walkFrames(for color: RamColor) -> [String] {
+        pick(coloredSets[color]?.walk, orWhite: walkCycle)
+    }
+
+    static func faceFrame(for color: RamColor) -> String {
+        guard let face = coloredSets[color]?.face, assetExists(face) else { return faceCameraFrame }
+        return face
+    }
+
+    /// Steady running loop for the map marker and the reel.
+    static func runningFrames(for color: RamColor) -> [String] {
+        pick(coloredSets[color]?.running, orWhite: gallopRunningStride)
+    }
+
+    /// The one-shot leaping finish played on arrival.
+    static func leapFrames(for color: RamColor) -> [String] {
+        pick(coloredSets[color]?.leap, orWhite: gallopLeapFinish)
+    }
+
+    static func idleFrames(for color: RamColor) -> [String] {
+        pick(coloredSets[color]?.idle, orWhite: idleHold)
+    }
+
+    static func rearUpFrames(for color: RamColor) -> [String] {
+        pick(coloredSets[color]?.rearUp, orWhite: rearUpWithEnvelope)
+    }
+}

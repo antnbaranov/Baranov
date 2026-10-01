@@ -156,6 +156,12 @@ struct GoalCardFace: View {
                      ?? String(localized: "The steps added up on their own.", bundle: .appLanguage, locale: .appLanguage))
                     .scaledFont(size: 14, weight: .semibold, design: .serif)
                     .italic()
+                if let weather = goal.completionWeather {
+                    Label(weather.summaryLine, systemImage: weather.symbolName)
+                        .symbolRenderingMode(.multicolor)
+                        .font(.caption)
+                        .lineLimit(2)
+                }
                 Spacer(minLength: 0)
                 Button(action: onReel) {
                     Label("Make reel", systemImage: "play.circle.fill")

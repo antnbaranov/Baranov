@@ -38,6 +38,8 @@ struct RamSpriteMarkerView: View {
     var bearingDegrees: Double
     var motionState: RamMotionState
     var markerSize: CGFloat = 44
+    /// Wool color of the ram this marker stands for.
+    var color: RamColor = .white
     /// Show the small compass chevron that carries the exact bearing.
     var showsHeadingIndicator: Bool = true
 
@@ -126,7 +128,7 @@ struct RamSpriteMarkerView: View {
             // Standing still reads as a slow, settled sway between two held
             // frames (Object-11/12) rather than a mid-stride pose — a long
             // frame duration so it doesn't flicker.
-            RamSpriteLoopView(frameNames: RamSpriteFrameSets.idleHold, frameDuration: .milliseconds(450))
+            RamSpriteLoopView(frameNames: RamSpriteFrameSets.idleFrames(for: color), frameDuration: .milliseconds(450))
                 .id(Phase.idle)
         case .running:
             // Object-2…Object-8, looped. Playback rate follows the
@@ -135,18 +137,18 @@ struct RamSpriteMarkerView: View {
             // starts, so the speed is quantized into three tiers and the
             // loop is keyed on the tier: a per-tick speed wobble never
             // restarts the stride, a real change of pace re-times it.
-            RamSpriteLoopView(frameNames: RamSpriteFrameSets.gallopRunningStride, frameDuration: runningFrameDuration)
-                .id("running-\(runningSpeedTier)")
+            RamSpriteLoopView(frameNames: RamSpriteFrameSets.runningFrames(for: color), frameDuration: runningFrameDuration)
+                .id("running-\(runningSpeedTier)-\(color.rawValue)")
         case .arriving:
             RamSpriteLoopView(
-                frameNames: RamSpriteFrameSets.gallopLeapFinish,
+                frameNames: RamSpriteFrameSets.leapFrames(for: color),
                 frameDuration: .milliseconds(70),
                 loops: false,
                 onFinishedOnce: { phase = .arrivedHold }
             )
             .id(Phase.arriving)
         case .arrivedHold:
-            if let last = RamSpriteFrameSets.gallopLeapFinish.last {
+            if let last = RamSpriteFrameSets.leapFrames(for: color).last {
                 Image(last)
                     .resizable()
                     .scaledToFit()

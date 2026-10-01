@@ -213,7 +213,7 @@ final class CalendarTripSuggestionService {
     }
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension CalendarTripSuggestionService {
     /// Illustrative suggestions for SwiftUI canvas previews — never backed
     /// by a real `EKEventStore` query.
@@ -237,4 +237,3 @@ extension CalendarTripSuggestionService {
         return service
     }
 }
-#endif

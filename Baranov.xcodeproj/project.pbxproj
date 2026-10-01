@@ -10,6 +10,7 @@
 		A721CF8A30568ACE0052DF31 /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8930568ACE0052DF31 /* ReceiptParser */; };
 		A721CF8C30568ACE0052DF31 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8B30568ACE0052DF31 /* RevenueCat */; };
 		A721CF8E30568ACE0052DF31 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = A721CF8D30568ACE0052DF31 /* RevenueCatUI */; };
+		A7FE6CF5306DD4CE003E98FC /* Baranov.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A7FE6CF4306DD4AB003E98FC /* Baranov.storekit */; };
 		C4B00000D00000000000000D /* BaranovWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C4B00000C00000000000000C /* BaranovWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D5C00000D00000000000000D /* BaranovWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D5C00000C00000000000000C /* BaranovWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -65,6 +66,7 @@
 
 /* Begin PBXFileReference section */
 		A721CF5C3054D4230052DF31 /* Baranov.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Baranov.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A7FE6CF4306DD4AB003E98FC /* Baranov.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Baranov.storekit; sourceTree = "<group>"; };
 		B4A1000100000000000000C1 /* BaranovTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BaranovTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4B00000C00000000000000C /* BaranovWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BaranovWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D5C00000C00000000000000C /* BaranovWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BaranovWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -164,6 +166,7 @@
 		A721CF533054D4230052DF31 = {
 			isa = PBXGroup;
 			children = (
+				A7FE6CF4306DD4AB003E98FC /* Baranov.storekit */,
 				A721CF5E3054D4230052DF31 /* Baranov */,
 				B4A1000200000000000000C2 /* BaranovTests */,
 				C4B000002000000000000002 /* BaranovWidget */,
@@ -385,6 +388,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A7FE6CF5306DD4CE003E98FC /* Baranov.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -602,13 +606,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -635,13 +639,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -702,20 +706,20 @@
 				DEVELOPMENT_TEAM = 7H96U9338J;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaranovWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -732,20 +736,20 @@
 				DEVELOPMENT_TEAM = 7H96U9338J;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaranovWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.BaranovWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -763,7 +767,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaranovWatch/Info.plist;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -771,7 +775,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -789,7 +793,7 @@
 				DEVELOPMENT_TEAM = 7H96U9338J;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BaranovWatch/Info.plist;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = antnbaranov.Baranov.watchkitapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
@@ -797,7 +801,7 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;

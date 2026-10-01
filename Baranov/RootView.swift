@@ -290,8 +290,14 @@ struct RootView: View {
                     SharingInvitation.registerSession()
                     Task { await considerSharingInvitation() }
                 }
-                if phase == .background { Task { await Analytics.shared.flush() } }
+                if phase == .background {
+                    Task { await Analytics.shared.flush() }
+                    // Last Live Activity push before suspension: a self-running
+                    // estimate, plus the "almost there" notification.
+                    flockViewModel.sceneDidEnterBackground()
+                }
                 guard phase == .active else { return }
+                flockViewModel.sceneDidBecomeActive()
                 Task { await tickPacketSchedule() }
                 consumePendingAppAction()
                 refreshTrackedPostSoon()
@@ -316,6 +322,11 @@ struct RootView: View {
                     isPasturePresented = true
                 } else if CommandLine.arguments.contains("-screenshotBag") {
                     bagRam = flockViewModel.activeRams.first
+                } else if CommandLine.arguments.contains("-screenshotPaywall") {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(500))
+                        isCapacityPaywallPresented = true
+                    }
                 }
                 #endif
             }
@@ -332,6 +343,11 @@ struct RootView: View {
         content
             .onChange(of: flockViewModel.activeRams) { _, rams in
                 notificationService.sync(rams: rams)
+                // A ram that just reached its gate is reported to the post
+                // office now, so the recipient is pushed without waiting.
+                LetterTracker.shared.flockChanged()
+                // A letter reaching this phone's gate locks name edits for 24 hours.
+                NameProfile.shared.noteArrivals(in: rams)
             }
             .onChange(of: notificationService.tappedRamID) { _, ramID in
                 guard let ramID else { return }
@@ -347,6 +363,10 @@ struct RootView: View {
             }
             .onChange(of: carrierDisplayName) { _, _ in
                 syncCarrierAttributes()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .importTransitFile)) { note in
+                guard let url = note.object as? URL else { return }
+                Task { await receiveTransitFile(at: url) }
             }
             .onOpenURL { url in
                 guard url.scheme?.caseInsensitiveCompare("baranov") != .orderedSame else { return }
@@ -544,6 +564,11 @@ struct RootView: View {
                 return
             }
 
+            if flockViewModel.shouldDecline(package) {
+                incomingImportErrorMessage = declinedNoCodeMessage
+                return
+            }
+
             guard flockViewModel.canImport(package) else {
                 // Someone else's letter never needs a pen, so a full mailbag
                 // is not a reason to sell one — just say so.
@@ -734,6 +759,10 @@ struct RootView: View {
     /// the same capacity gate as AirDrop. Returns the ram's name for the
     /// HUD, or `nil` if the pasture was full.
     private func receiveHoofbeatPackage(_ package: RamTransitPackage) async -> String? {
+        if flockViewModel.shouldDecline(package) {
+            incomingImportErrorMessage = declinedNoCodeMessage
+            return nil
+        }
         guard flockViewModel.canImport(package) else {
             if FlockViewModel.isGuestLetter(package.ram) {
                 incomingImportErrorMessage = mailbagFullMessage
@@ -747,6 +776,10 @@ struct RootView: View {
             receivedAt: locationService.currentCoordinate
         )
         return package.ram.name
+    }
+
+    private var declinedNoCodeMessage: String {
+        String(localized: "That letter was declined. It has reached its gate, but this phone doesn't have its code, so it can't be opened here.", bundle: .appLanguage, locale: .appLanguage)
     }
 
     private var mailbagFullMessage: String {

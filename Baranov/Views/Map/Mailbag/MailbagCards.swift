@@ -391,10 +391,7 @@ struct MailbagCollapsedBar: View {
                     Label("Break the Seal", systemImage: "seal.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(.green)
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: PastureTheme.green, expands: true))
             }
         }
         .animation(.snappy, value: ram.status)
@@ -458,16 +455,7 @@ struct MailbagCourierRow: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens the letter")
 
-            if isOutgoing, ram.status != .delivered, let message = ram.letterShareMessage {
-                ShareLink(item: message) {
-                    if ram.letter?.relayTicket != nil {
-                        Label("Share tracking link", systemImage: "square.and.arrow.up")
-                    } else {
-                        Label("Share code", systemImage: "square.and.arrow.up")
-                    }
-                }
-                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
-            }
+            RamShareButtons(ram: ram)
 
             if canBreakSeal {
                 Button {
@@ -477,9 +465,7 @@ struct MailbagCourierRow: View {
                     Label("Break the Seal and Read", systemImage: "seal.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .tint(.green)
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: PastureTheme.green, expands: true))
             }
         }
         .padding(.vertical, 4)
@@ -500,11 +486,7 @@ struct MailbagCourierRow: View {
             Button(action: onOpenBag) {
                 Label("Ram's Bag", systemImage: "bag")
             }
-            if let message = ram.letterShareMessage {
-                ShareLink(item: message) {
-                    Label("Share Code", systemImage: "square.and.arrow.up")
-                }
-            }
+            RamShareMenuItems(ram: ram)
             if canCancel {
                 Button(role: .destructive) {
                     isCancelConfirmationPresented = true
@@ -672,5 +654,67 @@ struct ExpectedLetterRow: View {
             Spacer(minLength: 0)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+
+// MARK: - Sharing every letter in a bag
+
+/// One share button per letter a ram carries. A ram with grouped letters
+/// used to offer a single button (for its own letter), so the passengers'
+/// codes could not be shared. Each letter now has its own, named for its
+/// recipient.
+struct RamShareButtons: View {
+    let ram: Ram
+
+    var body: some View {
+        // Kept after delivery too: the archive still offers the code.
+        if ram.status != .delivered || ram.isSentByThisPhone || ram.letterShareMessage != nil {
+            let isGrouped = !ram.passengerLetters.isEmpty
+            if let message = ram.senderShareMessage ?? ram.letterShareMessage {
+                ShareLink(item: message) {
+                    if isGrouped, let name = ram.letter?.recipientName.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+                        Label("Share for \(name)", systemImage: "square.and.arrow.up")
+                    } else if ram.letter?.relayTicket != nil {
+                        Label("Share tracking link", systemImage: "square.and.arrow.up")
+                    } else {
+                        Label("Share code", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            }
+            ForEach(ram.passengerShares) { share in
+                ShareLink(item: share.message) {
+                    if share.recipient.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Label("Share code", systemImage: "square.and.arrow.up")
+                    } else {
+                        Label("Share for \(share.recipient)", systemImage: "square.and.arrow.up")
+                    }
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            }
+        }
+    }
+}
+
+/// The same, as context-menu items.
+struct RamShareMenuItems: View {
+    let ram: Ram
+
+    var body: some View {
+        if let message = ram.senderShareMessage ?? ram.letterShareMessage {
+            ShareLink(item: message) {
+                if !ram.passengerLetters.isEmpty, let name = ram.letter?.recipientName, !name.isEmpty {
+                    Label("Share for \(name)", systemImage: "square.and.arrow.up")
+                } else {
+                    Label("Share Code", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        ForEach(ram.passengerShares) { share in
+            ShareLink(item: share.message) {
+                Label(share.recipient.isEmpty ? "Share Code" : "Share for \(share.recipient)", systemImage: "square.and.arrow.up")
+            }
+        }
     }
 }

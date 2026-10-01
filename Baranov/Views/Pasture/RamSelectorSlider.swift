@@ -208,7 +208,7 @@ private struct RamSelectorStage: View {
         /// a ram of its own is waiting there, under a suggested name the
         /// person can replace once.
         case openRam(slot: Int)
-        case locked
+        case locked(slot: Int)
     }
 
     /// How far the card travels off either edge — well past its own
@@ -221,9 +221,8 @@ private struct RamSelectorStage: View {
     /// too. Only a genuinely empty slot has no sprite to step through, so
     /// it just rides the same timed offset without swapping images.
     private static let frameDuration: Duration = .milliseconds(70)
-    private static let stepCount = max(RamSpriteFrameSets.walkCycle.count, 1)
 
-    @State private var displayed: Content = .locked
+    @State private var displayed: Content = .locked(slot: 0)
     @State private var displayedKey = ""
     @State private var hasAppeared = false
     @State private var walkTask: Task<Void, Never>?
@@ -233,10 +232,12 @@ private struct RamSelectorStage: View {
     @State private var isRearingUp = false
     @State private var rearFrame = 0
     @State private var bleatTrigger = 0
+    /// The ram whose one-time color choice is open, if any.
+    @State private var paintTarget: String?
 
     private func resolveContent(at index: Int) -> (content: Content, key: String) {
         guard index < unlockedSlots else {
-            return (.locked, "locked-\(index)")
+            return (.locked(slot: index), "locked-\(index)")
         }
         if index < rams.count {
             let ram = rams[index]
@@ -250,6 +251,56 @@ private struct RamSelectorStage: View {
 
     private var targetKey: String { resolveContent(at: slotIndex).key }
     private var targetContent: Content { resolveContent(at: slotIndex).content }
+
+    /// Name of the ram on screen, for looking up its wool color.
+    private var displayedName: String? {
+        switch displayed {
+        case .ram(let ram): ram.name
+        case .companion(let companion): companion.name
+        case .openRam(let slot): openSlotNames[slot]
+        case .locked: nil
+        }
+    }
+
+    /// The pasture slot of the ram on screen.
+    private var displayedSlot: Int {
+        switch displayed {
+        case .ram(let ram): rams.firstIndex { $0.id == ram.id } ?? slotIndex
+        case .companion: 0
+        case .openRam(let slot): slot
+        case .locked(let slot): slot
+        }
+    }
+
+    /// The person's own pick if they made one, otherwise the slot's
+    /// default (white, pink, brown, green…) — so even a locked pen shows
+    /// the color its ram will have.
+    private var displayedColor: RamColor {
+        if let name = displayedName, RamColorStore.shared.hasChosen(for: name) {
+            return RamColorStore.shared.color(for: name)
+        }
+        return RamColor.defaultColor(forSlot: displayedSlot)
+    }
+
+    /// The name to paint: from the second pasture slot on, the color can
+    /// be changed (the picker itself enforces the 24-hour wait).
+    private var paintableName: String? {
+        let name: String
+        let index: Int
+        switch displayed {
+        case .ram(let ram):
+            name = ram.name
+            index = rams.firstIndex { $0.id == ram.id } ?? slotIndex
+        case .openRam(let slot):
+            guard let suggested = openSlotNames[slot] else { return nil }
+            name = suggested
+            index = slot
+        case .companion, .locked:
+            return nil
+        }
+        guard index >= 1 else { return nil }
+        return name
+    }
 
     private var currentHasLetter: Bool {
         if case .ram(let ram) = displayed { return ram.letter != nil }
@@ -311,6 +362,20 @@ private struct RamSelectorStage: View {
                 guard hasAppeared, targetKey == displayedKey else { return }
                 displayed = targetContent
             }
+            // A color just chosen: swap the settled pose for the new
+            // color's. Skipped mid-walk, where the frames already follow
+            // the displayed ram's color.
+            .onChange(of: displayedColor) { old, new in
+                guard hasAppeared, targetKey == displayedKey,
+                      frameImageName == RamSpriteFrameSets.faceFrame(for: old) else { return }
+                frameImageName = RamSpriteFrameSets.faceFrame(for: new)
+            }
+            .sheet(isPresented: Binding(
+                get: { paintTarget != nil },
+                set: { if !$0 { paintTarget = nil } }
+            )) {
+                RamColorPickerSheet(ramName: paintTarget ?? "")
+            }
             .onDisappear {
                 walkTask?.cancel()
                 walkTask = nil
@@ -330,7 +395,7 @@ private struct RamSelectorStage: View {
         displayedKey = targetKey
         switch displayed {
         case .ram, .companion, .openRam, .locked:
-            frameImageName = RamSpriteFrameSets.faceCameraFrame
+            frameImageName = RamSpriteFrameSets.faceFrame(for: displayedColor)
             walkTask = Task {
                 await idleLoop()
                 walkTask = nil
@@ -393,6 +458,19 @@ private struct RamSelectorStage: View {
                             .offset(x: 4, y: 4)
                     }
                 }
+                .overlay(alignment: .topTrailing) {
+                    if let paintName = paintableName {
+                        Button {
+                            paintTarget = paintName
+                        } label: {
+                            Image(systemName: "paintpalette.fill")
+                        }
+                        .glassIconButton()
+                        .offset(x: 14, y: -10)
+                        .accessibilityLabel("Choose color")
+                        .accessibilityHint("Pick a color for \(paintName). You can change it once every 24 hours.")
+                    }
+                }
                 .contentShape(Rectangle())
                 .onTapGesture {
                     bleatTrigger += 1
@@ -435,8 +513,8 @@ private struct RamSelectorStage: View {
             Image("Ram-\(name)")
                 .resizable()
                 .scaledToFill()
-        } else if isRearingUp, RamSpriteFrameSets.assetExists(RamSpriteFrameSets.rearUpWithEnvelope.first ?? "") {
-            Image(RamSpriteFrameSets.rearUpWithEnvelope[safeIndex: rearFrame])
+        } else if isRearingUp, RamSpriteFrameSets.assetExists(RamSpriteFrameSets.rearUpFrames(for: displayedColor).first ?? "") {
+            Image(RamSpriteFrameSets.rearUpFrames(for: displayedColor)[safeIndex: rearFrame])
                 .resizable()
                 .scaledToFit()
         } else if let frameImageName, RamSpriteFrameSets.assetExists(frameImageName) {
@@ -465,11 +543,12 @@ private struct RamSelectorStage: View {
     @MainActor
     private func playSwap(to newKey: String) async {
         isRearingUp = false
-        let frames = RamSpriteFrameSets.walkCycle
-        for step in 0..<Self.stepCount {
+        let frames = RamSpriteFrameSets.walkFrames(for: displayedColor)
+        let stepCount = max(frames.count, 1)
+        for step in 0..<stepCount {
             guard !Task.isCancelled else { return }
             if !frames.isEmpty { frameImageName = frames[step % frames.count] }
-            offsetX = Self.travelDistance * CGFloat(step + 1) / CGFloat(Self.stepCount)
+            offsetX = Self.travelDistance * CGFloat(step + 1) / CGFloat(stepCount)
             try? await Task.sleep(for: Self.frameDuration)
         }
         guard !Task.isCancelled else { return }
@@ -486,13 +565,14 @@ private struct RamSelectorStage: View {
     /// on screen.
     @MainActor
     private func playWalkIn() async {
-        let frames = RamSpriteFrameSets.walkCycle
+        let frames = RamSpriteFrameSets.walkFrames(for: displayedColor)
+        let stepCount = max(frames.count, 1)
         offsetX = -Self.travelDistance
         frameImageName = frames.first
-        for step in 0..<Self.stepCount {
+        for step in 0..<stepCount {
             guard !Task.isCancelled else { return }
             if !frames.isEmpty { frameImageName = frames[step % frames.count] }
-            offsetX = -Self.travelDistance + Self.travelDistance * CGFloat(step + 1) / CGFloat(Self.stepCount)
+            offsetX = -Self.travelDistance + Self.travelDistance * CGFloat(step + 1) / CGFloat(stepCount)
             try? await Task.sleep(for: Self.frameDuration)
         }
         guard !Task.isCancelled else { return }
@@ -500,7 +580,7 @@ private struct RamSelectorStage: View {
 
         switch displayed {
         case .ram, .companion, .openRam, .locked:
-            frameImageName = RamSpriteFrameSets.faceCameraFrame
+            frameImageName = RamSpriteFrameSets.faceFrame(for: displayedColor)
             await idleLoop()
         }
     }
@@ -511,12 +591,12 @@ private struct RamSelectorStage: View {
     /// its mouth.
     @MainActor
     private func idleLoop() async {
-        guard currentHasLetter, RamSpriteFrameSets.assetExists(RamSpriteFrameSets.rearUpWithEnvelope.first ?? "") else { return }
+        guard currentHasLetter, RamSpriteFrameSets.assetExists(RamSpriteFrameSets.rearUpFrames(for: displayedColor).first ?? "") else { return }
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(Double.random(in: 4...7)))
             guard !Task.isCancelled else { return }
             isRearingUp = true
-            let frames = Array(RamSpriteFrameSets.rearUpWithEnvelope.indices)
+            let frames = Array(RamSpriteFrameSets.rearUpFrames(for: displayedColor).indices)
             // Rise slowly, hold at the top, then lower back down in
             // reverse — a deliberate rear rather than a flicker.
             for frame in frames {

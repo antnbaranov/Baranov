@@ -31,6 +31,9 @@ final class ReelJobStore {
     /// (the passport's reel card), so the floating overlay bar hides
     /// itself rather than showing the same status twice.
     var suppressesOverlay = false
+    /// The person closed the floating bar for this run. The job keeps going;
+    /// the bar comes back only when a new run starts or this one finishes.
+    private(set) var isOverlayHidden = false
     /// 0…1 while rendering.
     private(set) var progress: Double = 0
     private(set) var ramName: String?
@@ -65,14 +68,19 @@ final class ReelJobStore {
         ramName = base.ramName
         videoURL = nil
         progress = 0
+        isOverlayHidden = false
         phase = .writing
         task = Task { [weak self] in
             await self?.run(base: base, chosen: voice, avoiding: avoiding)
         }
     }
 
+    /// Hides the floating bar without touching the job.
+    func hideOverlay() { isOverlayHidden = true }
+
     /// Stops the job and forgets it.
     func cancel() {
+        isOverlayHidden = false
         task?.cancel()
         task = nil
         phase = .idle
@@ -111,12 +119,14 @@ final class ReelJobStore {
             }
             guard !Task.isCancelled else { return }
             videoURL = url
+            isOverlayHidden = false
             phase = .ready
             readyTick += 1
         } catch is CancellationError {
             return
         } catch {
             guard !Task.isCancelled else { return }
+            isOverlayHidden = false
             phase = .failed
         }
     }

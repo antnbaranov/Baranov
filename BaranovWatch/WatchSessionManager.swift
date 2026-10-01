@@ -10,6 +10,7 @@ import Foundation
 import Observation
 import WatchConnectivity
 import WatchKit
+import os
 
 struct WatchRamState: Codable, Equatable {
     var ramName: String
@@ -109,7 +110,8 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         if let error {
-            print("[WatchSessionManager] WCSession activation failed: \(error)")
+            Logger(subsystem: "com.baranov.watch", category: "WatchSession")
+                .error("WCSession activation failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

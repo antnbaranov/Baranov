@@ -45,8 +45,8 @@ The letter itself is ciphertext the entire way. Nobody who carries it can read i
 
 | Entitlement | What it unlocks | Products | Shape |
 |---|---|---|---|
-| `pasture_expansion` | 5 rams at once + every wax colour | `com.baranov.sub.monthly` ($2.99), `com.baranov.sub.quarterly` ($5.99/3 mo), `com.baranov.sub.annual` ($19.99, 7-day trial) | subscription |
-| `adopted_ram` | a permanent 2nd ram slot | `com.baranov.iap.ram.merino` ($2.99) | non-consumable, one-time |
+| `pasture_expansion` | 5 rams at once + every wax colour | `monthly`, `baranov.pasture.annual` (7-day trial) | subscription |
+| `adopted_ram` | a permanent 2nd ram slot | `baranov.ram.adopt` | non-consumable, one-time |
 
 Two shapes on purpose: some people want to rent a bigger pasture, some just want to own one more ram and never think about it again. `EntitlementService` folds both into a single `allowedRamSlots` that `FlockViewModel` enforces on every admission path (compose, AirDrop, shake).
 
@@ -54,7 +54,7 @@ What the integration actually does:
 
 - **`Purchases` configured with StoreKit 2**, entitlement state observed live via `PurchasesDelegate` (renewals, lapses, Family Sharing, restores on another device all flow in without polling).
 - **Package picker built from the live offering** — every price on screen is the App Store's; the "Best value · save 45%" badge is computed from real prices normalised per week, never typed in.
-- **Trial-aware CTA** ("Start Free Trial" / "Then $19.99 per year") driven by `introductoryDiscount` on the fetched product.
+- **Trial-aware CTA** ("Start Free Trial" / "Then $14.99 per year") driven by `introductoryDiscount` on the fetched product.
 - **Customer Center** (`RevenueCatUI`) for cancel / refund / plan changes / restore — from Pasture › Settings › Manage Subscription — so none of that is hand-built.
 - **Subscriber attributes** (`carrier_name`, `letters_delivered`, `steps_walked`, `active_rams`) synced on every change, so the RevenueCat dashboard shows usage next to revenue — the same numbers the course telemetry reports.
 - **A paywall that demonstrates instead of listing**: the pasture scene at the top shows your own ram alone, then the locked pens open and two more walk in (again whenever you pick a plan — the one-time "adopt" option opens exactly one); the wax row seals a real envelope in whatever colour you tap; monthly/annual is one capsule toggle with the price morphing in place; the only stat shown is how far your rams have really walked.

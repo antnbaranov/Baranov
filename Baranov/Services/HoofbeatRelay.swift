@@ -105,7 +105,7 @@ final class HoofbeatRelay: NSObject {
     /// How many times a failed connection to the same partner is retried
     /// before giving up. MultipeerConnectivity often fails the first
     /// attempt and succeeds on the second.
-    static let maxConnectAttempts = 2
+    static let maxConnectAttempts = 3
 
     /// How long a connected exchange may take before it is abandoned.
     static let transferTimeout: TimeInterval = 20
@@ -375,7 +375,7 @@ final class HoofbeatRelay: NSObject {
         }
         teardownTransport()
         phase = .failed(reason: reason)
-        autoDismiss(after: 3.0)
+        autoDismiss(after: 15.0)
     }
 
     private func autoDismiss(after seconds: TimeInterval) {
@@ -395,7 +395,7 @@ final class HoofbeatRelay: NSObject {
         stallTask?.cancel()
         teardownTransport()
         phase = .failed(reason: reason)
-        autoDismiss(after: 3.0)
+        autoDismiss(after: 15.0)
     }
 
     // MARK: - Pairing
@@ -422,13 +422,23 @@ final class HoofbeatRelay: NSObject {
         invite(peerID, session: session, browser: browser)
     }
 
+    /// Restarts Bonjour discovery on both halves. After a failed attempt
+    /// MultipeerConnectivity often keeps a stale record of the other phone
+    /// that blocks the next invitation; a fresh advertise/browse clears it.
+    private func restartDiscovery() {
+        browser?.stopBrowsingForPeers()
+        browser?.startBrowsingForPeers()
+        advertiser?.stopAdvertisingPeer()
+        advertiser?.startAdvertisingPeer()
+    }
+
     private func invite(_ peerID: MCPeerID, session: MCSession, browser: MCNearbyServiceBrowser) {
         trace("inviting \(peerID.displayName), attempt \(connectAttempts[peerID.displayName, default: 0] + 1)")
         invitedPeers.insert(peerID.displayName)
         connectAttempts[peerID.displayName, default: 0] += 1
         phase = .connecting(peerName: Self.friendlyName(peerID.displayName))
         armTimeout(Self.connectTimeout)
-        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
+        browser.invitePeer(peerID, to: session, withContext: nil, timeout: 12)
     }
 
     /// A connection that dropped before the exchange began. The inviter
@@ -440,15 +450,17 @@ final class HoofbeatRelay: NSObject {
         let name = peerID.displayName
         if discoveredPeers[name] != nil,
            connectAttempts[name, default: 0] < Self.maxConnectAttempts {
+            restartDiscovery()
             Task { [weak self] in
-                try? await Task.sleep(for: .milliseconds(500))
+                try? await Task.sleep(for: .milliseconds(900))
                 guard let self, self.activePeer == nil, case .connecting = self.phase,
                       let session = self.session, let browser = self.browser,
                       let peer = self.discoveredPeers[name] else { return }
                 self.invite(peer, session: session, browser: browser)
             }
         } else if discoveredPeers[name] == nil {
-            // We were the invitee: wait for the inviter's retry.
+            // We were the invitee: wait for the inviter's retry, visible again.
+            restartDiscovery()
             phase = .searching
         } else {
             fail(String(localized: "Couldn't reach \(Self.friendlyName(name)). Nothing changed — shake together again.", bundle: .appLanguage, locale: .appLanguage))

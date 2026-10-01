@@ -43,7 +43,6 @@ struct LetterDetailView: View {
     @Environment(FlockViewModel.self) private var flockViewModel
     @Environment(LocationService.self) private var locationService
 
-    @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
 
     // Receiving code
     @State private var enteredCode = ""
@@ -97,31 +96,40 @@ struct LetterDetailView: View {
         PaperStyle(paper: letter?.paper ?? .cream, customHex: letter?.paperCustomHex)
     }
 
+    /// The letter is addressed to any of this person's active names
+    /// (name, nickname, pen name — see `NameProfile`).
     private var recipientNameMatches: Bool {
         guard let letter else { return false }
-        return !storedDisplayName.gateNormalized.isEmpty
-            && letter.recipientName.gateNormalized == storedDisplayName.gateNormalized
+        return NameProfile.matches(letter.recipientName)
     }
 
-    /// How far this phone is from the spot where the letter was left;
-    /// `nil` while there is no location fix yet.
-    private var distanceToGate: CLLocationDistance? {
-        guard let here = locationService.currentCoordinate else { return nil }
-        return liveRam.distanceToGate(from: here)
+    /// Precise Geo Drop: only when the sender switched it on in the letter
+    /// sheet. Standard letters never trap the recipient in a radius.
+    private var isPreciseDrop: Bool { letter?.geofence != nil }
+
+    /// Whether this phone is inside the sender's chosen spot. Always true
+    /// for a letter without a Precise Geo Drop.
+    private var isAtPreciseSpot: Bool {
+        guard let letter, letter.geofence != nil else { return true }
+        return !letter.isOutsideGeofence(of: locationService.currentCoordinate)
     }
 
-    /// Whether the recipient is physically at the pick-up spot — the
-    /// letter can only be collected by walking there. `nil` while the
-    /// location is still resolving.
-    private var isAtPickupSpot: Bool? {
-        distanceToGate.map { $0 <= Ram.pickupRadiusMeters }
+    /// The ear tag is the real key: a complete code typed here opens the
+    /// seal whatever the names say. The writer's own pre-filled code doesn't
+    /// turn the sender into the recipient.
+    private var codeUnlocks: Bool {
+        isEncrypted && hasCompleteCode && !liveRam.isSentByThisPhone
+            && !(letter?.requiresNameMatch ?? false)
     }
 
-    /// The recipient, able to open it here: proven by the post office or a
-    /// key only this phone could open (wherever they are), or by name while
-    /// standing where the letter was left.
+    /// Who may break the seal: the post office's own delivery, a name match,
+    /// or the code. A Precise Geo Drop additionally needs the spot.
+    private var passesIdentity: Bool {
+        liveRam.addressedToThisPhone || recipientNameMatches || codeUnlocks
+    }
+
     private var isVerifiedRecipient: Bool {
-        liveRam.addressedToThisPhone || (recipientNameMatches && isAtPickupSpot == true)
+        passesIdentity && isAtPreciseSpot
     }
 
     /// Someone looking at a letter that's at somebody else's gate: its
@@ -138,7 +146,7 @@ struct LetterDetailView: View {
     private var lockedHint: LocalizedStringKey {
         isVerifiedRecipient
             ? "Enter your ear tag to unlock the seal"
-            : "The seal can only be broken by the recipient, standing where the letter was left."
+            : "Enter the ear tag code to open this seal, or sign in with a name the letter is addressed to."
     }
 
     /// The whole journey, across handoffs, as 0…1.
@@ -170,8 +178,7 @@ struct LetterDetailView: View {
                 ScrollView {
                     VStack(spacing: 24) {
                         envelopeSection
-                        routeSection
-                        LetterStatsBar(stats: stats)
+                        travelLog
                         handoffSection
 
                         if isRevealed, let letter {
@@ -218,7 +225,14 @@ struct LetterDetailView: View {
                     locationService.resolveCurrentLocation()
                 }
                 if enteredCode.isEmpty, let found = prefilledCode { enteredCode = found }
-                if enteredCode.isEmpty, let known = letter?.receivingCode { enteredCode = known; holdsCode = true }
+                // The writer's phone, and a phone the letter was sealed to by key, already
+                // hold the ear tag. Anyone else types it (from the message the sender
+                // sent), even when the phone happens to have it stored from a link.
+                if enteredCode.isEmpty, let known = letter?.receivingCode,
+                   liveRam.isSentByThisPhone || (letter.map(RecipientKeyring.isAddressedToMe) ?? false) {
+                    enteredCode = known
+                    holdsCode = true
+                }
             }
             .onDisappear { revealTask?.cancel() }
         }
@@ -289,14 +303,85 @@ struct LetterDetailView: View {
                             .transition(.opacity)
                     }
                 }
+            } else if passesIdentity, isPreciseDrop {
+                preciseDropNotice
             } else if isDeliverer, let letter {
-                gateDeliveryCard(for: letter)
+                VStack(spacing: 14) {
+                    gateDeliveryCard(for: letter)
+                    codeOverride
+                }
             } else {
                 LetterGateNoticeView(ram: liveRam, onVerified: {})
             }
+        } else if liveRam.status == .handedOff, liveRam.wasDeliveredInPerson,
+                  liveRam.isSentByThisPhone, let letter {
+            // Handed over in person: the archived copy shows the
+            // delivered stamp.
+            gateDeliveryCard(for: letter)
         } else {
             transitPill
         }
+    }
+
+    // MARK: - Code as master key, Precise Geo Drop
+
+    @State private var showsCodeOverride = false
+    @State private var confirmsReceived = false
+
+    /// Not addressed to any of this person's names? The ear tag still opens it.
+    @ViewBuilder
+    private var codeOverride: some View {
+        if letter?.requiresNameMatch == true, !liveRam.isSentByThisPhone {
+            Label("The sender made this letter for \(letter?.recipientName ?? "") only. A matching name is needed to open it.", systemImage: "person.badge.key")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if isEncrypted, !liveRam.isSentByThisPhone {
+            if showsCodeOverride {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Enter the ear tag code to open this letter.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    codeEntry
+                    if let wrongCodeMessage {
+                        Label(wrongCodeMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
+            } else {
+                Button { withAnimation(.snappy) { showsCodeOverride = true } } label: {
+                    Label("I have the code", systemImage: "key.fill")
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            }
+        }
+    }
+
+    /// The sender chose a precise spot: the recipient, by name or code, has to be there.
+    private var preciseDropNotice: some View {
+        let remaining = letter?.geofenceDistanceRemaining(from: locationService.currentCoordinate)
+        return VStack(alignment: .leading, spacing: 8) {
+            Label("Left at a precise spot", systemImage: "mappin.and.ellipse")
+                .font(.subheadline.weight(.semibold))
+            if locationService.currentCoordinate == nil {
+                Text("Finding where you are…")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let remaining {
+                Text("Walk to the spot the sender chose. \(DistanceFormatter.string(forMeters: Int(remaining))) to go.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Walk to the spot the sender chose to open it.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .task { if locationService.currentCoordinate == nil { locationService.resolveCurrentLocation() } }
     }
 
     // MARK: - Delivering at the gate
@@ -319,10 +404,39 @@ struct LetterDetailView: View {
         return tracker.wasHandedToPostOffice(letter) ? .atPostOffice : .handingOver
     }
 
-    /// What happens now the ram is at the recipient's gate, and the ways to
-    /// get the letter to them by hand when there's no post office (or they
-    /// simply meet first).
+    /// The ram is at the recipient's gate. Once the letter is received
+    /// (the post office confirmed it, or the sender marked it handed
+    /// over) there is nothing left to do: a stamp replaces the actions.
+    @ViewBuilder
     private func gateDeliveryCard(for letter: Letter) -> some View {
+        if gateDelivery(for: letter) == .collected || liveRam.status == .handedOff {
+            deliveredStamp
+        } else {
+            gateActionCard(for: letter)
+        }
+    }
+
+    /// A postmark-style badge: outlined, slightly off-square, low colour.
+    private var deliveredStamp: some View {
+        Label("Delivered to Recipient", systemImage: "checkmark.seal")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.secondary, lineWidth: 1.5)
+            }
+            .rotationEffect(.degrees(-3))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
+    }
+
+    /// What to do now the ram is at the gate: hand the letter over in
+    /// person, or dispatch it through the share sheet. The recipient's name
+    /// is already on the envelope above, so it is not repeated here.
+    private func gateActionCard(for letter: Letter) -> some View {
         let recipient = letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
         let to = recipient.isEmpty ? String(localized: "the recipient", bundle: .appLanguage, locale: .appLanguage) : recipient
         let delivery = gateDelivery(for: letter)
@@ -332,19 +446,15 @@ struct LetterDetailView: View {
         switch delivery {
         case .handingOver:
             title = String(localized: "Handing it to the post office", bundle: .appLanguage, locale: .appLanguage)
-            detail = String(localized: "It goes into \(to)'s mailbag as soon as this phone is online.", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "It goes into their mailbag as soon as this phone is online.", bundle: .appLanguage, locale: .appLanguage)
             symbol = "arrow.up.circle"
-        case .atPostOffice:
-            title = String(localized: "In \(to)'s mailbag", bundle: .appLanguage, locale: .appLanguage)
+        case .atPostOffice, .collected:
+            title = String(localized: "In their mailbag", bundle: .appLanguage, locale: .appLanguage)
             detail = String(localized: "It lands on their phone the next time Baranov is open.", bundle: .appLanguage, locale: .appLanguage)
             symbol = "tray.and.arrow.down.fill"
-        case .collected:
-            title = String(localized: "\(to) has it", bundle: .appLanguage, locale: .appLanguage)
-            detail = String(localized: "It's on their phone, ready to open.", bundle: .appLanguage, locale: .appLanguage)
-            symbol = "checkmark.circle.fill"
         case .byHand:
-            title = String(localized: "At \(to)'s gate", bundle: .appLanguage, locale: .appLanguage)
-            detail = String(localized: "Hand it over when you meet, or send \(to) the letter file.", bundle: .appLanguage, locale: .appLanguage)
+            title = String(localized: "Ram has arrived at the gate", bundle: .appLanguage, locale: .appLanguage)
+            detail = String(localized: "Trek completed. Hand over the letter in person or dispatch via share sheet.", bundle: .appLanguage, locale: .appLanguage)
             symbol = "flag.checkered"
         }
 
@@ -357,40 +467,62 @@ struct LetterDetailView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            if delivery != .collected {
-                if delivery != .byHand {
-                    Text("Meeting \(to) first? You can hand it over yourself.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+            if delivery != .byHand {
+                Text("Meeting them first? You can hand it over yourself.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // The sender keeps both ways of getting the letter across, as
+            // the app's glass buttons.
+            VStack(spacing: 10) {
+                ShareLink(
+                    item: LetterTracker.deliveryPackage(of: liveRam, carrying: letter),
+                    preview: SharePreview(
+                        String(localized: "\(letter.senderName)'s letter for \(to)", bundle: .appLanguage, locale: .appLanguage),
+                        image: Image(systemName: "envelope.fill")
+                    )
+                ) {
+                    Label("Share Letter", systemImage: "square.and.arrow.up")
                 }
-                HStack(spacing: 10) {
-                    if onShakeHandoff != nil {
-                        Button { shakeHandoff() } label: {
-                            Label("Hand over nearby", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+
+                if onShakeHandoff != nil {
+                    Button { shakeHandoff() } label: {
+                        Label("Hand Off Nearby", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+                }
+
+                // The code (or tracking link) stays shareable from the archive.
+                if let message = liveRam.senderShareMessage(for: letter) ?? liveRam.shareMessage(for: letter) {
+                    ShareLink(item: message) {
+                        if letter.relayTicket != nil {
+                            Label("Share tracking link", systemImage: "link")
+                        } else {
+                            Label("Share code", systemImage: "number")
                         }
                     }
-                    ShareLink(
-                        item: LetterTracker.deliveryPackage(of: liveRam, carrying: letter),
-                        preview: SharePreview(
-                            String(localized: "\(letter.senderName)'s letter for \(to)", bundle: .appLanguage, locale: .appLanguage),
-                            image: Image(systemName: "envelope.fill")
-                        )
-                    ) {
-                        Label("Send the file", systemImage: "square.and.arrow.up")
-                    }
+                    .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
                 }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
+            }
 
-                Button {
+            Button {
+                confirmsReceived = true
+            } label: {
+                Label("Mark as received", systemImage: "checkmark.circle")
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.primary)
+            .buttonStyle(.borderless)
+            .alert("Mark as received?", isPresented: $confirmsReceived) {
+                Button("Cancel", role: .cancel) {}
+                Button("Mark as received") {
                     flockViewModel.markHandedOff(ramId: ram.id, to: recipient.isEmpty ? nil : recipient)
-                } label: {
-                    Label("\(to) has it", systemImage: "checkmark.circle")
                 }
-                .font(.footnote.weight(.semibold))
-                .buttonStyle(.borderless)
+            } message: {
+                Text("Only do this once the recipient has the letter. It moves to your archive and can't be undone.")
             }
         }
         .padding(14)
@@ -523,15 +655,16 @@ struct LetterDetailView: View {
         return Date.now.addingTimeInterval(remaining / stepsPerDay * 86_400)
     }
 
-    // MARK: - Route and stats
+    // MARK: - Travel log
 
-    private var routeSection: some View {
-        LetterRouteIndicator(
+    /// Route, progress bar and the three stats in one grouped card.
+    private var travelLog: some View {
+        LetterTravelLog(
             originName: originName,
             destinationName: liveRam.targetCity,
-            progress: journeyProgress
+            progress: journeyProgress,
+            stats: stats
         )
-        .padding(.horizontal, 4)
     }
 
     private var stats: [LetterStatsBar.Stat] {
@@ -660,7 +793,7 @@ struct LetterDetailView: View {
     /// headline. Only the writer's own device holds the code.
     @ViewBuilder
     private var shareCodeBar: some View {
-        if !isRevealed, let message = liveRam.letterShareMessage {
+        if !isRevealed, let message = liveRam.senderShareMessage {
             ShareLink(item: message) {
                 if liveRam.letter?.relayTicket != nil {
                     Label("Share tracking link", systemImage: "square.and.arrow.up")
@@ -695,7 +828,11 @@ struct LetterDetailView: View {
             return
         }
         do {
-            try flockViewModel.openDeliveredLetter(ramId: ram.id, receivingCode: enteredCode)
+            try flockViewModel.openDeliveredLetter(
+                ramId: ram.id,
+                receivingCode: enteredCode,
+                currentCoordinate: locationService.currentCoordinate
+            )
         } catch {
             wrongCodeTick += 1
             sealResetToken += 1

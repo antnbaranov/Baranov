@@ -1,0 +1,4438 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Baranov Ram Transit Package": {
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "حزمة عبور بارانوف رام"
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Транзитен пакет Баранов Рам"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tranzitni paket Baranov Ram"
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paquet Baranov Ram Transit"
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit-pakke"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit-Paket"
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Πακέτο Baranov Ram Transit"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paquete Baranov Ram Transit"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paquete Baranov Ram Transit"
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transiidipakett"
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit paketea"
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit -paketti"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forfait Transit Baranov Ram"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forfait Transit Baranov Ram"
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pacáiste Idirthurais Ram Baranov"
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paquete Baranov Ram Transit"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "חבילת טרנזיט ברנוב רם"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव राम ट्रांजिट पैकेज"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tranzitni paket Baranov Ram"
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit csomag"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paket Transit Baranov Ram"
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit pakki"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pacchetto di transito Baranov Ram"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バラノフ ラム トランジット パッケージ"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვის რამის სატრანზიტო პაკეტი"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram транзиттік пакеті"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram 대중교통 패키지"
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovo Ram tranzito paketas"
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranova Ram tranzīta pakete"
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Транзитен пакет Баранов Рам"
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pakej Transit Ram Baranov"
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pakkett ta' Transitu Baranov Ram"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit-pakke"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit-pakket"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pakiet tranzytowy Baranowa Ram"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pacote de trânsito Baranov Ram"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pacote de trânsito Baranov Ram"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pachetul Baranov Ram Transit"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Транзитный пакет «Баранов Рам»"
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Package"
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tranzitni paket Baranov Ram"
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paketa Tranzit Baranov Ram"
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Транзитни пакет Баранов Рам"
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transitpaket"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "แพ็คเกจการขนส่ง Baranov Ram"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Ram Transit Paketi"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов Рам Транзит Пакет"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gói quá cảnh Baranov Ram"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫拉姆过境套餐"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫拉姆過境套餐"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫拉姆過境套餐"
+          }
+        }
+      }
+    },
+    "CFBundleDisplayName": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        }
+      }
+    },
+    "CFBundleName": {
+      "comment": "Bundle name",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "بارانوف"
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranow"
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Μπαράνοφ"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baránov"
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baránov"
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranova"
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב"
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バラノフ"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი"
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "바라노프"
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas"
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs"
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranow"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "บารานอฟ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫"
+          }
+        }
+      }
+    },
+    "NSCalendarsFullAccessUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ينظر بارانوف إلى أحداثك القادمة لاقتراح وجهات AirDrop للرسائل التي تحملها."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов разглежда предстоящите ви събития, за да предложи AirDrop дестинации за писмата, които носите."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gleda na vaše predstojeće događaje kako bi predložio AirDrop destinacije za pisma koja nosite."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analitza els vostres propers esdeveniments per suggerir destinacions d'AirDrop per a les cartes que porteu."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov se podívá na vaše nadcházející události, aby navrhl destinace AirDrop pro dopisy, které nesete."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ser på dine kommende begivenheder for at foreslå AirDrop-destinationer for breve, du medbringer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sieht sich deine anstehenden Termine an, um AirDrop-Ziele für Briefe vorzuschlagen, die du trägst."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov εξετάζει τις επερχόμενες εκδηλώσεις σας για να προτείνει προορισμούς AirDrop για γράμματα που μεταφέρετε."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza tus próximos eventos para sugerir destinos AirDrop para las cartas que llevas."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza tus próximos eventos para sugerir destinos AirDrop para las cartas que llevas."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov vaatab teie eelseisvaid sündmusi, et soovitada teie kaasas olevate kirjade jaoks AirDropi sihtkohti."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek datozen gertaerak aztertzen ditu eramaten dituzun gutunetarako AirDrop helmugak iradokitzeko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov tarkastelee tulevia tapahtumiasi ja ehdottaa AirDrop-kohteita mukanasi oleville kirjeille."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov examine tes événements à venir pour suggérer des destinations AirDrop pour les lettres que tu transportes."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov examine tes événements à venir pour suggérer des destinations AirDrop pour les lettres que tu transportes."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Féachann Baranov ar na himeachtaí atá agat le teacht chun cinn scríbe AirDrop a mholadh do litreacha atá á n-iompar agat."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza os teus próximos eventos para suxerir destinos de AirDrop para as cartas que levas."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב מסתכל על האירועים הקרובים שלך כדי להציע יעדי AirDrop למכתבים שאתה נושא."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके आने वाले कार्यक्रमों को देखकर आपके द्वारा ले जाने वाले पत्रों के लिए एयरड्रॉप गंतव्यों का सुझाव देता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gleda vaše nadolazeće događaje kako bi predložio AirDrop odredišta za pisma koja nosite."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov megnézi a közelgő eseményeit, hogy AirDrop úti célokat javasoljon az Ön által szállított levelek számára."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov melihat acara mendatang Anda untuk menyarankan tujuan AirDrop untuk surat yang Anda bawa."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov skoðar komandi viðburði þína til að stinga upp á AirDrop áfangastaði fyrir bréf sem þú ert með."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov esamina i tuoi prossimi eventi per suggerire destinazioni AirDrop per le lettere che stai trasportando."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は、今後のイベントを調べて、あなたが運ぶ手紙の AirDrop 宛先を提案します。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი ათვალიერებს თქვენს მომავალ მოვლენებს, რათა შემოგთავაზოთ AirDrop მიმართულებები იმ წერილებისთვის, რომლებიც თქვენ ატარებთ."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов сіз алып жүрген хаттар үшін AirDrop бағыттарын ұсыну үшін алдағы оқиғаларыңызға қарайды."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 다가오는 이벤트를 살펴보고 들고 있는 편지의 AirDrop 목적지를 제안합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas žiūri į jūsų būsimus įvykius, kad pasiūlytų AirDrop paskirties vietas jūsų vežamiems laiškams."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs aplūko jūsu gaidāmos notikumus, lai ieteiktu AirDrop galamērķus vēstulēm, kuras pārvadājat."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ги разгледува вашите претстојни настани за да предложи AirDrop дестинации за писмата што ги носите."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov melihat acara anda yang akan datang untuk mencadangkan destinasi AirDrop untuk surat yang anda bawa."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov iħares lejn l-avvenimenti li jmiss tiegħek biex jissuġġerixxi destinazzjonijiet AirDrop għall-ittri li qed iġorr."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ser på dine kommende arrangementer for å foreslå AirDrop-destinasjoner for brev du har med deg."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov kijkt naar uw aankomende evenementen om AirDrop-bestemmingen voor te stellen voor brieven die u bij u heeft."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov przegląda nadchodzące wydarzenia, aby zasugerować miejsca docelowe AirDrop dla listów, które nosisz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analisa seus próximos eventos para sugerir destinos AirDrop para as cartas que você carrega."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analisa seus próximos eventos para sugerir destinos AirDrop para as cartas que você carrega."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analizează evenimentele viitoare pentru a sugera destinații AirDrop pentru scrisorile pe care le transportați."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov просматривает твои предстоящие события, чтобы предлагать пункты назначения AirDrop для писем, которые ты несёшь."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sa pozerá na vaše nadchádzajúce udalosti, aby navrhol destinácie AirDrop pre listy, ktoré nosíte."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov si ogleda vaše prihajajoče dogodke in predlaga destinacije AirDrop za pisma, ki jih prenašate."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shikon ngjarjet tuaja të ardhshme për të sugjeruar destinacionet AirDrop për letrat që mbani."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов гледа на ваше предстојеће догађаје да би предложио АирДроп дестинације за писма која носите."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov tittar på dina kommande evenemang för att föreslå AirDrop-destinationer för brev du bär."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ดูกิจกรรมที่กำลังจะมาถึงของคุณเพื่อแนะนำจุดหมายปลายทาง AirDrop สำหรับจดหมายที่คุณถืออยู่"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, taşıdığınız mektuplar için AirDrop varış noktaları önermek üzere yaklaşan etkinliklerinize bakıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov переглядає твої майбутні події, щоб пропонувати пункти призначення AirDrop для листів, які ти несеш."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov xem xét các sự kiện sắp tới của bạn để đề xuất các điểm đến AirDrop cho những bức thư bạn mang theo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫会查看您即将举行的活动，为您携带的信件建议空投目的地。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫會查看您即將舉行的活動，為您攜帶的信件建議空投目的地。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫會查看您即將舉行的活動，為您攜帶的信件建議空投目的地。"
+          }
+        }
+      }
+    },
+    "NSCalendarsUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ينظر بارانوف إلى أحداثك القادمة لاقتراح وجهات AirDrop للرسائل التي تحملها."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов разглежда предстоящите ви събития, за да предложи AirDrop дестинации за писмата, които носите."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gleda na vaše predstojeće događaje kako bi predložio AirDrop destinacije za pisma koja nosite."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analitza els vostres propers esdeveniments per suggerir destinacions d'AirDrop per a les cartes que porteu."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov se podívá na vaše nadcházející události, aby navrhl destinace AirDrop pro dopisy, které nesete."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ser på dine kommende begivenheder for at foreslå AirDrop-destinationer for breve, du medbringer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sieht sich deine anstehenden Termine an, um AirDrop-Ziele für Briefe vorzuschlagen, die du trägst."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov εξετάζει τις επερχόμενες εκδηλώσεις σας για να προτείνει προορισμούς AirDrop για γράμματα που μεταφέρετε."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza tus próximos eventos para sugerir destinos AirDrop para las cartas que llevas."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza tus próximos eventos para sugerir destinos AirDrop para las cartas que llevas."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov vaatab teie eelseisvaid sündmusi, et soovitada teie kaasas olevate kirjade jaoks AirDropi sihtkohti."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek datozen gertaerak aztertzen ditu eramaten dituzun gutunetarako AirDrop helmugak iradokitzeko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov tarkastelee tulevia tapahtumiasi ja ehdottaa AirDrop-kohteita mukanasi oleville kirjeille."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov examine tes événements à venir pour suggérer des destinations AirDrop pour les lettres que tu transportes."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov examine tes événements à venir pour suggérer des destinations AirDrop pour les lettres que tu transportes."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Féachann Baranov ar na himeachtaí atá agat le teacht chun cinn scríbe AirDrop a mholadh do litreacha atá á n-iompar agat."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analiza os teus próximos eventos para suxerir destinos de AirDrop para as cartas que levas."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב מסתכל על האירועים הקרובים שלך כדי להציע יעדי AirDrop למכתבים שאתה נושא."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके आने वाले कार्यक्रमों को देखकर आपके द्वारा ले जाने वाले पत्रों के लिए एयरड्रॉप गंतव्यों का सुझाव देता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gleda vaše nadolazeće događaje kako bi predložio AirDrop odredišta za pisma koja nosite."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov megnézi a közelgő eseményeit, hogy AirDrop úti célokat javasoljon az Ön által szállított levelek számára."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov melihat acara mendatang Anda untuk menyarankan tujuan AirDrop untuk surat yang Anda bawa."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov skoðar komandi viðburði þína til að stinga upp á AirDrop áfangastaði fyrir bréf sem þú ert með."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov esamina i tuoi prossimi eventi per suggerire destinazioni AirDrop per le lettere che stai trasportando."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は、今後のイベントを調べて、あなたが運ぶ手紙の AirDrop 宛先を提案します。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი ათვალიერებს თქვენს მომავალ მოვლენებს, რათა შემოგთავაზოთ AirDrop მიმართულებები იმ წერილებისთვის, რომლებიც თქვენ ატარებთ."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов сіз алып жүрген хаттар үшін AirDrop бағыттарын ұсыну үшін алдағы оқиғаларыңызға қарайды."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 다가오는 이벤트를 살펴보고 들고 있는 편지의 AirDrop 목적지를 제안합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas žiūri į jūsų būsimus įvykius, kad pasiūlytų AirDrop paskirties vietas jūsų vežamiems laiškams."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs aplūko jūsu gaidāmos notikumus, lai ieteiktu AirDrop galamērķus vēstulēm, kuras pārvadājat."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ги разгледува вашите претстојни настани за да предложи AirDrop дестинации за писмата што ги носите."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov melihat acara anda yang akan datang untuk mencadangkan destinasi AirDrop untuk surat yang anda bawa."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov iħares lejn l-avvenimenti li jmiss tiegħek biex jissuġġerixxi destinazzjonijiet AirDrop għall-ittri li qed iġorr."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ser på dine kommende arrangementer for å foreslå AirDrop-destinasjoner for brev du har med deg."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov kijkt naar uw aankomende evenementen om AirDrop-bestemmingen voor te stellen voor brieven die u bij u heeft."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov przegląda nadchodzące wydarzenia, aby zasugerować miejsca docelowe AirDrop dla listów, które nosisz."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analisa seus próximos eventos para sugerir destinos AirDrop para as cartas que você carrega."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analisa seus próximos eventos para sugerir destinos AirDrop para as cartas que você carrega."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov analizează evenimentele viitoare pentru a sugera destinații AirDrop pentru scrisorile pe care le transportați."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov просматривает твои предстоящие события, чтобы предлагать пункты назначения AirDrop для писем, которые ты несёшь."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sa pozerá na vaše nadchádzajúce udalosti, aby navrhol destinácie AirDrop pre listy, ktoré nosíte."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov si ogleda vaše prihajajoče dogodke in predlaga destinacije AirDrop za pisma, ki jih prenašate."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shikon ngjarjet tuaja të ardhshme për të sugjeruar destinacionet AirDrop për letrat që mbani."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов гледа на ваше предстојеће догађаје да би предложио АирДроп дестинације за писма која носите."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov tittar på dina kommande evenemang för att föreslå AirDrop-destinationer för brev du bär."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ดูกิจกรรมที่กำลังจะมาถึงของคุณเพื่อแนะนำจุดหมายปลายทาง AirDrop สำหรับจดหมายที่คุณถืออยู่"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, taşıdığınız mektuplar için AirDrop varış noktaları önermek üzere yaklaşan etkinliklerinize bakıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov переглядає твої майбутні події, щоб пропонувати пункти призначення AirDrop для листів, які ти несеш."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov xem xét các sự kiện sắp tới của bạn để đề xuất các điểm đến AirDrop cho những bức thư bạn mang theo."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫会查看您即将举行的活动，为您携带的信件建议空投目的地。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫會查看您即將舉行的活動，為您攜帶的信件建議空投目的地。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫會查看您即將舉行的活動，為您攜帶的信件建議空投目的地。"
+          }
+        }
+      }
+    },
+    "NSContactsUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يقترح بارانوف أشخاصًا من جهات الاتصال الخاصة بك عندما توجه خطابًا إلى شخص ما."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов предлага хора от вашите контакти, когато адресирате писмо до някого."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov predlaže ljude iz vaših kontakata kada nekome uputite pismo."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggereix persones dels teus contactes quan adreça una carta a algú."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov navrhuje lidi z vašich kontaktů, když někomu adresujete dopis."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov foreslår personer fra dine kontakter, når du adresserer et brev til nogen."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov schlägt Personen aus deinen Kontakten vor, wenn du einen Brief adressierst."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov προτείνει άτομα από τις επαφές σας όταν απευθύνετε ένα γράμμα σε κάποιον."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggests people from your contacts when you address a letter to someone."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggests people from your contacts when you address a letter to someone."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggests people from your contacts when you address a letter to someone."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggests people from your contacts when you address a letter to someone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov te sugiere personas de tus contactos cuando le diriges una carta a alguien."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov te sugiere personas de tus contactos cuando le diriges una carta a alguien."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov soovitab inimesi teie kontaktide hulgast, kui adresseerite kellelegi kirja."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure kontaktuetako jendea iradokitzen du norbaiti gutun bat zuzentzen diozunean."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ehdottaa henkilöitä kontakteistasi, kun osoitat jollekin kirjeen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggère des personnes parmi tes contacts lorsque tu adresses une lettre."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggère des personnes parmi tes contacts lorsque tu adresses une lettre."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Molann Baranov daoine ó do theagmhálaithe nuair a sheolann tú litir chuig duine éigin."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suxire persoas dos teus contactos cando envías unha carta a alguén."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב מציע אנשים מאנשי הקשר שלך כשאתה מפנה מכתב למישהו."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जब आप किसी को पत्र संबोधित करते हैं तो बारानोव आपके संपर्कों के लोगों को सुझाव देता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov predlaže osobe iz vaših kontakata kada nekome upućujete pismo."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov embereket javasol az ismerősei közül, amikor levelet küld valakinek."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menyarankan orang-orang dari kontak Anda saat Anda mengirimkan surat kepada seseorang."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov stingur upp á fólki frá tengiliðum þínum þegar þú sendir bréf til einhvers."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggerisce persone dai tuoi contatti quando indirizzi una lettera a qualcuno."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バラノフは、手紙を誰かに宛てるとき、連絡先の中から人を提案します。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი გთავაზობს ადამიანებს თქვენი კონტაქტებიდან, როცა ვინმეს წერილს მიმართავთ."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Біреуге хат жолдаған кезде Баранов контактілеріңізден адамдарды ұсынады."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 누군가에게 편지를 보낼 때 연락처에 있는 사람들을 추천합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas siūlo žmones iš jūsų kontaktų, kai kam nors siunčiate laišką."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs iesaka cilvēkus no jūsu kontaktpersonām, kad adresējat kādam vēstuli."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов предлага луѓе од вашите контакти кога некому му обраќате писмо."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mencadangkan orang daripada kenalan anda apabila anda menghantar surat kepada seseorang."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov jissuġġerixxi nies mill-kuntatti tiegħek meta tindirizza ittra lil xi ħadd."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov foreslår personer fra kontaktene dine når du adresserer et brev til noen."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov suggereert mensen uit uw contacten wanneer u een brief aan iemand adresseert."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranow sugeruje osoby z Twoich kontaktów, gdy adresujesz do kogoś list."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sugere pessoas de seus contatos quando você endereça uma carta a alguém."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sugere pessoas de seus contatos quando você endereça uma carta a alguém."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sugerează persoane din contactele tale atunci când adresezi o scrisoare cuiva."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov предлагает людей из твоих контактов, когда ты адресуешь письмо."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov navrhuje ľudí z vašich kontaktov, keď niekomu adresujete list."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov predlaga osebe iz vaših stikov, ko nekomu naslovite pismo."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sugjeron njerëz nga kontaktet tuaja kur i drejtoni një letër dikujt."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов предлаже људе из ваших контаката када некоме упутите писмо."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov föreslår personer från dina kontakter när du adresserar ett brev till någon."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov แนะนำผู้คนจากรายชื่อติดต่อของคุณเมื่อคุณเขียนจดหมายถึงใครบางคน"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, birine mektup gönderdiğinizde kişilerinizden kişileri önerir."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov пропонує людей із твоїх контактів, коли ти адресуєш листа."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gợi ý những người trong danh bạ của bạn khi bạn gửi thư cho ai đó."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当您给某人写信时，巴拉诺夫会推荐您的联系人中的人。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當您寫信給某人時，巴拉諾夫會推薦您的聯絡人中的人。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當您寫信給某人時，巴拉諾夫會推薦您的聯絡人中的人。"
+          }
+        }
+      }
+    },
+    "NSGKFriendListUsageDescription": {
+      "comment": "Privacy - GameKit Friend List Usage Description",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يُظهر بارانوف أصدقاءك في Game Center حتى تتمكن من تسليم كبش لأحدهم ومقارنة الطاولات معهم."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov показва вашите приятели от Game Center, за да можете да подадете овен на един от тях и да сравните масите с тях."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pokazuje svoje prijatelje iz Game Centera tako da možete jednom od njih dati ovna i uporediti tabele sa njima."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mostra als teus amics del Game Center perquè puguis lliurar un ariet a un d'ells i comparar taules amb ells."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ukazuje vašim přátelům v Game Center, abyste mohli jednomu z nich předat berana a porovnat s nimi stoly."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov viser dine Game Center-venner, så du kan give en ram til en af ​​dem og sammenligne borde med dem."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov zeigt deine Game Center-Freunde an, damit du einem von ihnen einen Widder übergeben und Tabellen mit ihnen vergleichen kannst."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov δείχνει τους φίλους σας στο Game Center, ώστε να μπορείτε να δώσετε ένα κριάρι σε έναν από αυτούς και να συγκρίνετε πίνακες με αυτούς."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov muestra a tus amigos de Game Center para que puedas pasarle un carnero a uno de ellos y comparar tablas con ellos."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov muestra a tus amigos de Game Center para que puedas pasarle un carnero a uno de ellos y comparar tablas con ellos."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov näitab teie Game Centeri sõpru, et saaksite ühele neist jäära ulatada ja nendega tabeleid võrrelda."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure Game Center-eko lagunak erakusten dizkizu, haietako bati ahari bat eman diezaiozun eta haiekin mahaiak alderatu ditzazun."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov näyttää Game Center -ystävillesi, jotta voit ojentaa pässin yhdelle heistä ja vertailla pöytiä heidän kanssaan."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov montre tes amis Game Center afin que tu puisses confier un bélier à l'un d'eux et comparer vos classements."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov montre tes amis Game Center afin que tu puisses confier un bélier à l'un d'eux et comparer vos classements."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taispeánann Baranov do chairde san Ionad Cluiche ionas gur féidir leat reithe a thabhairt do cheann acu agus táblaí a chur i gcomparáid leo."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov móstralles aos teus amigos do Game Center para que poidas entregarlle un carneiro a un deles e comparar táboas con eles."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב מראה לחברים שלך ב-Game Center כדי שתוכל למסור איל לאחד מהם ולהשוות איתם טבלאות."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके गेम सेंटर मित्रों को दिखाता है ताकि आप उनमें से एक को एक रैम सौंप सकें और उनके साथ तालिकाओं की तुलना कर सकें।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pokazuje vaše prijatelje iz Game Centera tako da možete dati ovna jednom od njih i usporediti stolove s njima."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov megmutatja Game Center barátaidnak, hogy átnyújthass egy kost egyiküknek, és összehasonlítsd velük az asztalokat."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menunjukkan kepada teman-teman Game Center Anda sehingga Anda dapat memberikan ram kepada salah satu dari mereka dan membandingkan tabel dengan mereka."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sýnir Game Center vinum þínum svo þú getir afhent einum þeirra hrút og borið saman borð við þá."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mostra i tuoi amici del Game Center in modo che tu possa dare un ariete a uno di loro e confrontare i tavoli con loro."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は Game Center の友達を見せて、そのうちの 1 人に羊を渡してテーブルを比較できるようにします。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი აჩვენებს თქვენს თამაშის ცენტრის მეგობრებს, ასე რომ თქვენ შეგიძლიათ გადასცეთ ვერძი ერთ-ერთ მათგანს და შეადაროთ ცხრილები მათთან."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ойын орталығының достарын көрсетеді, сонда сіз олардың біріне қошқар беріп, олармен кестелерді салыстыра аласыз."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 Game Center 친구들에게 숫양을 건네주고 테이블을 비교할 수 있도록 보여줍니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas parodo jūsų žaidimų centro draugams, kad galėtumėte vienam iš jų įteikti aviną ir palyginti su jais lenteles."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs parāda jūsu Game Center draugus, lai jūs varētu kādam no viņiem pasniegt aunu un salīdzināt ar viņiem galdus."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ги покажува вашите пријатели од Game Center за да можете да му дадете овен на еден од нив и да ги споредите табелите со нив."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menunjukkan rakan Pusat Permainan anda supaya anda boleh menyerahkan seekor domba jantan kepada salah seorang daripada mereka dan membandingkan jadual dengan mereka."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov juri lill-ħbieb tiegħek taċ-Ċentru tal-Logħob sabiex tkun tista' tagħti muntun lil wieħed minnhom u tqabbel it-tabelli magħhom."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov viser Game Center-vennene dine slik at du kan gi en ram til en av dem og sammenligne tabeller med dem."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov laat het je Game Center-vrienden zien, zodat je een ram aan een van hen kunt overhandigen en tafels met hen kunt vergelijken."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pokazuje znajomym Game Center, dzięki czemu możesz podać barana jednemu z nich i porównać z nimi stoły."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mostra seus amigos do Game Center para que você possa entregar um carneiro a um deles e comparar as tabelas com eles."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mostra seus amigos do Game Center para que você possa entregar um carneiro a um deles e comparar as tabelas com eles."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov le arată prietenilor din Game Center, astfel încât să puteți înmâna un berbec unuia dintre ei și să comparați mesele cu ei."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov показывает твоих друзей в Game Center, чтобы ты мог передать барана одному из них и сравнивать результаты в таблицах."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ukáže vašim priateľom v Game Center, aby ste mohli jednému z nich podať barana a porovnať s nimi stoly."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pokaže vaše prijatelje iz Game Center, tako da lahko enemu od njih predate ovna in z njimi primerjate mize."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov u tregon miqve tuaj të Game Center që të mund t'i dorëzoni një dash njërit prej tyre dhe të krahasoni tabelat me ta."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов показује своје пријатеље из Гаме Центер-а тако да можете једном од њих дати овна и упоредити табеле са њима."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov visar dina Game Center-vänner så att du kan ge en bagge till en av dem och jämföra bord med dem."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov แสดงให้เพื่อน Game Center ของคุณดู เพื่อให้คุณสามารถส่งแกะให้หนึ่งในนั้นและเปรียบเทียบตารางกับพวกเขาได้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov Game Center arkadaşlarınıza gösteriyor, böylece onlardan birine koç verebilir ve onlarla masaları karşılaştırabilirsiniz."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov показує твоїх друзів у Game Center, щоб ти міг передати барана одному з них і порівнювати результати в таблицях."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov giới thiệu cho bạn bè trong Game Center của bạn để bạn có thể đưa ram cho một trong số họ và so sánh bảng với họ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫向您的游戏中心朋友展示，这样您就可以将一只公羊递给其中一个并与他们比较桌子。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫向您的遊戲中心朋友展示，這樣您就可以將一隻公羊遞給其中一個並與他們比較桌子。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫向您的遊戲中心朋友展示，這樣您就可以將一隻公羊遞給其中一個並與他們比較桌子。"
+          }
+        }
+      }
+    },
+    "NSHealthShareUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يقرأ بارانوف عدد خطواتك، بما في ذلك الخطوات المسجلة بواسطة Apple Watch، لتوجيه الكباش الناقل الخاص بك نحو وجهاتهم."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov чете броя на стъпките ви, включително стъпките, записани от вашия Apple Watch, за да преведе вашите превозни средства към техните дестинации."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov čita vaš broj koraka, uključujući korake koje je zabilježio vaš Apple Watch, kako bi vodio vaše ramove na nosaču prema njihovim odredištima."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov llegeix el vostre recompte de passos, inclosos els passos enregistrats pel vostre Apple Watch, per caminar amb el vostre operador cap a les seves destinacions."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov čte váš počet kroků, včetně kroků zaznamenaných vašimi Apple Watch, aby dopravil vaše berany do jejich cílů."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov læser dit skridttæller, inklusive skridt registreret af dit Apple Watch, for at gå dine bærervæddere mod deres destinationer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov liest deine Schrittzahl, auch von deiner Apple Watch, um deine Boten-Widder ihrem Ziel entgegenzuführen."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov διαβάζει τον αριθμό των βημάτων σας, συμπεριλαμβανομένων των βημάτων που καταγράφονται από το Apple Watch σας, για να περπατήσει τους κριούς σας προς τον προορισμό τους."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lee tu recuento de pasos, incluidos los de tu Apple Watch, para que tus carneros carteros avancen hacia su destino."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lee tu recuento de pasos, incluidos los de tu Apple Watch, para que tus carneros carteros avancen hacia su destino."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov loeb teie sammude arvu, sealhulgas teie Apple Watchi salvestatud samme, et suunata teie operaatori rammud sihtkohta."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure urratsen zenbaketa irakurtzen du, zure Apple Watch-ek grabatutako urratsak barne, zure garraiolarien ahariak beren helmugetara ibiltzeko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lukee askelmääräsi, mukaan lukien Apple Watchin tallentamat askeleet, ohjatakseen operaattorisi pässiä kohti määränpäätä."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lit ton nombre de pas, y compris depuis ton Apple Watch, pour faire avancer tes béliers porteurs vers leur destination."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lit ton nombre de pas, y compris depuis ton Apple Watch, pour faire avancer tes béliers porteurs vers leur destination."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Léann Baranov do chomhaireamh céimeanna, lena n-áirítear céimeanna arna dtaifeadadh ag do Apple Watch, chun do reithí iompróra a shiúl i dtreo a gceann scríbe."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov le o teu reconto de pasos, incluídos os pasos rexistrados polo teu Apple Watch, para camiñar ao teu operador cara aos seus destinos."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "בראנוב קורא את ספירת הצעדים שלך, כולל צעדים שנרשמו על ידי Apple Watch שלך, כדי ללכת עם האילים המובילים שלך לעבר היעדים שלהם."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके वाहक मेम्स को उनके गंतव्य की ओर ले जाने के लिए, आपके ऐप्पल वॉच द्वारा रिकॉर्ड किए गए कदमों सहित, आपके कदमों की गिनती पढ़ता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov očitava vaš broj koraka, uključujući korake koje je zabilježio vaš Apple Watch, kako bi vodio vaše nosače prema njihovim odredištima."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov beolvassa az Ön lépésszámát, beleértve az Apple Watch által rögzített lépéseket is, hogy a szolgáltató kosait úti céljuk felé irányítsa."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov membaca jumlah langkah Anda, termasuk langkah yang dicatat oleh Apple Watch Anda, untuk memandu operator Anda menuju tujuannya."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov les skrefatöluna þína, þar á meðal skref skráð af Apple Watch, til að ganga með hrútana þína í átt að áfangastaðnum."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov legge il conteggio dei tuoi passi, compresi i passi registrati dal tuo Apple Watch, per accompagnare il tuo operatore verso le loro destinazioni."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は、Apple Watch によって記録された歩数を含むあなたの歩数を読み取り、キャリアラムを目的地に向かって歩きます。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი კითხულობს თქვენი ნაბიჯების რაოდენობას, მათ შორის, თქვენი Apple Watch-ის მიერ ჩაწერილი ნაბიჯების ჩათვლით, რათა თქვენი გადამზიდავი ვერძები დანიშნულების ადგილამდე მიაცილონ."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов сіздің қадамдарыңызды, соның ішінде Apple Watch арқылы жазылған қадамдарды оқиды, тасымалдаушы қошқарларды межелі жерлеріне қарай жүреді."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 Apple Watch에 기록된 걸음 수를 포함하여 걸음 수를 판독하여 캐리어 램을 목적지로 안내합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas nuskaito jūsų žingsnių skaičių, įskaitant žingsnius, kuriuos užfiksavo jūsų „Apple Watch“, kad nuves jūsų vežėjo avinus link kelionės tikslo."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs nolasa jūsu soļu skaitu, tostarp soļus, kas reģistrēti jūsu Apple Watch, lai virzītu jūsu mobilo sakaru operatoru uz galamērķi."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов го чита вашиот број на чекори, вклучително и чекорите снимени од вашиот Apple Watch, за да ги одиме вашите овни-превозници кон нивните дестинации."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov membaca kiraan langkah anda, termasuk langkah-langkah yang direkodkan oleh Apple Watch anda, untuk membawa ram pembawa anda ke destinasi mereka."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov jaqra l-għadd tal-passi tiegħek, inklużi l-passi rreġistrati mill-Apple Watch tiegħek, biex jimxi l-imtaten trasportatur tiegħek lejn id-destinazzjonijiet tagħhom."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov leser skritttellingen din, inkludert skritt registrert av Apple Watch, for å gå bærerammene dine mot deres destinasjoner."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov leest uw stappentelling, inclusief de stappen die door uw Apple Watch zijn geregistreerd, om uw koerierrammen naar hun bestemming te leiden."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov odczytuje liczbę kroków, w tym kroki zarejestrowane na zegarku Apple Watch, aby poprowadzić siłowniki nośne w stronę miejsca docelowego."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lê sua contagem de passos, incluindo passos registrados pelo seu Apple Watch, para levar seus aríetes até seus destinos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lê sua contagem de passos, incluindo passos registrados pelo seu Apple Watch, para levar seus aríetes até seus destinos."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov vă citește numărul de pași, inclusiv pașii înregistrați de Apple Watch, pentru a vă plimba transportatorul către destinații."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov считывает твоё количество шагов, в том числе с Apple Watch, чтобы твои бараны-курьеры шли к месту назначения."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov číta váš počet krokov, vrátane krokov zaznamenaných vašimi hodinkami Apple Watch, aby odprevadil vašich baranov do ich cieľov."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bere vaše štetje korakov, vključno s koraki, ki jih zabeleži vaša ura Apple Watch, za sprehod vašega nosilca do njihovih ciljev."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov lexon numrin tuaj të hapave, duke përfshirë hapat e regjistruar nga Apple Watch, për të ecur deshët e transportuesit drejt destinacioneve të tyre."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов чита ваш број корака, укључујући кораке које је забележио ваш Аппле Ватцх, да би водио ваше рамове на носачу ка њиховим одредиштима."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov läser av ditt stegräkning, inklusive steg som registrerats av din Apple Watch, för att gå dina bärbaggar mot sina destinationer."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov อ่านจำนวนก้าวของคุณ รวมถึงจำนวนก้าวที่ Apple Watch บันทึกไว้ เพื่อเดินแกะผู้ให้บริการของคุณไปยังจุดหมายปลายทาง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, taşıyıcı koçlarınızı hedeflerine doğru yürütmek için Apple Watch'unuz tarafından kaydedilen adımlar da dahil olmak üzere adım sayınızı okur."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov зчитує твою кількість кроків, зокрема з Apple Watch, щоб твої барани-кур'єри йшли до місця призначення."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov đọc số bước của bạn, bao gồm các bước được Apple Watch ghi lại, để hướng dẫn nhà cung cấp dịch vụ của bạn hướng tới điểm đến của họ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov 会读取您的步数，包括 Apple Watch 记录的步数，以便让您的运输公羊驶向目的地。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov 會讀取您的步數，包括 Apple Watch 記錄的步數，以便讓您的運載公羊駛向目的地。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov 會讀取您的步數，包括 Apple Watch 記錄的步數，以便讓您的運輸公羊駛向目的地。"
+          }
+        }
+      }
+    },
+    "NSLocalNetworkUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يجد بارانوف راعيًا آخر يقف بجوارك - عندما تهز هواتفكما، أو عندما يشارك شخص قريب منك رمز الالتقاط - حتى يتمكن الكبش أو الرمز من الوصول إليك بدون الإنترنت."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов намира друг овчар, който стои до вас — когато и двамата разклатите телефоните си или когато някой наблизо сподели код за вземане — така че овен или код може да ви достигне без интернет."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pronalazi drugog pastira kako stoji pored vas - kada oboje protresete telefone, ili kada neko u blizini podijeli šifru za preuzimanje - tako da ovan ili šifra mogu doći do vas bez interneta."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov troba un altre pastor al teu costat, quan tots dos sacsejades el telèfon o quan algú a prop comparteix un codi de recollida, de manera que un RAM o un codi us poden arribar sense Internet."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov najde dalšího pastýře, který stojí vedle vás – když oba zatřesete telefony nebo když někdo poblíž sdělí kód vyzvednutí – takže se k vám může dostat beran nebo kód bez internetu."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finder en anden hyrde stående ved siden af ​​dig - når I begge ryster på dine telefoner, eller når nogen i nærheden deler en afhentningskode - så en ram eller en kode kan nå dig uden internet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov findet einen anderen Hirten direkt neben dir – wenn ihr beide eure Handys schüttelt oder jemand in der Nähe einen Abholcode teilt –, damit ein Widder oder ein Code dich auch ohne Internet erreicht."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Μπαράνοφ βρίσκει έναν άλλο βοσκό να στέκεται δίπλα σας — όταν κουνάτε και οι δύο τα τηλέφωνά σας ή όταν κάποιος κοντά μοιράζεται έναν κωδικό παραλαβής — έτσι ώστε ένας κριός ή ένας κωδικός να μπορεί να σας φτάσει χωρίς το διαδίκτυο."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finds another shepherd standing next to you — when you both shake your phones, or when someone nearby shares a pickup code — so a ram or a code can reach you without the internet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov encuentra a otro pastor cerca de ti (cuando ambos agitan sus teléfonos o alguien comparte un código) para que un carnero o código te llegue sin Internet."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov encuentra a otro pastor cerca de ti (cuando ambos agitan sus teléfonos o alguien comparte un código) para que un carnero o código te llegue sin Internet."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov leiab teie kõrval seismas teise karjase – kui te mõlemad oma telefone raputate või kui keegi läheduses jagab järelevõtmiskoodi –, et jäär või kood jõuaks teieni ilma internetita."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek beste artzain bat aurkituko du zure ondoan —biek telefonoa astintzen duzunean edo gertuko norbaitek jasotzeko kode bat partekatzen duenean—, ahari bat edo kode bat zuregana iritsi daiteke Internet gabe."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov löytää toisen paimenen seisovan vieressäsi – kun molemmat ravistatte puhelimianne tai kun joku lähistöllä jakaa noutokoodin – jotta pässi tai koodi voi tavoittaa sinut ilman internetiä."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov trouve un autre berger près de toi – quand vous secouez tous les deux vos téléphones ou que quelqu'un partage un code – pour qu'un bélier ou un code t'atteigne sans Internet."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov trouve un autre berger près de toi – quand vous secouez tous les deux vos téléphones ou que quelqu'un partage un code – pour qu'un bélier ou un code t'atteigne sans Internet."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Faigheann Baranov aoire eile ina sheasamh in aice leat - nuair a chroitheann tú do ghutháin, nó nuair a roinneann duine in aice leat cód bailithe - ionas gur féidir le reithe nó cód dul i dteagmháil leat gan an t-idirlíon."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov atopa outro pastor parado ao teu lado, cando axitas o teu teléfono ou cando alguén cerca comparte un código de recollida, para que un carneiro ou un código poida chegar a ti sen internet."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב מוצא רועה אחר עומד לידך - כששניכם מנערים את הטלפונים שלך, או כשמישהו בקרבת מקום חולק קוד איסוף - אז איל או קוד יכולים להגיע אלייך בלי האינטרנט."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव को आपके बगल में एक और चरवाहा खड़ा मिलता है - जब आप दोनों अपने फोन हिलाते हैं, या जब आस-पास कोई व्यक्ति पिकअप कोड साझा करता है - तो एक रैम या एक कोड इंटरनेट के बिना आप तक पहुंच सकता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov nalazi drugog pastira kako stoji pored vas — kada oboje protresete telefone ili kada netko u blizini podijeli šifru za preuzimanje — tako da ovan ili šifra mogu doći do vas bez interneta."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov egy másik pásztort talál melletted – amikor mindketten megrázzák a telefonjukat, vagy ha valaki a közelben megosztja a felvételi kódot –, így egy kos vagy egy kód internet nélkül is elérheti Önt."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menemukan penggembala lain yang berdiri di samping Anda — saat Anda berdua menggoyangkan ponsel, atau saat seseorang di sekitar membagikan kode pengambilan — sehingga ram atau kode dapat menghubungi Anda tanpa internet."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finnur annan fjárhirði sem stendur við hliðina á þér - þegar þið hristið bæði símana eða þegar einhver í nágrenninu deilir sendikóða - svo hrútur eða kóða geti náð í þig án internetsins."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov trova un altro pastore in piedi accanto a te – quando entrambi scuoti i telefoni o quando qualcuno nelle vicinanze condivide un codice di ritiro – in modo che un ariete o un codice possano raggiungerti senza Internet."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バラノフ氏は、二人で携帯電話を振っているときや、近くにいる誰かがピックアップ コードを共有しているときに、あなたの隣に立っている別の羊飼いを見つけます。これにより、インターネットなしでラムやコードが届くようになります。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი სხვა მწყემსს აღმოაჩენს, რომელიც შენს გვერდით დგას - როცა ორივე აკანკალებთ ტელეფონებს, ან როცა ვინმე ახლომახლო იზიარებს პიკაპის კოდს - ასე რომ, ვერძი ან კოდი ინტერნეტის გარეშე მოგაწვდიან."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов қасыңызда тұрған басқа шопан тауып алады — екеуің де телефондарыңды сілкіп тұрғанда немесе жақын жердегі біреу алып кету кодын бөліскенде — қошқар немесе код сізге интернетсіз жетеді."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 두 사람이 모두 휴대폰을 흔들거나 근처에 있는 누군가가 픽업 코드를 공유할 때 여러분 옆에 서 있는 다른 목자를 발견합니다. 따라서 인터넷 없이도 램이나 코드가 여러분에게 도달할 수 있습니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas randa šalia jūsų stovintį kitą piemenį – kai abu papurtote telefonus arba kai kas nors netoliese dalijasi paėmimo kodu – todėl avinas ar kodas gali jus pasiekti be interneto."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs atrod citu ganu, kas stāv jums blakus — kad jūs abi pakratat savus tālruņus vai kad kāds tuvumā dalās ar saņemšanas kodu —, lai auns vai kods varētu jūs sasniegt bez interneta."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов наоѓа друг овчар како стои до вас - кога двајцата ги тресете телефоните или кога некој во близина споделува код за пикап - за да може овен или шифра да ви стигне без интернет."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menemui gembala lain berdiri di sebelah anda — apabila anda berdua menggoncang telefon anda, atau apabila seseorang yang berdekatan berkongsi kod pikap — supaya seekor ram atau kod boleh menghubungi anda tanpa internet."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov isib ragħaj ieħor bilwieqfa ħdejk — meta t-tnejn ħawwdu t-telefowns tiegħek, jew meta xi ħadd fil-qrib jaqsam kodiċi ta’ pickup — sabiex muntun jew kodiċi jistgħu jilħquk mingħajr l-internet."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov finner en annen hyrde som står ved siden av deg - når dere begge rister telefonene, eller når noen i nærheten deler en hentekode - slik at en ram eller en kode kan nå deg uten internett."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov vindt een andere herder naast je staan ​​– wanneer jullie allebei met je telefoon schudden, of wanneer iemand in de buurt een ophaalcode deelt – zodat een ram of een code je kan bereiken zonder internet."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov znajduje obok ciebie innego pasterza — kiedy oboje potrząśniecie telefonami lub gdy ktoś w pobliżu udostępni kod do odbioru — aby baran lub kod mógł dotrzeć do was bez Internetu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov encontra outro pastor ao seu lado – quando vocês dois agitam seus telefones ou quando alguém próximo compartilha um código de coleta – para que um carneiro ou código possa alcançá-lo sem a internet."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov encontra outro pastor ao seu lado – quando vocês dois agitam seus telefones ou quando alguém próximo compartilha um código de coleta – para que um carneiro ou código possa alcançá-lo sem a internet."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov găsește un alt cioban care stă lângă tine – când vă scuturați amândoi telefoanele sau când cineva din apropiere împărtășește un cod de preluare – astfel încât un berbec sau un cod să vă poată ajunge fără internet."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov находит другого пастуха рядом с тобой — когда вы оба встряхиваете телефоны или кто-то поблизости делится кодом получения, — чтобы баран или код дошли до тебя без интернета."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov nájde iného pastiera, ktorý stojí vedľa vás – keď obaja potrasiete telefónmi alebo keď niekto nablízku zdieľa kód na vyzdvihnutie – takže baran alebo kód vás môžu zastihnúť bez internetu."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov najde drugega pastirja, ki stoji zraven tebe – ko oba streseta telefona ali ko nekdo v bližini deli kodo za prevzem – tako da te lahko oven ali koda doseže brez interneta."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gjen një bari tjetër që qëndron pranë jush - kur të dy tundni telefonat ose kur dikush afër ndan një kod marrjeje - kështu që një dash ose një kod mund t'ju arrijë pa internet."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов проналази другог пастира како стоји поред вас — када обојица тресете телефоне или када неко у близини подели шифру за преузимање — тако да ован или шифра могу да дођу до вас без интернета."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov hittar en annan herde som står bredvid dig - när ni båda skakar era telefoner, eller när någon i närheten delar en hämtkod - så att en bagge eller en kod kan nå dig utan internet."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov พบคนเลี้ยงแกะอีกคนหนึ่งยืนอยู่ข้างคุณ เมื่อคุณทั้งคู่เขย่าโทรศัพท์ หรือเมื่อมีคนใกล้เคียงแบ่งปันรหัสรับสินค้า เพื่อให้แกะหรือรหัสสามารถติดต่อคุณได้โดยไม่ต้องใช้อินเทอร์เน็ต"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, ikiniz de telefonlarınızı salladığınızda ya da yakındaki biri bir alma kodunu paylaştığında, internet olmadan da bir koç ya da kod size ulaşsın diye yanınızda duran başka bir çoban buluyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov знаходить іншого пастуха поруч із тобою — коли ви обидва струшуєте телефони або хтось поблизу ділиться кодом отримання, — щоб баран чи код дійшли до тебе без інтернету."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov tìm thấy một người chăn cừu khác đang đứng cạnh bạn — khi cả hai cùng lắc điện thoại hoặc khi ai đó ở gần chia sẻ mã nhận hàng — để ram hoặc mã có thể liên hệ với bạn mà không cần internet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫发现另一个牧羊人站在你旁边——当你们都摇动手机时，或者当附近有人分享取货代码时——这样公羊或代码就可以在没有互联网的情况下联系到你。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫發現另一個牧羊人站在你旁邊——當你們都搖動手機時，或者當附近有人分享取貨代碼時——這樣公羊或代碼就可以在沒有互聯網的情況下聯繫到你。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫發現另一個牧羊人站在你旁邊——當你們都搖動手機時，或者當附近有人分享取貨代碼時——這樣公羊或代碼就可以在沒有互聯網的情況下聯繫到你。"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم بارانوف موقعك الحالي لتحديد المكان الذي تبدأ فيه رحلة الرسالة."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов използва вашето текущо местоположение, за да зададе откъде започва пътуването на писмото."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi vašu trenutnu lokaciju da odredi gdje počinje putovanje pisma."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilitza la vostra ubicació actual per definir on comença el viatge d'una carta."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používá vaši aktuální polohu k nastavení, kde začíná cesta dopisu."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruger din nuværende placering til at angive, hvor et brevs rejse starter."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov verwendet deinen aktuellen Standort, um den Startpunkt der Reise eines Briefes festzulegen."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov χρησιμοποιεί την τρέχουσα τοποθεσία σας για να ορίσει πού ξεκινά το ταξίδι ενός γράμματος."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your current location to set where a letter's journey starts."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your current location to set where a letter's journey starts."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your current location to set where a letter's journey starts."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your current location to set where a letter's journey starts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa tu ubicación actual para determinar el punto de partida de la carta."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa tu ubicación actual para determinar el punto de partida de la carta."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov kasutab teie praegust asukohta, et määrata, kust kirja teekond algab."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure uneko kokapena erabiltzen du gutun baten bidaia non hasten den zehazteko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov käyttää nykyistä sijaintiasi määrittääkseen, mistä kirjeen matka alkaa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise ta position actuelle pour définir le point de départ du voyage d'une lettre."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise ta position actuelle pour définir le point de départ du voyage d'une lettre."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Úsáideann Baranov do shuíomh reatha chun an áit a dtosaíonn turas litreach a shocrú."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa a túa localización actual para definir onde comeza a viaxe dunha carta."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב משתמש במיקום הנוכחי שלך כדי לקבוע היכן מתחיל המסע של מכתב."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके वर्तमान स्थान का उपयोग यह निर्धारित करने के लिए करता है कि पत्र की यात्रा कहाँ से शुरू होती है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi vašu trenutnu lokaciju da odredi gdje počinje putovanje pisma."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov az Ön aktuális tartózkodási helye alapján állítja be, hol kezdődik a levél útja."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan lokasi Anda saat ini untuk menentukan di mana perjalanan surat dimulai."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov notar núverandi staðsetningu þína til að stilla hvar ferð bréfs hefst."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilizza la tua posizione attuale per stabilire dove inizia il viaggio di una lettera."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は、あなたの現在位置を使用して、手紙の旅の開始場所を設定します。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი იყენებს თქვენს ამჟამინდელ მდებარეობას, რათა დაადგინოს, სად იწყება წერილის მოგზაურობა."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов хаттың қай жерде басталатынын орнату үшін ағымдағы орналасқан жеріңізді пайдаланады."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 현재 위치를 사용하여 편지 여행이 시작되는 위치를 설정합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas naudoja jūsų dabartinę vietą, kad nustatytų, kur prasideda laiško kelionė."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs izmanto jūsu pašreizējo atrašanās vietu, lai iestatītu, kur sākas vēstules ceļš."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ја користи вашата моментална локација за да постави каде започнува патувањето на писмото."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan lokasi semasa anda untuk menetapkan di mana perjalanan surat bermula."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov juża l-post attwali tiegħek biex jistabbilixxi fejn jibda l-vjaġġ ta 'ittra."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruker din nåværende posisjon til å angi hvor et brevs reise starter."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gebruikt uw huidige locatie om in te stellen waar de reis van een brief begint."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov wykorzystuje Twoją aktualną lokalizację, aby określić, gdzie zaczyna się podróż listu."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa sua localização atual para definir onde começa a jornada de uma carta."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa sua localização atual para definir onde começa a jornada de uma carta."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov folosește locația dvs. actuală pentru a stabili unde începe călătoria unei scrisori."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov использует твоё текущее местоположение, чтобы определить, откуда начнётся путешествие письма."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používa vašu aktuálnu polohu na nastavenie, kde začína cesta listu."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uporablja vašo trenutno lokacijo, da določi, kje se začne potovanje pisma."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov përdor vendndodhjen tuaj aktuale për të vendosur se ku fillon udhëtimi i një letre."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов користи вашу тренутну локацију да одреди где почиње путовање писма."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov använder din nuvarande plats för att ställa in var ett brevs resa börjar."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ใช้ตำแหน่งปัจจุบันของคุณเพื่อกำหนดจุดเริ่มต้นของการเดินทางของจดหมาย"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, bir mektubun yolculuğunun nerede başlayacağını belirlemek için mevcut konumunuzu kullanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov використовує твоє поточне місцезнаходження, щоб визначити, звідки почнеться подорож листа."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sử dụng vị trí hiện tại của bạn để đặt nơi bắt đầu hành trình của một bức thư."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫使用您当前的位置来设置信件旅程的起点。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫使用您目前的位置來設定信件旅程的起點。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫使用您目前的位置來設定信件旅程的起點。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم بارانوف الميكروفون حتى تتمكن من إملاء النص بدلاً من كتابته."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов използва микрофона, за да можете да диктувате текст, вместо да го пишете."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi mikrofon tako da možete diktirati tekst umjesto da ga kucate."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilitza el micròfon perquè pugueu dictar text en lloc d'escriure-lo."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používá mikrofon, takže můžete diktovat text místo psaní."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruger mikrofonen, så du kan diktere tekst i stedet for at skrive den."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov nutzt das Mikrofon, damit du Text diktieren kannst, statt ihn zu tippen."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov χρησιμοποιεί το μικρόφωνο για να μπορείτε να υπαγορεύετε κείμενο αντί να το πληκτρολογείτε."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses the microphone so you can dictate text instead of typing it."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses the microphone so you can dictate text instead of typing it."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses the microphone so you can dictate text instead of typing it."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses the microphone so you can dictate text instead of typing it."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa el micrófono para que puedas dictar texto en lugar de escribirlo."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa el micrófono para que puedas dictar texto en lugar de escribirlo."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov kasutab mikrofoni, et saaksite teksti tippimise asemel dikteerida."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek mikrofonoa erabiltzen du, idatzi beharrean, testua diktatu ahal izateko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov käyttää mikrofonia, jotta voit sanella tekstiä kirjoittamisen sijaan."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise le micro pour que tu puisses dicter ton texte au lieu de le taper."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise le micro pour que tu puisses dicter ton texte au lieu de le taper."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Úsáideann Baranov an micreafón ionas gur féidir leat téacs a dheachtú seachas é a chlóscríobh."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa o micrófono para que poidas ditar texto en lugar de tecleo."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב משתמש במיקרופון כדי שתוכל להכתיב טקסט במקום להקליד אותו."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव माइक्रोफ़ोन का उपयोग करता है ताकि आप पाठ को टाइप करने के बजाय उसे निर्देशित कर सकें।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi mikrofon tako da možete diktirati tekst umjesto da ga tipkate."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov a mikrofont használja, így Ön diktálhat szöveget a gépelés helyett."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan mikrofon sehingga Anda dapat mendiktekan teks alih-alih mengetiknya."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov notar hljóðnemann svo þú getur fyrirskipað texta í stað þess að slá hann inn."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilizza il microfono in modo da poter dettare il testo invece di digitarlo."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov はマイクを使用するので、テキストを入力する代わりに口述入力できます。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი იყენებს მიკროფონს, ასე რომ თქვენ შეგიძლიათ კარნახოთ ტექსტი აკრეფის ნაცვლად."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов микрофонды пайдаланады, сондықтан мәтінді терудің орнына диктант жасай аласыз."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 마이크를 사용하므로 텍스트를 입력하는 대신 받아쓰기할 수 있습니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas naudoja mikrofoną, kad galėtumėte diktuoti tekstą, o ne jį rašyti."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs izmanto mikrofonu, lai jūs varētu diktēt tekstu, nevis to rakstīt."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов го користи микрофонот за да можете да диктирате текст наместо да го пишувате."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan mikrofon supaya anda boleh mengimlak teks dan bukannya menaipnya."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov juża l-mikrofonu sabiex inti tista 'tiddetta test minflok ittajpjah."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruker mikrofonen slik at du kan diktere tekst i stedet for å skrive den."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gebruikt de microfoon zodat je tekst kunt dicteren in plaats van typen."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov używa mikrofonu, dzięki czemu możesz dyktować tekst zamiast go wpisywać."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa o microfone para que você possa ditar o texto em vez de digitá-lo."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa o microfone para que você possa ditar o texto em vez de digitá-lo."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov folosește microfonul astfel încât să poți dicta text în loc să-l tastezi."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov использует микрофон, чтобы ты мог диктовать текст вместо набора."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používa mikrofón, takže môžete diktovať text namiesto písania."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uporablja mikrofon, tako da lahko narekujete besedilo, namesto da ga tipkate."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov përdor mikrofonin që të mund të diktosh tekst në vend që ta shtypësh."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов користи микрофон тако да можете да диктирате текст уместо да га куцате."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov använder mikrofonen så att du kan diktera text istället för att skriva den."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ใช้ไมโครโฟนเพื่อให้คุณสามารถป้อนข้อความตามคำบอกแทนการพิมพ์ได้"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, metni yazmak yerine dikte edebilmeniz için mikrofonu kullanıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov використовує мікрофон, щоб ти міг диктувати текст замість введення."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sử dụng micrô để bạn có thể đọc chính tả văn bản thay vì gõ văn bản."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫使用麦克风，因此您可以听写文本而不是打字。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫使用麥克風，因此您可以聽寫文字而不是打字。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫使用麥克風，因此您可以聽寫文字而不是打字。"
+          }
+        }
+      }
+    },
+    "NSMotionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يستخدم بارانوف خطواتك لتمشية كباشك الحاملة نحو وجهاتها."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов използва стъпките ви, за да преведе вашите носещи овни към техните дестинации."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi vaše korake da otprati vaše ovnove nosača prema njihovim odredištima."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilitza els vostres passos per caminar amb els ariets del vostre transportista cap a les seves destinacions."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používá vaše kroky, aby vedl vaše nosné berany směrem k jejich cílům."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruger dine trin til at gå dine bærervæddere mod deres destinationer."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov nutzt deine Schritte, um deine Boten-Widder ihrem Ziel entgegenzuführen."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov χρησιμοποιεί τα βήματά σας για να περπατήσει τους κριούς σας προς τους προορισμούς τους."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your steps to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your steps to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your steps to walk your carrier rams toward their destinations."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uses your steps to walk your carrier rams toward their destinations."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa tus pasos para que tus carneros carteros avancen hacia su destino."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa tus pasos para que tus carneros carteros avancen hacia su destino."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov kasutab teie samme, et teie kandurid sihtkohtadesse suunata."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure urratsak erabiltzen ditu zure garraiolarien ahariak helmugarantz ibiltzeko."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov käyttää askeleitasi kuljettaakseen kantopässiäsi kohti määränpäätä."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise tes pas pour faire avancer tes béliers porteurs vers leur destination."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov utilise tes pas pour faire avancer tes béliers porteurs vers leur destination."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Úsáideann Baranov do chéimeanna chun do reithí iompróra a shiúl i dtreo a gceann scríbe."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa os teus pasos para camiñar aos teus arietes de transporte cara aos seus destinos."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב משתמש בצעדים שלך כדי לטייל באילים המובילות שלך לעבר יעדיהם."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "बारानोव आपके वाहक मेढ़ों को उनके गंतव्य की ओर ले जाने के लिए आपके कदमों का उपयोग करता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov koristi vaše korake da vodi vaše ovnove nosače prema njihovim odredištima."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov az Ön lépéseit használja, hogy a szállító kosokat a céljuk felé irányítsa."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan langkah Anda untuk memandu domba jantan Anda menuju tujuan mereka."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov notar skrefin þín til að ganga með burðarhrútana þína í átt að áfangastaðnum."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa i tuoi passi per accompagnare i tuoi arieti portaerei verso le loro destinazioni."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "バラノフはあなたの歩幅を利用してキャリアラムを目的地に向かって歩きます。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი იყენებს თქვენს ნაბიჯებს თქვენი გადამზიდავი ვერძების დანიშნულების ადგილამდე მისასვლელად."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов сіздің қадамдарыңызбен тасымалдаушы қошқарларыңызды межелі жерлеріне қарай жүреді."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 당신의 발걸음을 이용해 캐리어 램을 목적지로 걸어갑니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas naudoja jūsų žingsnius, kad nuvestų jūsų vežėjų avinus link kelionės tikslo."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs izmanto jūsu soļus, lai vestu jūsu pārvadātāju aunus uz galamērķi."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов ги користи вашите чекори за да ги шета вашите овни носачи кон нивните дестинации."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menggunakan langkah anda untuk membawa ram pembawa anda ke destinasi mereka."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov juża l-passi tiegħek biex jimxi l-imtaten trasportatur tiegħek lejn id-destinazzjonijiet tagħhom."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov bruker skrittene dine til å gå bærerammene dine mot destinasjonene deres."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gebruikt jouw stappen om de rammen naar hun bestemming te leiden."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov używa twoich kroków, aby poprowadzić taran nośny do miejsca przeznaczenia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa seus passos para conduzir seus aríetes em direção aos seus destinos."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov usa seus passos para conduzir seus aríetes em direção aos seus destinos."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov folosește pașii tăi pentru a-ți plimba berbecii de transport către destinațiile lor."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov использует твои шаги, чтобы бараны-курьеры двигались к месту назначения."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov používa vaše kroky, aby kráčal vašich baranov smerom k ich cieľom."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov uporablja vaše korake, da vodi vaše nosilne ovne proti njihovim ciljem."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov përdor hapat tuaj për të ecur deshët tuaj transportues drejt destinacioneve të tyre."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов користи ваше кораке да отпрати ваше овнове носача ка њиховим одредиштима."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov använder dina steg för att gå dina bärbaggar mot sina destinationer."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov ใช้ขั้นตอนของคุณเพื่อเดินแกะผู้ให้บริการของคุณไปยังจุดหมายปลายทาง"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, taşıyıcı koçlarınızı hedeflerine doğru yürütmek için adımlarınızı kullanıyor."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov використовує твої кроки, щоб барани-кур'єри рухалися до місця призначення."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov sử dụng các bước của bạn để dẫn đường cho người vận chuyển của bạn tới điểm đến của họ."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉诺夫用你的脚步带领你的运载公羊驶向目的地。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫用你的腳步帶領你的運載公羊駛向目的地。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "巴拉諾夫用你的腳步帶領你的運載公羊駛向目的地。"
+          }
+        }
+      }
+    },
+    "NSSpeechRecognitionUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "يقوم بارانوف بتحويل كلامك إلى نص عند استخدام الإملاء."
+          }
+        },
+        "bg": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов превръща вашата реч в текст, когато използвате диктовка."
+          }
+        },
+        "bs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pretvara vaš govor u tekst kada koristite diktat."
+          }
+        },
+        "ca": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov converteix el vostre discurs en text quan feu servir el dictat."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov promění vaši řeč na text, když použijete diktát."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov forvandler din tale til tekst, når du bruger diktat."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov wandelt deine Sprache in Text um, wenn du das Diktieren nutzt."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ο Baranov μετατρέπει την ομιλία σας σε κείμενο όταν χρησιμοποιείτε υπαγόρευση."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov turns your speech into text when you use dictation."
+          }
+        },
+        "en-AU": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov turns your speech into text when you use dictation."
+          }
+        },
+        "en-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov turns your speech into text when you use dictation."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov turns your speech into text when you use dictation."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov convierte tu voz en texto cuando usas el dictado."
+          }
+        },
+        "es-419": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov convierte tu voz en texto cuando usas el dictado."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov muudab teie kõne tekstiks, kui kasutate dikteerimist."
+          }
+        },
+        "eu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov-ek zure diskurtsoa testu bihurtzen du diktaketa erabiltzen duzunean."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov muuttaa puheesi tekstiksi, kun käytät sanelua."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov transforme ta voix en texte lorsque tu utilises la dictée."
+          }
+        },
+        "fr-CA": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov transforme ta voix en texte lorsque tu utilises la dictée."
+          }
+        },
+        "ga": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déanann Baranov do chuid cainte a thiontú ina téacs nuair a úsáideann tú deachtú."
+          }
+        },
+        "gl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov converte o teu discurso en texto cando usas o ditado."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ברנוב הופך את הנאום שלך לטקסט כשאתה משתמש בהכתבה."
+          }
+        },
+        "hi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "जब आप श्रुतलेख का उपयोग करते हैं तो बारानोव आपके भाषण को पाठ में बदल देता है।"
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov pretvara vaš govor u tekst kada koristite diktat."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov szöveggé alakítja beszédét, amikor diktálást használ."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov mengubah pidato Anda menjadi teks saat Anda menggunakan dikte."
+          }
+        },
+        "is": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov breytir ræðu þinni í texta þegar þú notar einræði."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov trasforma il tuo discorso in testo quando usi la dettatura."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov は、ディクテーションを使用すると、スピーチをテキストに変換します。"
+          }
+        },
+        "ka": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ბარანოვი თქვენს მეტყველებას ტექსტად აქცევს, როცა კარნახს იყენებთ."
+          }
+        },
+        "kk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов диктантты қолданғанда сөзіңді мәтінге айналдырады."
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov는 받아쓰기를 사용하면 음성을 텍스트로 변환합니다."
+          }
+        },
+        "lt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovas paverčia jūsų kalbą tekstu, kai naudojate diktantą."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranovs jūsu runu pārvērš tekstā, kad lietojat diktātu."
+          }
+        },
+        "mk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов го претвора вашиот говор во текст кога користите диктат."
+          }
+        },
+        "ms": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov menukar ucapan anda menjadi teks apabila anda menggunakan imlak."
+          }
+        },
+        "mt": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov jibdel id-diskors tiegħek f'test meta tuża d-dettatura."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov gjør talen din om til tekst når du bruker diktat."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov verandert uw toespraak in tekst wanneer u dicteert."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov zamienia Twoją mowę na tekst, gdy używasz dyktowania."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov transforma seu discurso em texto quando você usa o ditado."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov transforma seu discurso em texto quando você usa o ditado."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov îți transformă discursul în text atunci când folosești dictarea."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov преобразует твою речь в текст, когда ты используешь диктовку."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov zmení vašu reč na text, keď použijete diktát."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov spremeni vaš govor v besedilo, ko uporabite narek."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov e kthen fjalimin tuaj në tekst kur përdorni diktim."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Баранов претвара ваш говор у текст када користите диктат."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov förvandlar ditt tal till text när du använder diktering."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov เปลี่ยนคำพูดของคุณให้เป็นข้อความเมื่อคุณใช้การเขียนตามคำบอก"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov, dikteyi kullandığınızda konuşmanızı metne dönüştürür."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov перетворює твоє мовлення на текст під час диктування."
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baranov biến lời nói của bạn thành văn bản khi bạn sử dụng tính năng đọc chính tả."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当您使用听写时，巴拉诺夫会将您的演讲转换为文本。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當您使用聽寫時，巴拉諾夫會將您的演講轉換為文字。"
+          }
+        },
+        "zh-HK": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "當您使用聽寫時，巴拉諾夫會將您的演講轉換為文字。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

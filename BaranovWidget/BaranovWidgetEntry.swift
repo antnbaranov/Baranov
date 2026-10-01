@@ -24,7 +24,7 @@ struct BaranovWidgetEntry: TimelineEntry {
             progress: 0.42,
             remainingDistance: "248 km",
             statusSymbol: "figure.walk",
-            statusLabel: "Walking"
+            statusLabel: String(localized: "Walking")
         )
     }
 
@@ -37,7 +37,7 @@ struct BaranovWidgetEntry: TimelineEntry {
             progress: 0,
             remainingDistance: nil,
             statusSymbol: "pawprint",
-            statusLabel: "Resting"
+            statusLabel: String(localized: "Resting")
         )
     }
 }

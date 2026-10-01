@@ -48,6 +48,10 @@ struct ComposeLetterView: View {
     /// persistent docked sheet.
     let onCancel: () -> Void
 
+    /// Fires after a letter went into a ram's mailbag: the panel closes and
+    /// the map flies to that ram.
+    var onRodeAlong: (Ram) -> Void = { _ in }
+
     /// The letter relay. With it, the destination can be a Shepherd ID (or an
     /// ear tag to hand over) instead of an address — see `isCodeMode`.
     var relay: LetterRelayService?
@@ -145,6 +149,8 @@ struct ComposeLetterView: View {
 
     @State private var ramName = ""
     @State private var recipientName = ""
+    /// "Only this name can open it": the recipient's name must match; the code alone won't open it.
+    @State private var requiresNameMatch = false
     @State private var messageBody = ""
     /// The wax the letter will be sealed with — crimson for everyone,
     /// the rest with the pasture expansion (see `SealColor`).
@@ -202,6 +208,8 @@ struct ComposeLetterView: View {
     @State private var ridesWithExistingRam = false
     @State private var resolutionError: LocalizedStringKey?
     @State private var isPasturePaywallPresented = false
+    /// Every pen is taken: says plainly that the letter starts later.
+    @State private var startsLaterAlertPresented = false
 
     // MARK: - Premium Touches (paid: Time-Capsule, Geo-Lock, Scratch-Off)
 
@@ -308,7 +316,12 @@ struct ComposeLetterView: View {
     /// its collapsed height, so the sender sees the whole form right away
     /// instead of it waiting on their first keystroke.
     private var isExpanded: Bool {
-        !isPanelCompact && isPanelExpanded
+        #if DEBUG
+        if CommandLine.arguments.contains("-screenshotCompose") {
+            return true
+        }
+        #endif
+        return !isPanelCompact && isPanelExpanded
     }
 
     /// Every field the form is still waiting on, in the order they sit on
@@ -337,6 +350,20 @@ struct ComposeLetterView: View {
             return "Pick a handoff city from the suggestions."
         }
         return nil
+    }
+
+    /// The ram heading the same way, when it is the one picked above.
+    private var hostRam: Ram? { targetCoordinate.flatMap { flockViewModel.ramHeading(to: $0) } }
+
+    /// On by itself when the picked ram is the one going there, or when no
+    /// pen is free; otherwise an offer the sender can accept.
+    private var ridesByDefault: Bool {
+        hostRam != nil && (isPickedRamGoingThere || !flockViewModel.hasFreeRamSlot)
+    }
+
+    private var isPickedRamGoingThere: Bool {
+        guard let hostRam, !ramName.trimmed.isEmpty else { return false }
+        return hostRam.name == ramName.trimmed
     }
 
     private var isRidingWithExistingRam: Bool {
@@ -442,31 +469,53 @@ struct ComposeLetterView: View {
         // everything in one `ScrollView` means anything that doesn't fit
         // — suggestions included — is simply reachable by scrolling,
         // instead of silently disappearing off the bottom of the sheet.
-        ScrollView {
-            VStack(spacing: 0) {
-                if !isExpanded, relay != nil {
-                    // The expanded form has the toggle in its header; the short sheet has no header,
-                    // so it sits beside the destination field.
-                    HStack(alignment: .top, spacing: -8) {
+        ScrollViewReader { scrollProxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    if !isExpanded, relay != nil {
+                        // The expanded form has the toggle in its header; the short sheet has no header,
+                        // so it sits beside the destination field.
+                        HStack(alignment: .top, spacing: -8) {
+                            destinationRow
+                            codeModeToggleButton
+                                .padding(.top, isPanelTiny ? 10 : 20)
+                                .padding(.trailing, 12)
+                        }
+                    } else {
                         destinationRow
-                        codeModeToggleButton
-                            .padding(.top, isPanelTiny ? 10 : 20)
-                            .padding(.trailing, 12)
                     }
-                } else {
-                    destinationRow
-                }
 
-                if isExpanded {
-                    expandedFields
-                        .padding(.horizontal, 20)
-                        .padding(.top, 4)
-                        .padding(.bottom, 24)
-                        .transition(.opacity)
-                } else if !isPanelTiny {
-                    collapsedForm
-                        .transition(.opacity)
+                    if isExpanded {
+                        expandedFields
+                            .padding(.horizontal, 20)
+                            .padding(.top, 4)
+                            .padding(.bottom, 24)
+                            .transition(.opacity)
+                    } else if !isPanelTiny {
+                        collapsedForm
+                            .transition(.opacity)
+                    }
                 }
+            }
+            .task {
+                #if DEBUG
+                if CommandLine.arguments.contains("-screenshotCompose") {
+                    try? await Task.sleep(for: .milliseconds(1400))
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        scrollProxy.scrollTo("sealSection", anchor: .bottom)
+                    }
+                    try? await Task.sleep(for: .milliseconds(800))
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        scrollProxy.scrollTo("sealSection", anchor: .bottom)
+                    }
+                }
+                if CommandLine.arguments.contains("-demoSealAnimation") {
+                    try? await Task.sleep(for: .milliseconds(1800))
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                        closure = .sealed
+                    }
+                }
+                #endif
             }
         }
         .scrollDismissesKeyboard(.interactively)
@@ -483,6 +532,13 @@ struct ComposeLetterView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
+        .onChange(of: ramName) { _, _ in ridesWithExistingRam = ridesByDefault }
+        .onChange(of: ridesWithExistingRam) { _, rides in
+            // Sending with the ram that's already going there means that ram
+            // is the chosen one.
+            if rides, let hostRam, ramName.trimmed != hostRam.name { ramName = hostRam.name }
+        }
+        .onChange(of: hostRam?.id) { _, _ in ridesWithExistingRam = ridesByDefault }
         .onChange(of: missingRequirementKey) { _, _ in
             // A "you're still missing X" notice from a Send tap clears
             // itself the moment the form changes — it shouldn't linger
@@ -498,7 +554,28 @@ struct ComposeLetterView: View {
         .sheet(isPresented: $isPasturePaywallPresented) {
             PasturePaywallView()
         }
+        .alert("It will start later", isPresented: $startsLaterAlertPresented) {
+            Button("OK", role: .cancel) {}
+            if !entitlementService.hasPastureExpansion {
+                Button("Expand the Pasture") { isPasturePaywallPresented = true }
+            }
+        } message: {
+            Text("All \(flockViewModel.maxAllowedRams) of your rams are already out. Your letter is saved exactly as written. Send it again once a ram is free and it sets off then.")
+        }
         .task {
+            #if DEBUG
+            if CommandLine.arguments.contains("-screenshotCompose") {
+                targetCity = "Frankfurt"
+                targetCoordinate = CLLocationCoordinate2D(latitude: 50.1109, longitude: 8.6821)
+                ramName = "Klaus"
+                recipientName = "Marta"
+                messageBody = "Meet me by the old fountain when the autumn leaves begin to turn."
+                sealColor = .crimson
+                paper = .cream
+                closure = nil
+                onDestinationSelected()
+            }
+            #endif
             restoreDraftIfNeeded()
             applyShepherdIDRequest(shepherdIDRequest.wrappedValue)
             syncRoutePreview()
@@ -716,6 +793,9 @@ struct ComposeLetterView: View {
             fieldSection(nil) {
                 VStack(spacing: 10) {
                     ContactSuggestionField(placeholder: "Who is this for?", text: $recipientName, onAddressSelected: recipientAddressPicked)
+                    if closure != .postcard, !recipientName.trimmed.isEmpty {
+                        nameMatchToggle
+                    }
                     if closure != .sealed {
                         messageField
                             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
@@ -906,8 +986,21 @@ struct ComposeLetterView: View {
                     .lineLimit(6...16)
                     .foregroundStyle(paperStyle.ink)
                     .focused($isMessageFocused)
+                    .accessibilityLabel("Tap here to start writing")
+
+                // Before anyone has written a word the page would otherwise
+                // be blank paper with nothing to say "write here". A quiet
+                // blinking caret and a line of text invite the first tap;
+                // it disappears the moment the field is focused or filled.
+                if messageBody.isEmpty && !isMessageFocused {
+                    writeHere
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
             }
             .animation(.easeInOut(duration: 0.25), value: promptIndex)
+            .animation(.easeInOut(duration: 0.2), value: isMessageFocused)
+            .animation(.easeInOut(duration: 0.2), value: messageBody.isEmpty)
 
             if let photo = attachedPhoto {
                 photoAttachment(photo)
@@ -990,6 +1083,38 @@ struct ComposeLetterView: View {
                 }
             }
         }
+    }
+
+    /// The "write here" invitation shown on an empty, unfocused page.
+    private var writeHere: some View {
+        HStack(spacing: 8) {
+            Group {
+                if reduceMotion {
+                    caret.opacity(0.8)
+                } else {
+                    caret.phaseAnimator([true, false]) { view, on in
+                        view.opacity(on ? 0.9 : 0.15)
+                    } animation: { _ in
+                        .easeInOut(duration: 0.65)
+                    }
+                }
+            }
+            Text("Tap here to start writing")
+                .font(.system(.body, design: .serif))
+                .foregroundStyle(paperStyle.ink.opacity(0.45))
+            Image(systemName: "pencil.line")
+                .font(.body)
+                .foregroundStyle(paperStyle.ink.opacity(0.45))
+                .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
+    private var caret: some View {
+        Capsule()
+            .fill(Color.accentColor)
+            .frame(width: 2, height: 22)
     }
 
     /// The optional drawing that rides with the letter.
@@ -1078,6 +1203,7 @@ struct ComposeLetterView: View {
     }
 
     @FocusState private var isMessageFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var promptIndex = Int.random(in: 0..<8)
     @State private var promptTick = 0
 
@@ -1261,7 +1387,9 @@ struct ComposeLetterView: View {
                 wax: sealColor,
                 monogram: monogram,
                 customHex: customPaperHex,
-                sealPreview: isHoldingSeal ? 1 : 0
+                sealPreview: isHoldingSeal ? 1 : 0,
+                hasScratchSecret: wantsScratchSecret,
+                scratchSecret: scratchSecretText
             )
             .padding(.top, 4)
             .animation(.easeInOut(duration: 0.25), value: paperStyle)
@@ -1286,7 +1414,7 @@ struct ComposeLetterView: View {
                         .buttonStyle(.plain)
                         .sensoryFeedback(.impact(weight: .heavy), trigger: closure == .sealed)
                         .accessibilityLabel("Seal the letter")
-                        Text("Tap the seal!")
+                        Text(hasContent ? LocalizedStringKey("Tap the seal!") : "Write the letter first.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
@@ -1296,15 +1424,18 @@ struct ComposeLetterView: View {
                             }
                             isHoldingSeal = false
                         }
-                        Text("Hold to seal")
+                        Text(hasContent ? LocalizedStringKey("Hold to seal") : "Write the letter first.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
+            .disabled(!hasContent)
+            .opacity(hasContent ? 1 : 0.4)
             .padding(16)
             .frame(maxWidth: .infinity)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .id("sealSection")
         }
         .frame(maxWidth: .infinity)
     }
@@ -1549,7 +1680,7 @@ struct ComposeLetterView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Scratch-off settings, with a live card to try scratching your own line.
+    /// Scratch-off settings. The foil itself is on the postcard above, so it is not shown twice.
     private var scratchSecretEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("A short secret line", text: $scratchSecretText, axis: .vertical)
@@ -1559,13 +1690,6 @@ struct ComposeLetterView: View {
                 .onChange(of: scratchSecretText) { _, newValue in
                     if newValue.count > 120 { scratchSecretText = String(newValue.prefix(120)) }
                 }
-            if !scratchSecretText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("Try it. This is how they'll see it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ScratchOffRevealView(secretText: scratchSecretText)
-                    .id(scratchSecretText)
-            }
             Text("Travels sealed, alongside the letter. They scratch it clear after opening the letter, not before.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1872,10 +1996,12 @@ struct ComposeLetterView: View {
 
     @ViewBuilder
     private var tripExtrasSection: some View {
-        let host = targetCoordinate.flatMap { flockViewModel.ramHeading(to: $0) }
+        let host = hostRam
         if host != nil {
             VStack(alignment: .leading, spacing: 12) {
                 if let host {
+                    // The picked ram is the one going there: it carries the
+                    // letter, so the choice is made and can't be undone here.
                     Toggle(isOn: $ridesWithExistingRam) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Send with \(host.name)")
@@ -1885,6 +2011,8 @@ struct ComposeLetterView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .tint(Color.wax)
+                    .disabled(isPickedRamGoingThere)
                 }
             }
             .task(id: targetCoordinate?.latitude) {
@@ -1993,6 +2121,11 @@ struct ComposeLetterView: View {
     /// with a post office to deliver it; without one the ticket says nothing
     /// new (the letter is handed over in person, as always).
     private func ticketDeliveryLine(carrierName: String) -> String? {
+        // No ram free and not riding along: say so before Send, instead of
+        // promising an arrival that cannot start yet.
+        if !flockViewModel.hasFreeRamSlot, !isRidingWithExistingRam {
+            return String(localized: "Every ram is out, so this letter will start later, as soon as one is free.", bundle: .appLanguage, locale: .appLanguage)
+        }
         guard TelemetryService.isServerConfigured else { return nil }
         let to = recipientName.trimmed
         guard !to.isEmpty else { return nil }
@@ -2490,6 +2623,7 @@ struct ComposeLetterView: View {
             draftStore.clear()
             draftSavedNotice = false
             resetForm()
+            onRodeAlong(host)
             return
         }
 
@@ -2716,6 +2850,20 @@ struct ComposeLetterView: View {
         NotificationCenter.default.post(name: .letterReadyToShare, object: nil, userInfo: ["message": message])
     }
 
+    /// Under "Who is this for?": make the name a real condition, not just a label.
+    private var nameMatchToggle: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle("Only this name can open it", isOn: $requiresNameMatch)
+                .font(.subheadline.weight(.semibold))
+                .tint(Color.wax)
+            Text("They need a name that matches \(recipientName.trimmed). Without this, the ear tag code alone opens the letter.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 4)
+    }
+
     private func makeUnpapered() -> Letter {
         switch closure {
         case .postcard:
@@ -2732,7 +2880,7 @@ struct ComposeLetterView: View {
             }
             return postcard
         case .sealed, .none:
-            return Letter.write(
+            var letter = Letter.write(
                 senderName: senderName,
                 recipientName: recipientName.trimmed,
                 messageBody: messageBody.trimmed,
@@ -2742,6 +2890,8 @@ struct ComposeLetterView: View {
                 geofence: composedGeofence,
                 scratchSecret: composedScratchSecret
             ).letter
+            letter.requiresNameMatch = requiresNameMatch && !recipientName.trimmed.isEmpty
+            return letter
         }
     }
 
@@ -2789,7 +2939,7 @@ struct ComposeLetterView: View {
         draftStore.save(currentDraft(wasSetAsideAtDispatch: true))
         withAnimation { draftSavedNotice = true }
         sendAttemptWarningTick += 1
-        isPasturePaywallPresented = true
+        startsLaterAlertPresented = true
     }
 
     /// A form with something in it, kept across the panel's page switches
@@ -2851,6 +3001,7 @@ struct ComposeLetterView: View {
         resetHandoffState()
         ramName = ""
         recipientName = ""
+        requiresNameMatch = false
         shepherdID = ""
         messageBody = ""
         attachedPhoto = nil

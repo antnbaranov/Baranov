@@ -276,13 +276,11 @@ struct ShepherdsBoardCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Friends are turned off for Baranov.")
                     .font(.subheadline.weight(.semibold))
-                Text("Allow Baranov to see your Game Center friends in Settings to compare tables.")
+                Text("You said no when Game Center asked. iOS only asks once; you can change it under Settings → Game Center → Friends Access, or ask again with the button below.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    Link("Open Settings", destination: url)
-                        .font(.footnote.weight(.semibold))
-                }
+                Button("Try Again", action: onRequestFriends)
+                    .font(.footnote.weight(.semibold))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)

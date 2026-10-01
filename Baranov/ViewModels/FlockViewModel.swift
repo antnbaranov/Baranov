@@ -16,6 +16,7 @@ import CoreLocation
 import Foundation
 import Observation
 import ActivityKit
+import UIKit
 import WidgetKit
 
 @Observable
@@ -27,7 +28,10 @@ final class FlockViewModel {
     static let pastureCapacity = 5
 
     var activeRams: [Ram] = [] {
-        didSet { persist() }
+        didSet {
+            persist()
+            endFinishedLiveActivities()
+        }
     }
     var selectedRamId: UUID? {
         didSet { persist() }
@@ -60,8 +64,12 @@ final class FlockViewModel {
                 self.addStepProgress(ramId: active.id, steps: steps)
             }
         }
-        if let active = self.ownRams.first(where: { $0.status == .walking }) ?? self.activeRams.first(where: { $0.status == .walking }) ?? self.activeRams.first {
+        if let active = self.liveActivityRam {
             self.startOrUpdateLiveActivity(for: active)
+        } else {
+            // Nothing in play (everything arrived, was delivered or handed on):
+            // a card left over from the last launch must not linger.
+            self.endAllLiveActivities()
         }
     }
 
@@ -97,6 +105,11 @@ final class FlockViewModel {
     /// ram's gait, the step count and the bar visibly move instead of
     /// waiting for the next pedometer callback.
     @ObservationIgnored private var liveTicker: Task<Void, Never>?
+    /// True between the scene going to the background and coming back. The
+    /// app has no background mode, so anything pushed in this window is the
+    /// last thing the card shows until a HealthKit wake or the next launch:
+    /// it carries the long projection `staleDate` instead of the 30 s one.
+    @ObservationIgnored private var isInBackground = false
     /// Last ride-along route check per ram, so a phone sitting in the
     /// wrong place doesn't send an MKDirections request every 30 seconds.
     @ObservationIgnored private var isCarryingGuests = false
@@ -114,8 +127,14 @@ final class FlockViewModel {
         var state = contentState(for: ram)
         // One Live Activity for the whole flock: the ram that is walking now (or the
         // first one). Other rams never spawn their own card.
-        let primary = ownRams.first(where: { $0.status == .walking }) ?? activeRams.first(where: { $0.status == .walking }) ?? activeRams.first
-        if ActivityAuthorizationInfo().areActivitiesEnabled, primary == nil || primary?.id == ram.id {
+        let primary = liveActivityRam
+        if !Self.showsLiveActivity(ram) {
+            // The ram reached the gate (or was delivered / handed on): the
+            // journey is over, so take the card off the Lock Screen and the
+            // Dynamic Island at once instead of leaving it frozen there.
+            endLiveActivity(for: ram.id, immediately: true)
+            if primary == nil { endAllLiveActivities() }
+        } else if ActivityAuthorizationInfo().areActivitiesEnabled, primary == nil || primary?.id == ram.id {
             if let existing = liveActivities[ram.id], existing.activityState == .active {
                 let now = Date()
                 let statusChanged = lastPushedSymbol[ram.id] != state.statusSymbol
@@ -205,15 +224,17 @@ final class FlockViewModel {
         return min(Double(total) / span, 3.5)
     }
 
-    /// While the person is walking, the card is only trusted for 30 s: if the
-    /// app is suspended and stops pushing, the widget drops the self-running
-    /// bar instead of sliding it on toward an arrival that never happened.
+    /// In the foreground the app pushes every few seconds, so a walking card
+    /// is only trusted for 30 s. Pushed on the way into the background, the
+    /// card keeps projecting toward the ETA for `backgroundProjectionWindow`,
+    /// then goes stale and shows the last real numbers.
     private func liveStaleDate(for state: RamActivityAttributes.ContentState, now: Date) -> Date {
-        state.isMoving == true ? now.addingTimeInterval(30) : now.addingTimeInterval(30 * 60)
+        if isInBackground { return state.backgroundStaleDate(now: now) }
+        return state.isMoving == true ? now.addingTimeInterval(30) : now.addingTimeInterval(30 * 60)
     }
 
     private func ensureLiveTicker() {
-        guard liveTicker == nil else { return }
+        guard liveTicker == nil, !isInBackground else { return }
         liveTicker = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
@@ -228,6 +249,7 @@ final class FlockViewModel {
 
     /// One tick. Returns `false` when there is nothing left to tick for.
     private func tickLiveActivity() -> Bool {
+        guard !isInBackground else { return false }
         guard let ram = activeRams.first(where: { $0.status == .walking }),
               let activity = liveActivities[ram.id],
               activity.activityState == .active else { return false }
@@ -246,9 +268,47 @@ final class FlockViewModel {
         return true
     }
 
-    func endLiveActivity(for ramId: UUID) {
+    /// Whether a ram still deserves a Live Activity. Once it has reached the
+    /// recipient's gate, been delivered, or been passed to another carrier,
+    /// nothing on it moves any more and the card would only sit there.
+    static func showsLiveActivity(_ ram: Ram) -> Bool {
+        switch ram.status {
+        case .arrivedAtGate, .delivered, .handedOff: return false
+        case .grazing, .walking, .waitingForHandoff, .atSea: return true
+        }
+    }
+
+    /// Ends every Live Activity this app has, including cards left over from
+    /// a previous launch that `liveActivities` doesn't know about.
+    /// Safety net for every path that flips a ram to arrived / delivered /
+    /// handed on: whichever code did it, its card comes down with it.
+    private func endFinishedLiveActivities() {
+        guard !liveActivities.isEmpty else { return }
+        for ram in activeRams where !Self.showsLiveActivity(ram) && liveActivities[ram.id] != nil {
+            endLiveActivity(for: ram.id, immediately: true)
+        }
+    }
+
+    private func endAllLiveActivities() {
+        for activity in Activity<RamActivityAttributes>.activities {
+            Task { await activity.end(nil, dismissalPolicy: .immediate) }
+        }
+        liveActivities.removeAll()
+        lastActivityUpdate.removeAll()
+        activityStride.removeAll()
+        walkingSince.removeAll()
+        stepSamples.removeAll()
+        lastStepAt.removeAll()
+        lastPushedMoving.removeAll()
+        lastPushedSymbol.removeAll()
+        liveTicker?.cancel()
+        liveTicker = nil
+    }
+
+    func endLiveActivity(for ramId: UUID, immediately: Bool = false) {
         guard let activity = liveActivities[ramId] else { return }
-        Task { await activity.end(nil, dismissalPolicy: .after(Date().addingTimeInterval(5))) }
+        let policy: ActivityUIDismissalPolicy = immediately ? .immediate : .after(Date().addingTimeInterval(5))
+        Task { await activity.end(nil, dismissalPolicy: policy) }
         liveActivities.removeValue(forKey: ramId)
         lastActivityUpdate.removeValue(forKey: ramId)
         activityStride.removeValue(forKey: ramId)
@@ -270,43 +330,70 @@ final class FlockViewModel {
         } else {
             walkingSince.removeValue(forKey: ram.id)
         }
-        let remaining = max(0, ram.totalStepsRequired - ram.stepsWalked)
-        let progress = ram.totalStepsRequired > 0 ? min(1.0, Double(ram.stepsWalked) / Double(ram.totalStepsRequired)) : 0
-        let distanceStr = remaining >= 1000 ? String(format: "%.1f km", Double(remaining) / 1000) : "\(remaining) m"
         let now = Date()
-        var moving: Bool?
-        var stepsPerMinute: Int?
-        var barStart: Date?
-        var barEnd: Date?
-        if ram.status == .walking {
-            let isMovingNow = isMoving(ram.id, now: now)
-            moving = isMovingNow
-            let pace = stepsPerSecond(ram.id, now: now)
-            if isMovingNow, pace > 0 { stepsPerMinute = Int((pace * 60).rounded()) }
-            if isMovingNow, pace >= 0.3, remaining > 0, ram.totalStepsRequired > 0 {
-                let secondsLeft = Double(remaining) / pace
-                if secondsLeft <= 6 * 3600 {
-                    let end = now.addingTimeInterval(secondsLeft)
-                    barEnd = end
-                    barStart = end.addingTimeInterval(-Double(ram.totalStepsRequired) / pace)
-                }
-            }
-        }
-        return RamActivityAttributes.ContentState(
-            progress: progress,
-            remainingSteps: remaining,
-            remainingDistance: distanceStr,
-            statusSymbol: ram.status.symbolName,
-            statusLabel: ram.status.displayName,
-            weatherSymbol: liveWeatherSymbols[ram.id],
+        return RamActivityAttributes.ContentState.make(
+            ram: ram,
+            isMoving: ram.status == .walking ? isMoving(ram.id, now: now) : nil,
+            stepsPerSecond: stepsPerSecond(ram.id, now: now),
             stride: activityStride[ram.id, default: 0],
             walkingSince: walkingSince[ram.id],
-            isMoving: moving,
-            totalSteps: ram.totalStepsRequired,
-            stepsPerMinute: stepsPerMinute,
-            barStart: barStart,
-            barEnd: barEnd
+            weatherSymbol: liveWeatherSymbols[ram.id],
+            now: now
         )
+    }
+
+    // MARK: Background and foreground
+
+    /// The ram the one Live Activity is about.
+    private var liveActivityRam: Ram? {
+        let live = activeRams.filter(Self.showsLiveActivity)
+        return live.first(where: { $0.status == .walking && !$0.isGuest })
+            ?? live.first(where: { $0.status == .walking })
+            ?? live.first
+    }
+
+    /// The scene is going to the background and the app will be suspended
+    /// within seconds. Pushes one last card that projects toward the ETA on
+    /// its own, saves the step baseline for HealthKit wakes, and schedules
+    /// the "almost there" notification from the same estimate.
+    func sceneDidEnterBackground() {
+        isInBackground = true
+        liveTicker?.cancel()
+        liveTicker = nil
+
+        // The steps applied up to now are what a HealthKit wake counts on from.
+        BackgroundStepSync.shared.flushBaseline()
+        guard let ram = liveActivityRam, ram.status == .walking else { return }
+
+        let state = contentState(for: ram)
+        let eta = state.barEnd
+        let activity = liveActivities[ram.id]
+        // A few seconds of runway so the update and the notification land
+        // before suspension. Not a background mode; iOS grants this to any app.
+        let taskID = UIApplication.shared.beginBackgroundTask(withName: "Live Activity handoff")
+        Task {
+            if let activity, activity.activityState == .active {
+                lastActivityUpdate[ram.id] = Date()
+                lastPushedSymbol[ram.id] = state.statusSymbol
+                lastPushedMoving[ram.id] = state.isMoving
+                await activity.update(ActivityContent(state: state, staleDate: state.backgroundStaleDate()))
+            }
+            await ArrivalEstimateNotifier.schedule(for: ram, eta: eta)
+            if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
+        }
+    }
+
+    /// Back on screen: the real step pipeline takes over again. Pending
+    /// estimates are dropped (the real arrival announces itself) and the
+    /// card gets real numbers as soon as the pedometer catches up.
+    func sceneDidBecomeActive() {
+        isInBackground = false
+        Task { await ArrivalEstimateNotifier.cancelAll() }
+        if let ram = liveActivityRam {
+            // Force a push: the card may be showing a stale projection.
+            lastActivityUpdate.removeValue(forKey: ram.id)
+            startOrUpdateLiveActivity(for: ram)
+        }
     }
 
     /// Best-effort, fire-and-forget: asks `WeatherSnapshotService` for a
@@ -447,11 +534,8 @@ final class FlockViewModel {
     /// Whether this person is the letter's recipient, by the display name
     /// they carry — the same identity the arrival screen checks.
     static func isAddressedToMe(_ letter: Letter) -> Bool {
-        let mine = (UserDefaults.standard.string(forKey: "com.baranov.carrierDisplayName") ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !mine.isEmpty else { return false }
-        return letter.recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
-            .caseInsensitiveCompare(mine) == .orderedSame
+        // Any of the person's active names (name, nickname, pen name).
+        NameProfile.matches(letter.recipientName)
     }
 
     // MARK: - Delivery receipts
@@ -516,6 +600,8 @@ final class FlockViewModel {
         return ownRams.first { ram in
             guard ram.status == .grazing || ram.status == .walking
                     || ram.status == .waitingForHandoff || ram.status == .atSea else { return false }
+            // A ram carries at most three letters besides its own.
+            guard ram.passengerLetters.count < RamAgeStage.adult.maxPassengerLetters else { return false }
             let goal = CLLocation(latitude: ram.finalDestinationCoordinate.latitude,
                                   longitude: ram.finalDestinationCoordinate.longitude)
             return goal.distance(from: target) <= 25_000
@@ -535,6 +621,24 @@ final class FlockViewModel {
     /// now: a ram already tracked locally can always be re-imported
     /// (idempotent, e.g. resuming a leg after a handoff), while a
     /// brand-new ram is only admitted while under `maxAllowedRams`.
+    /// A sealed letter that already stands at its gate but whose code this
+    /// phone neither holds nor can open (no key sealed to this phone's
+    /// profile, no code stored) can never be read here, so it is declined
+    /// rather than left in the mailbag as a letter nobody can open. Letters
+    /// still on the road are never declined: a carrier doesn't need the code.
+    /// Already-tracked rams and relay deliveries (which store the code
+    /// first) are not affected.
+    func shouldDecline(_ package: RamTransitPackage) -> Bool {
+        let ram = package.ram
+        guard ram.status == .arrivedAtGate,
+              !activeRams.contains(where: { $0.id == ram.id }),
+              let letter = ram.letter,
+              letter.isEncrypted, letter.isSealed
+        else { return false }
+        if SealKeyVault.code(for: letter.id) != nil { return false }
+        return !RecipientKeyring.adoptAll(in: ram)
+    }
+
     func canImport(_ package: RamTransitPackage) -> Bool {
         if activeRams.contains(where: { $0.id == package.ram.id }) { return true }
         // A letter delivered at the gate takes no pen: it's here to be opened.
@@ -593,6 +697,12 @@ final class FlockViewModel {
         if !ram.isGuest {
             noteSteps(ramId: ramId, steps: steps)
             startOrUpdateLiveActivity(for: ram)
+            if ram.status == .walking {
+                // What a HealthKit wake counts on from, if the app is suspended next.
+                BackgroundStepSync.shared.recordBaseline(ramId: ram.id, stepsWalked: ram.stepsWalked)
+            } else {
+                BackgroundStepSync.shared.clearBaseline()
+            }
         }
 
         // Guests ride in the mailbag of the ram being walked: the same steps
@@ -844,6 +954,9 @@ final class FlockViewModel {
         let alreadyTracked = activeRams.contains { $0.id == importedRam.id }
 
         guard canImport(package) else { return }
+        // Delivered by the post office the code is already stored, so this
+        // only ever stops a letter handed over with no way to open it.
+        if !asRecipient, shouldDecline(package) { return }
 
         // A key sealed to this phone's profile opens here and nowhere else:
         // keep the code for the seal, and the letter is this person's.
@@ -1277,7 +1390,7 @@ final class FlockViewModel {
 
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension FlockViewModel {
     /// Realistic preview data for SwiftUI canvases: Klaus, en route from
     /// Burnaby toward Frankfurt by way of Calgary and Gander — the classic
@@ -1346,4 +1459,3 @@ extension FlockViewModel {
         return model
     }
 }
-#endif

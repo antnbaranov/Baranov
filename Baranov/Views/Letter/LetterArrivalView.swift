@@ -106,8 +106,7 @@ struct LetterArrivalView: View {
     /// carrier-directory matching already uses elsewhere in the project.
     private var recipientNameMatches: Bool {
         guard let letter else { return false }
-        return letter.recipientName.normalizedForMatching == storedDisplayName.normalizedForMatching
-            && !storedDisplayName.trimmed.isEmpty
+        return NameProfile.matches(letter.recipientName)
     }
 
     /// Whether the device's resolved current city matches this ram's
@@ -117,8 +116,17 @@ struct LetterArrivalView: View {
         return currentCityName.normalizedForMatching == ram.targetCity.normalizedForMatching
     }
 
+    /// The ear tag is the real key: a complete code opens the seal whatever
+    /// the names say. The writer's own pre-filled code doesn't count.
+    private var codeUnlocks: Bool {
+        isEncrypted && hasCompleteCode && !NameProfile.matches(letter?.senderName ?? "")
+            && !(letter?.requiresNameMatch ?? false)
+    }
+
+    /// A name match or the code is enough; there is no city or radius check
+    /// here. A Precise Geo Drop is enforced by `isGeoLocked`, and only that.
     private var isVerifiedRecipient: Bool {
-        recipientNameMatches && cityMatches == true
+        recipientNameMatches || codeUnlocks || ram.addressedToThisPhone
     }
 
     var body: some View {
@@ -134,8 +142,6 @@ struct LetterArrivalView: View {
                         }
                     } else if letter == nil {
                         ContentUnavailableView("Letter Missing", systemImage: "envelope.badge.exclamationmark")
-                    } else if cityMatches == nil {
-                        verifyingRecipient
                     } else if isVerifiedRecipient {
                         sealedEnvelope
                     } else {
@@ -164,7 +170,10 @@ struct LetterArrivalView: View {
                 if enteredCode.isEmpty, let found = prefilledCode {
                     enteredCode = found
                 }
-                if enteredCode.isEmpty, let known = letter?.receivingCode {
+                // Only the writer, or a phone the letter was sealed to by key, skips
+                // typing; everyone else enters the ear tag from the sender's message.
+                if enteredCode.isEmpty, let known = letter?.receivingCode,
+                   ram.isSentByThisPhone || (letter.map(RecipientKeyring.isAddressedToMe) ?? false) {
                     enteredCode = known
                     holdsCode = true
                 }
@@ -203,21 +212,19 @@ struct LetterArrivalView: View {
                         ? String(localized: "Addressed to you", bundle: .appLanguage, locale: .appLanguage)
                         : String(localized: "Addressed to \(letter?.recipientName ?? String(localized: "someone else", bundle: .appLanguage, locale: .appLanguage))", bundle: .appLanguage, locale: .appLanguage)
                 )
-                mismatchRow(
-                    isMatch: cityMatches == true,
-                    label: cityMatches == true
-                        ? String(localized: "You're at the right gate", bundle: .appLanguage, locale: .appLanguage)
-                        : String(localized: "This gate is in \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage)
-                )
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-            Text("The seal can only be broken by the recipient, standing at the destination city.")
+            Text(letter?.requiresNameMatch == true
+                 ? LocalizedStringKey("The sender made this letter for one name only.")
+                 : LocalizedStringKey("Not one of your names? The ear tag code still opens it."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            if isEncrypted, letter?.requiresNameMatch != true { codeEntry }
         }
         .padding(.top, 20)
     }

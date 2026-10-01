@@ -151,9 +151,15 @@ final class NearbyCourierService: NSObject {
     @ObservationIgnored private var requestSession: MCSession?
     @ObservationIgnored private var requestExpiry: Task<Void, Never>?
 
+    /// Set once the Nearby explainer has been answered (either button).
+    nonisolated static let introSeenKey = "com.baranov.nearbyIntroSeen"
+
     /// Start looking. Pass `announce` to also be seen by others.
     func start(announce: (name: String, tripCity: String, trip: RamCoordinate?)?) {
         stop()
+        // Browsing is what triggers iOS's Local Network prompt, so it waits until the person
+        // has seen the explainer in Profile (see `NearbyIntroSheet`) instead of firing at launch.
+        guard UserDefaults.standard.bool(forKey: Self.introSeenKey) else { return }
         let b = MCNearbyServiceBrowser(peer: peerID, serviceType: Self.serviceType)
         b.delegate = self
         b.startBrowsingForPeers()

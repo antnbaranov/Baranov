@@ -180,7 +180,7 @@ final class RamLedger {
     }
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension RamLedger {
     /// An illustrative lifetime record for SwiftUI canvas previews.
     static var preview: RamLedger {
@@ -196,4 +196,3 @@ extension RamLedger {
         return ledger
     }
 }
-#endif

@@ -28,8 +28,13 @@ struct RamPortraitView: View {
     let name: String
     var diameter: CGFloat = 56
 
+    /// The wool color the person gave this ram (white until they do).
+    private var walkFrames: [String] {
+        RamSpriteFrameSets.walkFrames(for: RamColorStore.shared.color(for: name))
+    }
+
     private var hasWalkCycleArt: Bool {
-        guard let first = RamSpriteFrameSets.walkCycle.first else { return false }
+        guard let first = walkFrames.first else { return false }
         return RamSpriteFrameSets.assetExists(first)
     }
 
@@ -40,7 +45,7 @@ struct RamPortraitView: View {
                     .resizable()
                     .scaledToFill()
             } else if hasWalkCycleArt {
-                RamSpriteLoopView(frameNames: RamSpriteFrameSets.walkCycle, frameDuration: .milliseconds(70))
+                RamSpriteLoopView(frameNames: walkFrames, frameDuration: .milliseconds(70))
                     .padding(diameter * 0.06)
             } else if UIImage(named: "RamPortraitPlaceholder") != nil {
                 Image("RamPortraitPlaceholder")

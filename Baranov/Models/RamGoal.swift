@@ -24,6 +24,8 @@ struct RamGoal: Codable, Identifiable, Hashable, Sendable {
     var startMeters: Int
     var createdAt: Date
     var completedAt: Date?
+    /// The sky when the person ticked it off, if a stamp had weather by then.
+    var completionWeather: StampWeather?
 
     func isDone(totalMeters: Int) -> Bool {
         if completedAt != nil { return true }
@@ -48,6 +50,29 @@ struct RamGoalSuggestion: Identifiable, Hashable, Sendable {
     let title: String
     let kilometers: Int?
     var id: String { title }
+
+    /// Suggestions shuffled, with the ones that fit the current sky first.
+    static func ordered(for weather: StampWeather?, count: Int = 4) -> [RamGoalSuggestion] {
+        let fitting = weather.map(weatherSuggestions(for:)) ?? []
+        let rest = all.filter { item in !fitting.contains(where: { $0.id == item.id }) }.shuffled()
+        return Array((fitting.shuffled() + rest).prefix(count))
+    }
+
+    static func weatherSuggestions(for weather: StampWeather) -> [RamGoalSuggestion] {
+        if weather.isWet {
+            return [
+                .init(title: String(localized: "Get a stamp in the rain and refuse to complain", bundle: .appLanguage, locale: .appLanguage), kilometers: nil),
+                .init(title: String(localized: "Keep the letter dry through a proper downpour", bundle: .appLanguage, locale: .appLanguage), kilometers: 3),
+            ]
+        }
+        if weather.temperatureCelsius <= 3 {
+            return [.init(title: String(localized: "Walk on through the cold and earn a warm drink", bundle: .appLanguage, locale: .appLanguage), kilometers: 3)]
+        }
+        if weather.temperatureCelsius >= 26 {
+            return [.init(title: String(localized: "Beat the heat and find a shady spot for the letter", bundle: .appLanguage, locale: .appLanguage), kilometers: 3)]
+        }
+        return [.init(title: String(localized: "Make the most of this weather with a long walk", bundle: .appLanguage, locale: .appLanguage), kilometers: 6)]
+    }
 
     static var all: [RamGoalSuggestion] {
         [
@@ -94,14 +119,15 @@ final class RamGoalStore {
         goals.append(RamGoal(
             id: UUID(), ramID: ramID, title: String(trimmed.prefix(90)),
             targetMeters: kilometers.map { $0 * 1_000 },
-            startMeters: currentMeters, createdAt: Date(), completedAt: nil
+            startMeters: currentMeters, createdAt: Date(), completedAt: nil, completionWeather: nil
         ))
         save()
     }
 
-    func markDone(_ goal: RamGoal) {
+    func markDone(_ goal: RamGoal, weather: StampWeather? = nil) {
         guard let index = goals.firstIndex(where: { $0.id == goal.id }), goals[index].completedAt == nil else { return }
         goals[index].completedAt = Date()
+        goals[index].completionWeather = weather
         save()
     }
 

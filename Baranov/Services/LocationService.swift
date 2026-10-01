@@ -22,6 +22,12 @@
 //     switch between its running and standing frames even before the
 //     pedometer's first (often seconds-late) step callback.
 //
+//  Location is strictly while-in-use. There is no background location:
+//  steps come from CMPedometer / HealthKit, which keep counting while the
+//  app is suspended and are caught up when it returns, so the radio has no
+//  reason to run behind a locked screen. (`location` is deliberately not in
+//  `UIBackgroundModes`.)
+//
 //  The one-shot resolver and live tracking coexist: while live tracking
 //  is on, a resolve just reads the freshest fix instead of stopping the
 //  radio out from under the map, and `stopLiveTracking` returns the
@@ -189,8 +195,6 @@ final class LocationService: NSObject {
         wantsLiveTracking = false
         guard isLiveTracking else { return }
         isLiveTracking = false
-        manager.allowsBackgroundLocationUpdates = false
-        manager.showsBackgroundLocationIndicator = false
         manager.stopUpdatingHeading()
         // Only stop location updates if no one-shot resolve is mid-flight;
         // `endFix` will stop them itself when that finishes.
@@ -205,23 +209,6 @@ final class LocationService: NSObject {
         currentSpeedMetersPerSecond = 0
     }
 
-    /// Whether the location radio may keep the app alive in the background.
-    /// Only true while a ram is walking, so steps keep counting and the Live
-    /// Activity keeps updating with the phone locked. When nothing is walking,
-    /// location stops the moment the app leaves the screen.
-    @ObservationIgnored private var keepsAliveForWalk = false
-
-    /// Called by the map whenever "a ram is walking" changes.
-    func setWalkKeepAlive(_ walking: Bool) {
-        keepsAliveForWalk = walking
-        if isLiveTracking { applyBackgroundKeepAlive() }
-    }
-
-    private func applyBackgroundKeepAlive() {
-        manager.allowsBackgroundLocationUpdates = keepsAliveForWalk
-        manager.showsBackgroundLocationIndicator = keepsAliveForWalk
-    }
-
     private func beginLiveUpdates() {
         guard !isLiveTracking else { return }
         isLiveTracking = true
@@ -232,7 +219,6 @@ final class LocationService: NSObject {
         manager.distanceFilter = 5
         manager.headingFilter = 5
         manager.pausesLocationUpdatesAutomatically = false
-        applyBackgroundKeepAlive()
 
         if let cached = manager.location {
             publish(cached)

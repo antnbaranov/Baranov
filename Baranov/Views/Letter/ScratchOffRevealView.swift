@@ -25,6 +25,11 @@ import SwiftUI
 
 struct ScratchOffRevealView: View {
     let secretText: String
+    /// A small strip (on the compose postcard) instead of the full card.
+    var isCompact = false
+
+    private var height: CGFloat { isCompact ? 84 : 120 }
+    private var cornerRadius: CGFloat { isCompact ? 8 : 16 }
 
     /// Coarse erase-progress grid. Counting *cells* uncovered (not raw
     /// touch points) is what makes `revealThreshold` mean something
@@ -50,12 +55,8 @@ struct ScratchOffRevealView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 120)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.secondary.opacity(0.25), lineWidth: 1)
-        )
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .sensoryFeedback(.impact(weight: .light, intensity: 0.5), trigger: erasedCells.count)
         .sensoryFeedback(.success, trigger: isRevealed)
         .accessibilityElement(children: .combine)
@@ -68,19 +69,31 @@ struct ScratchOffRevealView: View {
         }
     }
 
+    @ViewBuilder
     private var secretContent: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .symbolRenderingMode(.hierarchical)
+        if isCompact {
             Text(secretText)
-                .font(.system(.subheadline, design: .serif).italic())
+                .font(.system(.footnote, design: .serif).italic())
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 16)
+                .lineLimit(4)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(uiColor: .secondarySystemBackground))
+        } else {
+            VStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .symbolRenderingMode(.hierarchical)
+                Text(secretText)
+                    .font(.system(.subheadline, design: .serif).italic())
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(uiColor: .secondarySystemBackground))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .secondarySystemBackground))
     }
 
     private var foilLayer: some View {
@@ -104,7 +117,9 @@ struct ScratchOffRevealView: View {
             .overlay {
                 if erasedCells.isEmpty {
                     Label("Scratch to reveal", systemImage: "hand.draw")
-                        .font(.caption.weight(.semibold))
+                        .font(isCompact ? .caption2.weight(.semibold) : .caption.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .foregroundStyle(.white.opacity(0.85))
                 }
             }

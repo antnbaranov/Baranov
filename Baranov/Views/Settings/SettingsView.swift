@@ -292,7 +292,7 @@ struct SettingsView: View {
     private func redeemDebugCode() {
         let trimmed = debugCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         debugRedeemTick += 1
-        guard trimmed == "NY2026" || trimmed == Secrets.debugCode.uppercased() else {
+        guard trimmed == "NY2026" else {
             debugRedeemResult = .invalid
             return
         }

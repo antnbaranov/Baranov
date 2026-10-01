@@ -13,15 +13,13 @@ import SwiftUI
 
 struct ReelSnackbar: View {
     private var job: ReelJobStore { .shared }
-    @State private var hiddenTick = -1
 
     private var isVisible: Bool {
         // The passport's own reel card already shows this exact job's
         // progress and share button — don't show it twice.
-        guard !job.suppressesOverlay else { return false }
+        guard !job.suppressesOverlay, !job.isOverlayHidden else { return false }
         switch job.phase {
-        case .writing, .rendering, .failed: return true
-        case .ready: return hiddenTick != job.readyTick
+        case .writing, .rendering, .failed, .ready: return true
         case .idle: return false
         }
     }
@@ -40,7 +38,7 @@ struct ReelSnackbar: View {
             guard job.phase == .ready else { return }
             let tick = job.readyTick
             try? await Task.sleep(for: .seconds(10))
-            if job.readyTick == tick { hiddenTick = tick }
+            if job.readyTick == tick, job.phase == .ready { job.hideOverlay() }
         }
     }
 
@@ -130,11 +128,13 @@ struct ReelSnackbar: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Share reel")
             }
-            closeButton { hiddenTick = job.readyTick }
+            closeButton { job.hideOverlay() }
         case .failed:
             closeButton { job.dismissResult() }
         default:
-            EmptyView()
+            // Still working: the bar can be put away, the reel keeps going
+            // and the bar returns when it is ready.
+            closeButton { job.hideOverlay() }
         }
     }
 
@@ -143,7 +143,8 @@ struct ReelSnackbar: View {
             Image(systemName: "xmark")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 28, height: 28)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Dismiss")

@@ -64,7 +64,7 @@ final class RamCompanionStore {
     }
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension RamCompanionStore {
     /// An illustrative already-onboarded companion for SwiftUI canvas
     /// previews.
@@ -74,4 +74,3 @@ extension RamCompanionStore {
         return store
     }
 }
-#endif

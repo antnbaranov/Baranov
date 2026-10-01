@@ -2,10 +2,10 @@
 //  LetterRouteStats.swift
 //  Baranov
 //
-//  The two quiet blocks under the envelope: where the letter is going
-//  (a one-line "Origin → Destination" and a slim route with the ram on
-//  it) and how far it has come (an Apple Health-style three-column bar).
-//  System materials and semantic styles only.
+//  The travel log under the envelope: one grouped card holding where the
+//  letter is going (a one-line "Origin → Destination"), a slim route with
+//  the ram on it, and how far it has come (three columns: walked, steps,
+//  to go). System colours and semantic styles only.
 //
 
 import SwiftUI
@@ -130,24 +130,55 @@ struct LetterStatsBar: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 8)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
-#Preview("Route and stats") {
-    VStack(spacing: 20) {
-        LetterRouteIndicator(
-            originName: "BCIT Burnaby, Burnaby, British Columbia",
-            destinationName: "Destination Gate",
-            progress: 0.35
-        )
-        LetterStatsBar(stats: [
+// MARK: - Travel log
+
+/// Route, progress and stats as one grouped card: a white card on the
+/// grouped background, like the rest of the app.
+///
+///     Burnaby → Vancity
+///     ──────●────────⚑
+///     8.7 km │ 8,742 │ 0 km
+struct LetterTravelLog: View {
+    let originName: String
+    let destinationName: String
+    /// 0…1 along the whole route.
+    let progress: Double
+    let stats: [LetterStatsBar.Stat]
+
+    var body: some View {
+        VStack(spacing: 16) {
+            LetterRouteIndicator(
+                originName: originName,
+                destinationName: destinationName,
+                progress: progress
+            )
+
+            Divider()
+
+            LetterStatsBar(stats: stats)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+#Preview("Travel log") {
+    LetterTravelLog(
+        originName: "BCIT Burnaby, Burnaby, British Columbia",
+        destinationName: "Vancity",
+        progress: 0.35,
+        stats: [
             .init(id: "walked", symbol: "figure.walk", value: "0.6 km", caption: "walked"),
             .init(id: "steps", symbol: "shoeprints.fill", value: "812", caption: "steps"),
             .init(id: "togo", symbol: "flag.checkered", value: "1.1 km", caption: "to go"),
-        ])
-    }
+        ]
+    )
     .padding()
+    .background(Color(uiColor: .systemGroupedBackground))
 }

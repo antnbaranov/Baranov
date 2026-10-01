@@ -37,8 +37,10 @@ final class SoundEffectPlayer {
         Task { await engine.preload() }
     }
 
-    func play(_ sound: Sound, volume: Float = 1.0) {
-        Task { await engine.play(sound, volume: volume) }
+    /// `ignoresSilentSwitch` is for sounds the person asks for with a tap
+    /// (petting a ram), which should be heard even with the ringer off.
+    func play(_ sound: Sound, volume: Float = 1.0, ignoresSilentSwitch: Bool = false) {
+        Task { await engine.play(sound, volume: volume, ignoresSilentSwitch: ignoresSilentSwitch) }
     }
 }
 
@@ -60,8 +62,8 @@ private actor AudioEngine {
         }
     }
 
-    func play(_ sound: SoundEffectPlayer.Sound, volume: Float) {
-        configureSessionIfNeeded()
+    func play(_ sound: SoundEffectPlayer.Sound, volume: Float, ignoresSilentSwitch: Bool) {
+        configureSessionIfNeeded(ignoresSilentSwitch: ignoresSilentSwitch)
 
         if let player = players[sound] {
             player.volume = volume
@@ -101,11 +103,17 @@ private actor AudioEngine {
         return nil
     }
 
-    private func configureSessionIfNeeded() {
-        guard !didConfigureSession else { return }
-        didConfigureSession = true
+    /// Re-checked on every play, not once per launch: dictation switches
+    /// the shared session to `.record` and deactivates it afterwards, which
+    /// used to leave every effect silent until the app was relaunched.
+    /// `.ambient` + `.mixWithOthers` also respects the silent switch and
+    /// never interrupts the player's music.
+    private func configureSessionIfNeeded(ignoresSilentSwitch: Bool = false) {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.ambient, options: [.mixWithOthers])
+        let category: AVAudioSession.Category = ignoresSilentSwitch ? .playback : .ambient
+        if didConfigureSession, session.category == category { return }
+        didConfigureSession = true
+        try? session.setCategory(category, options: [.mixWithOthers])
         try? session.setActive(true)
     }
 }

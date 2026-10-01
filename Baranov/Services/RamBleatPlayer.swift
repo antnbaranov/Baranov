@@ -37,7 +37,7 @@ final class RamBleatPlayer {
             index = (index + 1) % Self.variants.count
         }
         lastVariantIndex = index
-        SoundEffectPlayer.shared.play(Self.variants[index])
+        SoundEffectPlayer.shared.play(Self.variants[index], ignoresSilentSwitch: true)
     }
 
     private static var bundledBleatURL: URL? {

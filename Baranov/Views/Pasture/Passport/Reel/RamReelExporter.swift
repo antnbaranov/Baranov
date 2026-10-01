@@ -70,6 +70,10 @@ enum RamReelExporter {
             for frame in 0..<totalFrames {
                 try Task.checkCancellation()
                 while !input.isReadyForMoreMediaData {
+                    // A failed writer (e.g. the encoder is torn down while the
+                    // app is in the background) never becomes ready again —
+                    // without this check the loop would spin forever.
+                    guard writer.status == .writing else { throw RamReelExportError.failed }
                     try await Task.sleep(for: .milliseconds(5))
                 }
 
@@ -91,7 +95,9 @@ enum RamReelExporter {
                 try await Task.sleep(for: .milliseconds(6))
             }
         } catch {
-            writer.cancelWriting()
+            // AVAssetWriter raises an Objective-C exception if cancelled
+            // from any state other than writing.
+            if writer.status == .writing { writer.cancelWriting() }
             throw error
         }
 

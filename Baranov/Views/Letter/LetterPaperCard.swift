@@ -24,6 +24,7 @@ struct LetterPaperCard: View {
         VStack(spacing: 16) {
             letterSheet
             passport
+            LetterJourneyReplayView(stamps: ram.stamps)
         }
     }
 
@@ -52,6 +53,12 @@ struct LetterPaperCard: View {
                     .scaledToFit()
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .accessibilityLabel("Drawing attached to the letter")
+            }
+
+            // The sender's scratch-off secret: the recipient scratches it clear.
+            if let secret = letter.scratchSecretText?.trimmingCharacters(in: .whitespacesAndNewlines), !secret.isEmpty {
+                ScratchOffRevealView(secretText: secret)
+                    .id(letter.id)
             }
         }
         .foregroundStyle(paper.ink)

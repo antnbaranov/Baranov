@@ -116,7 +116,7 @@ struct OnboardingView: View {
             TabView(selection: $page) {
                 PainPage().tag(0)
                 MissedPersonPage(selection: $missedRaw).tag(1)
-                RamPage(recipientLabel: missedLabel).tag(2)
+                RamPage(recipientLabel: missedLabel, hasRecipient: missedPerson != nil).tag(2)
                 OceanPage(isActive: page == 3, recipientLabel: missedLabel).tag(3)
                 SealPage(person: missedPerson).tag(4)
                 AlertsPage(person: missedPerson).tag(5)
@@ -145,6 +145,7 @@ struct OnboardingView: View {
 
             footer
         }
+        .id(selectedLanguageCode)
         .sheet(isPresented: $isLanguagePickerPresented) {
             NavigationStack {
                 AppLanguagePickerView()
@@ -152,6 +153,7 @@ struct OnboardingView: View {
             .tint(Color.primary)
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            .environment(\.locale, Locale(identifier: selectedLanguageCode))
         }
         .environment(\.locale, Locale(identifier: selectedLanguageCode))
         // Burgundy, the same wax as the seal, for the buttons and selection
@@ -298,6 +300,7 @@ struct OnboardingView: View {
             .sheet(isPresented: $isAvatarPickerPresented) {
                 ShepherdPickerSheet(selection: $avatarSelection, customFileName: $avatarFile, motto: $motto)
                     .tint(nil)
+                    .environment(\.locale, Locale(identifier: selectedLanguageCode))
             }
         }
     }
@@ -669,7 +672,9 @@ private struct AlertsPage: View {
             demoLift: 36
         ) {
             NotificationPreviewCard(
-                title: String(localized: "Your ram is at \(person?.possessive ?? String(localized: "their", bundle: .appLanguage, locale: .appLanguage)) gate", bundle: .appLanguage, locale: .appLanguage),
+                title: person != nil
+                    ? String(localized: "Your ram is at \(person!.possessive) gate", bundle: .appLanguage, locale: .appLanguage)
+                    : String(localized: "Your ram is at their gate", bundle: .appLanguage, locale: .appLanguage),
                 message: String(localized: "The seal is waiting. Hold it to break it.", bundle: .appLanguage, locale: .appLanguage),
                 time: String(localized: "now", bundle: .appLanguage, locale: .appLanguage),
                 fill: AnyShapeStyle(Color(.secondarySystemGroupedBackground))
@@ -760,12 +765,15 @@ private struct PainPage: View {
 
 private struct RamPage: View {
     let recipientLabel: String
+    var hasRecipient: Bool = false
     @State private var stepCount = 0
 
     var body: some View {
         OnboardingPageLayout(
             title: "A letter that has to be carried.",
-            text: "Your ram walks it to \(recipientLabel). One of your real steps moves it one metre closer."
+            text: hasRecipient
+                ? "Your ram walks it to \(recipientLabel). One of your real steps moves it one metre closer."
+                : "Your ram walks it to them. One of your real steps moves it one metre closer."
         ) {
             VStack(spacing: 14) {
                 RamSpriteLoopView(frameNames: RamSpriteFrameSets.walkCycle, frameDuration: .milliseconds(80))

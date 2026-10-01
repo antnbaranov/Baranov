@@ -74,7 +74,7 @@ struct PasturePaywallView: View {
 
     /// Slots the selected option would unlock — what the scene previews.
     private var slotsForSelection: Int {
-        guard let option = viewModel.selectedOption else { return entitlementService.allowedRamSlots }
+        guard let option = viewModel.activeOption else { return entitlementService.allowedRamSlots }
         return option.isOneTime ? max(2, entitlementService.allowedRamSlots) : FlockViewModel.pastureCapacity
     }
 
@@ -204,7 +204,8 @@ struct PasturePaywallView: View {
                             index: index,
                             isOpen: index < previewedSlots,
                             isOwned: index < entitlementService.allowedRamSlots,
-                            name: index == 0 ? companionName : Self.previewRamNames[index % Self.previewRamNames.count]
+                            name: index == 0 ? companionName : Self.previewRamNames[index % Self.previewRamNames.count],
+                            color: RamColor.defaultColor(forSlot: index)
                         )
                         .frame(width: 64)
                     }
@@ -259,11 +260,7 @@ struct PasturePaywallView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
         } else if viewModel.options.isEmpty {
-            Text("Pricing unavailable right now")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
+            unavailablePlans
         } else {
             VStack(spacing: 14) {
                 planList
@@ -277,6 +274,58 @@ struct PasturePaywallView: View {
         }
     }
 
+    /// The store didn't answer (offline, or the offering isn't reachable
+    /// right now). The two subscriptions still show, so the person knows
+    /// what is on offer, with a way to ask the store again. Nothing here is
+    /// purchasable until real prices arrive.
+    private var unavailablePlans: some View {
+        VStack(spacing: 10) {
+            ForEach([
+                (String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage), String(localized: "/ year", bundle: .appLanguage, locale: .appLanguage)),
+                (String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage), String(localized: "/ month", bundle: .appLanguage, locale: .appLanguage)),
+            ], id: \.0) { plan in
+                HStack(spacing: 12) {
+                    Image(systemName: "circle")
+                        .font(.title3)
+                        .foregroundStyle(Color.secondary.opacity(0.4))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Expand the Pasture · \(plan.0)")
+                            .font(.subheadline.weight(.semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("Pricing unavailable right now")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Text(plan.1)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                )
+                .accessibilityElement(children: .combine)
+            }
+
+            Button {
+                Task { await viewModel.loadOffering() }
+            } label: {
+                Label("Try again", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+
+            if let diagnostic = viewModel.loadDiagnostic, PasturePaywallViewModel.showsDiagnostics {
+                Text(diagnostic)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+
     /// Every way to pay, as one list of equal-weight rows — a subscription
     /// and a one-time purchase side by side, nothing shouting. Selection is
     /// a plain primary stroke; the only accent on the whole screen is the
@@ -284,11 +333,14 @@ struct PasturePaywallView: View {
     private var planList: some View {
         VStack(spacing: 10) {
             ForEach(viewModel.orderedOptions) { option in
+                let isOwned = option.isOneTime && entitlementService.hasSecondRam
                 PlanRow(
                     option: option,
                     badge: viewModel.badge(for: option),
-                    isSelected: viewModel.selectedOption?.id == option.id
+                    isSelected: !isOwned && viewModel.activeOption?.id == option.id,
+                    isOwned: isOwned
                 ) {
+                    guard !isOwned else { return }
                     withAnimation(.snappy) { viewModel.selectedOption = option }
                 }
             }
@@ -453,17 +505,17 @@ struct PasturePaywallView: View {
     // MARK: - Actions
 
     private var ctaTitle: LocalizedStringKey {
-        guard let option = viewModel.selectedOption else { return "Continue" }
-        if option.isOneTime { return "Adopt a Ram" }
-        return option.hasIntroductoryOffer ? "Start Free Week" : "Expand the Pasture"
+        guard let option = viewModel.activeOption else { return "Continue" }
+        if option.isOneTime { return entitlementService.hasSecondRam ? "Purchased" : "Adopt a Second Ram" }
+        // Only a free trial this person can actually get changes the button;
+        // `introOffer` is cleared when RevenueCat says they're not eligible.
+        return option.introOffer?.isFreeTrial == true ? "Start free trial" : "Expand the Pasture"
     }
 
     private var ctaSubtitle: LocalizedStringKey? {
-        guard let option = viewModel.selectedOption, option.hasIntroductoryOffer else { return nil }
-        let priceLine = option.periodDescription.isEmpty
-            ? option.priceString
-            : "\(option.priceString) \(option.periodDescription)"
-        return "Then \(priceLine). Cancel anytime."
+        guard let option = viewModel.activeOption,
+              let offer = option.introOffer, offer.isFreeTrial else { return nil }
+        return "\(offer.duration) free, then \(option.priceString) \(option.periodDescription). Cancel anytime."
     }
 
     private var actionBar: some View {
@@ -508,7 +560,7 @@ struct PasturePaywallView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
-                .disabled(viewModel.isPurchasing || viewModel.isRestoring || viewModel.selectedOption == nil)
+                .disabled(viewModel.isPurchasing || viewModel.isRestoring || viewModel.activeOption == nil)
                 .animation(.snappy, value: ctaTitle)
             }
 
@@ -516,6 +568,15 @@ struct PasturePaywallView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+
+            if !entitlementService.hasPastureExpansion, viewModel.activeOption?.isOneTime == false {
+                // Auto-renewal terms next to the button that starts the subscription.
+                Text("Subscriptions renew automatically unless cancelled at least 24 hours before the period ends. Manage or cancel in Settings.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             HStack(spacing: 16) {
                 Button {
@@ -562,21 +623,23 @@ private struct PlanRow: View {
     let option: PaywallOption
     let badge: String?
     let isSelected: Bool
+    /// One-time ram already bought: shown as done, not selectable.
+    var isOwned: Bool = false
     let onTap: () -> Void
 
     private var subtitle: LocalizedStringKey {
         if option.isOneTime {
             return "Pay once. A second ram, yours for good."
         }
-        if option.hasIntroductoryOffer {
-            return "7 days free, then \(option.priceString) \(option.periodDescription). Cancel anytime."
+        if let offer = option.introOffer, offer.isFreeTrial {
+            return "\(offer.duration) free, then \(option.priceString) \(option.periodDescription). Cancel anytime."
         }
         return "\(option.priceString) \(option.periodDescription). Cancel anytime."
     }
 
     private var title: LocalizedStringKey {
         if option.isOneTime {
-            return "Adopt a Ram"
+            return "Adopt a Second Ram"
         } else {
             return "Expand the Pasture · \(option.title)"
         }
@@ -585,9 +648,9 @@ private struct PlanRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                Image(systemName: (isSelected || isOwned) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isSelected ? Color.primary : Color.secondary.opacity(0.4))
+                    .foregroundStyle(isOwned ? Color.secondary : (isSelected ? Color.primary : Color.secondary.opacity(0.4)))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -615,11 +678,17 @@ private struct PlanRow: View {
                 Spacer(minLength: 8)
 
                 VStack(alignment: .trailing, spacing: 1) {
-                    Text(option.priceString)
-                        .font(.headline.monospacedDigit())
-                    Text(option.isOneTime ? "once" : option.shortPeriod)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    if isOwned {
+                        Text("Purchased")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(option.priceString)
+                            .font(.headline.monospacedDigit())
+                        Text(option.isOneTime ? "once" : option.shortPeriod)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(14)
@@ -634,7 +703,10 @@ private struct PlanRow: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(title), \(option.priceString) \(option.isOneTime ? String(localized: "once", bundle: .appLanguage, locale: .appLanguage) : option.periodDescription)")
+        .disabled(isOwned)
+        .accessibilityLabel(isOwned
+            ? "\(title), \(String(localized: "Purchased", bundle: .appLanguage, locale: .appLanguage))"
+            : "\(title), \(option.priceString) \(option.isOneTime ? String(localized: "once", bundle: .appLanguage, locale: .appLanguage) : option.periodDescription)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -650,6 +722,9 @@ private struct PasturePenView: View {
     let isOpen: Bool
     let isOwned: Bool
     let name: String
+    /// Showcase wool color for this pen's ram: the first pen is always
+    /// the person's white ram, later pens show the colors on offer.
+    var color: RamColor = .white
 
     @State private var hasArrived = false
 
@@ -663,7 +738,7 @@ private struct PasturePenView: View {
 
                 if isOpen {
                     RamSpriteLoopView(
-                        frameNames: hasArrived ? RamSpriteFrameSets.idleHold : RamSpriteFrameSets.walkCycle,
+                        frameNames: hasArrived ? RamSpriteFrameSets.idleFrames(for: color) : RamSpriteFrameSets.walkFrames(for: color),
                         frameDuration: hasArrived ? .milliseconds(520) : .milliseconds(80)
                     )
                     .frame(height: 46)
@@ -715,9 +790,55 @@ struct PaywallOption: Identifiable {
     let price: Decimal
     /// Approximate days the price covers; `nil` for a one-time purchase.
     let approximateDays: Double?
-    let hasIntroductoryOffer: Bool
+    /// The product's introductory offer, only while this person is eligible
+    /// for it (see `PasturePaywallViewModel.applyIntroEligibility`). The
+    /// paywall's trial wording is built from it, never hard-coded.
+    var introOffer: IntroOffer?
     let isOneTime: Bool
     let package: Package?
+    /// The store product, kept so a plan can still be bought when it came straight
+    /// from StoreKit rather than from a RevenueCat offering package.
+    let storeProduct: StoreProduct?
+
+    var hasIntroductoryOffer: Bool { introOffer != nil }
+
+    /// A trial or discounted first period, as the store describes it.
+    struct IntroOffer {
+        /// Free trial (as opposed to a discounted first period).
+        let isFreeTrial: Bool
+        /// "1 week", "3 days", "1 month" in the app's language.
+        let duration: String
+
+        init(isFreeTrial: Bool, duration: String) {
+            self.isFreeTrial = isFreeTrial
+            self.duration = duration
+        }
+
+        init(discount: StoreProductDiscount) {
+            isFreeTrial = discount.paymentMode == .freeTrial
+            let period = discount.subscriptionPeriod
+            let count = period.value * max(1, discount.numberOfPeriods)
+            var components = DateComponents()
+            switch period.unit {
+            case .day: components.day = count
+            case .week: components.weekOfMonth = count
+            case .month: components.month = count
+            case .year: components.year = count
+            }
+            duration = Self.format(components)
+        }
+
+        static func format(_ components: DateComponents) -> String {
+            let formatter = DateComponentsFormatter()
+            formatter.unitsStyle = .full
+            formatter.maximumUnitCount = 1
+            formatter.allowedUnits = [.day, .weekOfMonth, .month, .year]
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.locale = .appLanguage
+            formatter.calendar = calendar
+            return formatter.string(from: components) ?? ""
+        }
+    }
 
     /// "/ year", "/ month" — the price's small suffix in a plan row.
     var shortPeriod: String {
@@ -736,36 +857,48 @@ struct PaywallOption: Identifiable {
     }
 
     init(package: Package) {
-        let product = package.storeProduct
-        id = package.identifier
-        switch package.packageType {
-        case .weekly:
-            title = String(localized: "Weekly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per week", bundle: .appLanguage, locale: .appLanguage); approximateDays = 7
-        case .monthly:
-            title = String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per month", bundle: .appLanguage, locale: .appLanguage); approximateDays = 30
-        case .twoMonth:
-            title = String(localized: "Every 2 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 2 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 60
-        case .threeMonth:
-            title = String(localized: "Every 3 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 3 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 90
-        case .sixMonth:
-            title = String(localized: "Every 6 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 6 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 180
-        case .annual:
-            title = String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per year", bundle: .appLanguage, locale: .appLanguage); approximateDays = 365
-        case .lifetime:
-            title = String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage); approximateDays = nil
-        default:
-            if product.subscriptionPeriod == nil {
-                title = String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage); approximateDays = nil
-            } else {
-                title = product.localizedTitle.isEmpty ? String(localized: "Custom", bundle: .appLanguage, locale: .appLanguage) : product.localizedTitle
-                periodDescription = ""; approximateDays = nil
+        self.init(product: package.storeProduct, id: package.identifier, package: package)
+    }
+
+    init(product: StoreProduct, id: String, package: Package?) {
+        self.id = id
+        // The billing period comes from the store product itself, not from the
+        // package type: a package with a custom identifier (or a product id
+        // like `monthly`) has type `.custom`, which used to lose its period,
+        // its savings badge and its "best value" ranking.
+        let days: Double? = product.subscriptionPeriod.map { period in
+            switch period.unit {
+            case .day: Double(period.value)
+            case .week: Double(period.value * 7)
+            case .month: Double(period.value * 30)
+            case .year: Double(period.value * 365)
             }
+        }
+        switch days {
+        case nil:
+            title = String(localized: "Adopt a Second Ram", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage); approximateDays = nil
+        case 7:
+            title = String(localized: "Weekly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per week", bundle: .appLanguage, locale: .appLanguage); approximateDays = 7
+        case 30:
+            title = String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per month", bundle: .appLanguage, locale: .appLanguage); approximateDays = 30
+        case 60:
+            title = String(localized: "Every 2 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 2 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 60
+        case 90:
+            title = String(localized: "Every 3 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 3 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 90
+        case 180:
+            title = String(localized: "Every 6 Months", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "every 6 months", bundle: .appLanguage, locale: .appLanguage); approximateDays = 180
+        case 365:
+            title = String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage); periodDescription = String(localized: "per year", bundle: .appLanguage, locale: .appLanguage); approximateDays = 365
+        default:
+            title = product.localizedTitle.isEmpty ? String(localized: "Custom", bundle: .appLanguage, locale: .appLanguage) : product.localizedTitle
+            periodDescription = ""; approximateDays = days
         }
         priceString = product.localizedPriceString
         price = product.price
-        hasIntroductoryOffer = product.introductoryDiscount != nil
+        introOffer = product.introductoryDiscount.map(IntroOffer.init(discount:))
         isOneTime = product.subscriptionPeriod == nil
         self.package = package
+        storeProduct = product
     }
 
     /// A sample option for builds with no RevenueCat key.
@@ -776,9 +909,12 @@ struct PaywallOption: Identifiable {
         self.priceString = priceString
         self.price = price
         self.approximateDays = approximateDays
-        self.hasIntroductoryOffer = hasIntroductoryOffer
+        introOffer = hasIntroductoryOffer
+            ? IntroOffer(isFreeTrial: true, duration: IntroOffer.format(DateComponents(weekOfMonth: 1)))
+            : nil
         isOneTime = approximateDays == nil
         package = nil
+        storeProduct = nil
     }
 }
 
@@ -805,10 +941,31 @@ final class PasturePaywallViewModel {
     private(set) var options: [PaywallOption] = []
     var selectedOption: PaywallOption?
 
+    /// What the button acts on. If the ram is already owned it can't be the
+    /// target, so fall back to the best subscription: the primary button
+    /// stays live for Annual/Monthly no matter what was bought before.
+    var activeOption: PaywallOption? {
+        if let selectedOption, !(selectedOption.isOneTime && entitlementService?.hasSecondRam == true) {
+            return selectedOption
+        }
+        return bestValueSubscription() ?? subscriptionOptions.first ?? selectedOption
+    }
+
     private(set) var isLoadingOffering = false
     private(set) var isPurchasing = false
     private(set) var isRestoring = false
     private(set) var isShowingSamplePricing = false
+    /// Why the last offering load came back empty (debug builds show it under "Try again").
+    private(set) var loadDiagnostic: String?
+
+    /// Debug and TestFlight builds only; App Store users never see raw diagnostics.
+    static var showsDiagnostics: Bool {
+        #if DEBUG
+        true
+        #else
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }
 
     var showsError = false
     private(set) var errorMessage: String?
@@ -834,22 +991,75 @@ final class PasturePaywallViewModel {
         isLoadingOffering = true
         defer { isLoadingOffering = false }
 
+        var loaded: [PaywallOption] = []
+        var diagnostic = ""
+
+        // 1. The RevenueCat offering (the normal path).
         do {
             let offerings = try await Purchases.shared.offerings()
-            guard let current = offerings.current else { return }
-            options = current.availablePackages.map(PaywallOption.init(package:))
-            #if DEBUG
-            // Prices here come from the RevenueCat offering, not from the
-            // local .storekit file. If these lines show old IDs/prices, the
-            // RevenueCat dashboard (Products / Offerings) is what to update.
-            for package in current.availablePackages {
-                print("[Paywall] offering '\(current.identifier)' package \(package.identifier) → \(package.storeProduct.productIdentifier) \(package.storeProduct.localizedPriceString)")
+            // Prefer the current offering; fall back to any offering that actually has packages.
+            if let current = offerings.current.flatMap({ $0.availablePackages.isEmpty ? nil : $0 })
+                ?? offerings.all.values.first(where: { !$0.availablePackages.isEmpty }) {
+                // Show exactly the products Baranov sells. A leftover product in the
+                // offering stays hidden; if none of ours are in it, show what it has.
+                let known = current.availablePackages.filter {
+                    RevenueCatConfiguration.ProductID.all.contains($0.storeProduct.productIdentifier)
+                }
+                loaded = (known.isEmpty ? current.availablePackages : known).map(PaywallOption.init(package:))
+                #if DEBUG
+                for package in current.availablePackages {
+                    print("[Paywall] offering '\(current.identifier)' package \(package.identifier) → \(package.storeProduct.productIdentifier) \(package.storeProduct.localizedPriceString)")
+                }
+                #endif
+            } else {
+                diagnostic = "Offering has no packages (current=\(offerings.current?.identifier ?? "nil"), offerings=\(offerings.all.keys.sorted()))."
             }
-            #endif
-            selectedOption = bestValueSubscription() ?? options.first
         } catch {
-            // Non-fatal: the picker falls back to a "pricing unavailable"
-            // label; RevenueCat's own cache usually answers offline anyway.
+            diagnostic = "offerings() failed: \(error.localizedDescription)."
+            #if DEBUG
+            print("[Paywall] offerings() failed: \(error)")
+            #endif
+        }
+
+        // 2. Fallback: ask the store for Baranov's three products directly, so a
+        // missing or cached-empty offering can't leave the paywall blank.
+        if loaded.isEmpty {
+            let products = await Purchases.shared.products(Array(RevenueCatConfiguration.ProductID.all))
+            loaded = products.map { PaywallOption(product: $0, id: $0.productIdentifier, package: nil) }
+            if loaded.isEmpty {
+                diagnostic += " The store returned none of \(RevenueCatConfiguration.ProductID.all.sorted())."
+            }
+            #if DEBUG
+            print("[Paywall] direct product fetch → \(products.map(\.productIdentifier))")
+            #endif
+        }
+
+        guard !loaded.isEmpty else {
+            loadDiagnostic = diagnostic
+            #if DEBUG
+            print("[Paywall] \(diagnostic)")
+            #endif
+            return
+        }
+        loadDiagnostic = nil
+        options = await Self.applyIntroEligibility(to: loaded)
+        selectedOption = bestValueSubscription() ?? options.first
+    }
+
+    /// Keeps an intro offer on an option only when StoreKit, through
+    /// RevenueCat, says this Apple Account can still redeem it. Someone who
+    /// already used their trial must never see "free" on a button that
+    /// charges them straight away. Unknown counts as not eligible: the
+    /// plain price is always true.
+    private static func applyIntroEligibility(to options: [PaywallOption]) async -> [PaywallOption] {
+        let ids = options.compactMap { $0.introOffer == nil ? nil : $0.storeProduct?.productIdentifier }
+        guard !ids.isEmpty else { return options }
+        let eligibility = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: ids)
+        return options.map { option in
+            guard option.introOffer != nil, let id = option.storeProduct?.productIdentifier else { return option }
+            var checked = option
+            if eligibility[id]?.status != .eligible { checked.introOffer = nil }
+            return checked
         }
     }
 
@@ -858,18 +1068,32 @@ final class PasturePaywallViewModel {
         isPurchasing = true
         defer { isPurchasing = false }
 
-        guard let selectedOption else {
+        guard let selectedOption = activeOption else {
             present(error: String(localized: "This offer isn't available right now. Please try again later.", bundle: .appLanguage, locale: .appLanguage))
             return
         }
 
-        guard Purchases.isConfigured, let package = selectedOption.package else {
+        // Non-consumable: never sell the second ram twice.
+        if selectedOption.isOneTime, entitlementService?.hasSecondRam == true { return }
+
+        guard Purchases.isConfigured else {
             await mockPurchase(selectedOption)
+            return
+        }
+        guard selectedOption.package != nil || selectedOption.storeProduct != nil else {
+            present(error: String(localized: "This offer isn't available right now. Please try again later.", bundle: .appLanguage, locale: .appLanguage))
             return
         }
 
         do {
-            let result = try await Purchases.shared.purchase(package: package)
+            let result: PurchaseResultData
+            if let package = selectedOption.package {
+                result = try await Purchases.shared.purchase(package: package)
+            } else if let product = selectedOption.storeProduct {
+                result = try await Purchases.shared.purchase(product: product)
+            } else {
+                return
+            }
             if result.userCancelled { return }
             let info = result.customerInfo
             if info.entitlements.active.isEmpty && info.activeSubscriptions.isEmpty && info.nonSubscriptions.isEmpty {
@@ -879,6 +1103,9 @@ final class PasturePaywallViewModel {
                 // too, but refreshing explicitly means the pasture unlocks
                 // immediately rather than waiting on it.
                 await entitlementService?.refresh()
+                if selectedOption.isOneTime, entitlementService?.hasSecondRam == true {
+                    self.selectedOption = bestValueSubscription() ?? self.selectedOption
+                }
             }
         } catch {
             #if DEBUG
@@ -945,7 +1172,7 @@ final class PasturePaywallViewModel {
     private func mockPurchase(_ option: PaywallOption) async {
         try? await Task.sleep(for: .seconds(1))
         if option.isOneTime {
-            MockEntitlementStore.hasAdoptedRam = true
+            MockEntitlementStore.hasSecondRam = true
         } else {
             MockEntitlementStore.hasPastureExpansion = true
         }
@@ -964,10 +1191,9 @@ final class PasturePaywallViewModel {
     /// RevenueCat dashboard — for design review and demos without a key.
     private static var sampleOptions: [PaywallOption] {
         [
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per month", bundle: .appLanguage, locale: .appLanguage), priceString: "$2.99", price: 2.99, approximateDays: 30),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureQuarterly, title: String(localized: "Every 3 Months", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "every 3 months", bundle: .appLanguage, locale: .appLanguage), priceString: "$5.99", price: 5.99, approximateDays: 90),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per year", bundle: .appLanguage, locale: .appLanguage), priceString: "$19.99", price: 19.99, approximateDays: 365, hasIntroductoryOffer: true),
-            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: String(localized: "Adopt a Ram", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage), priceString: "$2.99", price: 2.99, approximateDays: nil),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureMonthly, title: String(localized: "Monthly", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per month", bundle: .appLanguage, locale: .appLanguage), priceString: "$1.99", price: 1.99, approximateDays: 30),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.pastureAnnual, title: String(localized: "Annual", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "per year", bundle: .appLanguage, locale: .appLanguage), priceString: "$14.99", price: 14.99, approximateDays: 365, hasIntroductoryOffer: true),
+            PaywallOption(sampleID: RevenueCatConfiguration.ProductID.adoptRam, title: String(localized: "Adopt a Second Ram", bundle: .appLanguage, locale: .appLanguage), periodDescription: String(localized: "one-time purchase", bundle: .appLanguage, locale: .appLanguage), priceString: "$4.99", price: 4.99, approximateDays: nil),
         ]
     }
 }

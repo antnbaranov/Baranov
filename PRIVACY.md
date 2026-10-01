@@ -71,9 +71,10 @@ deleted.
 
 **Course telemetry.** This app is part of the BCIT ACIT3855 distributed
 systems coursework. Builds pointed at the course receiver post anonymous hop
-and flock-metric events: a per-install ID, a ram ID, step counts, timestamps,
-and the ram's rounded position along its route. No names and no letter
-contents.
+and flock-metric events: a per-install ID, a ram ID, step counts, the number
+of active rams and letters delivered, and timestamps. No names, no positions
+and no letter contents. The same "Share anonymous usage stats" switch in
+Settings turns these off.
 
 **Logs you choose to send.** The app keeps a small log on your phone to help fix
 bugs. It is sent only if you tap "Send logs to developer", and you review the

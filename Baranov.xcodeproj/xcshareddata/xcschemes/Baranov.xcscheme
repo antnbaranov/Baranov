@@ -64,7 +64,7 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../Config/Baranov.storekit">
+         identifier = "../../Baranov.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

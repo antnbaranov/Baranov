@@ -86,16 +86,7 @@ struct MailbagSwipeDeck: View {
     /// link) themselves: a visible button, not just the long-press menu.
     @ViewBuilder
     private func senderShareButton(for ram: Ram) -> some View {
-        if isOutgoing(ram), ram.status != .delivered, let message = ram.letterShareMessage {
-            ShareLink(item: message) {
-                if ram.letter?.relayTicket != nil {
-                    Label("Share tracking link", systemImage: "square.and.arrow.up")
-                } else {
-                    Label("Share code", systemImage: "square.and.arrow.up")
-                }
-            }
-            .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
-        }
+        RamShareButtons(ram: ram)
     }
 
     @ViewBuilder
@@ -111,10 +102,7 @@ struct MailbagSwipeDeck: View {
                     Label("Break the Seal and Read", systemImage: "seal.fill")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.large)
-                .tint(.green)
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: PastureTheme.green, expands: true))
             }
         }
             .padding(20)
@@ -148,9 +136,7 @@ struct MailbagSwipeDeck: View {
                 .onTapGesture { onOpen(ram) }
                 .contextMenu {
                     Button { onOpenBag(ram) } label: { Label("Ram's Bag", systemImage: "bag") }
-                    if let message = ram.letterShareMessage {
-                        ShareLink(item: message) { Label("Share Code", systemImage: "square.and.arrow.up") }
-                    }
+                    RamShareMenuItems(ram: ram)
                     if canCancel(ram) {
                         Button(role: .destructive) { ramToCancel = ram } label: {
                             Label("Cancel Journey", systemImage: "xmark")

@@ -4,7 +4,8 @@
 //
 //  The little UIKit that SwiftUI's lifecycle doesn't cover: becoming the
 //  notification delegate before launch finishes (so a tap that opens the
-//  app is handled), and receiving the APNs device token.
+//  app is handled), registering the HealthKit step observer that wakes the
+//  app in the background, and receiving the APNs device token.
 //
 
 import UIKit
@@ -15,6 +16,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         NotificationManager.shared.activate()
+        // Must be registered before launch finishes so a HealthKit step wake
+        // of a terminated app is delivered (see BackgroundStepSync).
+        BackgroundStepSync.shared.activate()
         return true
     }
 

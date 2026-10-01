@@ -42,8 +42,8 @@ struct BaranovWidgetProvider: TimelineProvider {
         let progress = ram.totalStepsRequired > 0
             ? min(1.0, Double(ram.stepsWalked) / Double(ram.totalStepsRequired)) : 0
         let distanceStr = remaining >= 1000
-            ? String(format: "%.1f km", Double(remaining) / 1000)
-            : "\(remaining) m"
+            ? String(format: String(localized: "%.1f km"), Double(remaining) / 1000)
+            : String(format: String(localized: "%lld m"), remaining)
         let (symbol, label) = statusDisplay(ram.status)
 
         return BaranovWidgetEntry(
@@ -70,11 +70,11 @@ struct BaranovWidgetProvider: TimelineProvider {
 
     private func statusDisplay(_ status: String) -> (String, String) {
         switch status {
-        case "walking": return ("figure.walk", "Walking")
-        case "atSea": return ("sailboat", "At Sea")
-        case "waitingForHandoff": return ("ferry", "At Port")
-        case "arrivedAtGate": return ("flag.checkered", "Arrived")
-        default: return ("pawprint", "Resting")
+        case "walking": return ("figure.walk", String(localized: "Walking"))
+        case "atSea": return ("sailboat", String(localized: "At Sea"))
+        case "waitingForHandoff": return ("ferry", String(localized: "At Port"))
+        case "arrivedAtGate": return ("flag.checkered", String(localized: "Arrived"))
+        default: return ("pawprint", String(localized: "Resting"))
         }
     }
 }

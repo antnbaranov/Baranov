@@ -13,6 +13,12 @@ struct BaranovWidgetView: View {
         switch family {
         case .systemMedium:
             MediumBaranovWidgetView(entry: entry)
+        case .accessoryCircular:
+            CircularLockWidgetView(entry: entry)
+        case .accessoryRectangular:
+            RectangularLockWidgetView(entry: entry)
+        case .accessoryInline:
+            InlineLockWidgetView(entry: entry)
         default:
             SmallBaranovWidgetView(entry: entry)
         }
@@ -150,6 +156,103 @@ struct MediumBaranovWidgetView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(entry.accessibilityDescription)
     }
+}
+
+// MARK: - Lock screen
+
+/// Progress ring with the distance left in the middle.
+private struct CircularLockWidgetView: View {
+    let entry: BaranovWidgetEntry
+
+    var body: some View {
+        Group {
+            if let remaining = entry.remainingDistance {
+                Gauge(value: entry.progress) {
+                    Image(systemName: entry.statusSymbol)
+                } currentValueLabel: {
+                    Text(remaining)
+                        .font(.system(size: 13, weight: .semibold))
+                        .minimumScaleFactor(0.5)
+                        .lineLimit(1)
+                }
+                .gaugeStyle(.accessoryCircular)
+            } else {
+                Image(systemName: "pawprint.fill")
+                    .font(.title2)
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.accessibilityDescription)
+    }
+}
+
+/// Ram, where it is heading, distance left and a progress bar.
+private struct RectangularLockWidgetView: View {
+    let entry: BaranovWidgetEntry
+
+    var body: some View {
+        Group {
+            if let name = entry.ramName, let remaining = entry.remainingDistance {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(name, systemImage: entry.statusSymbol)
+                        .font(.headline)
+                        .lineLimit(1)
+                    if let to = entry.toCity, !to.isEmpty {
+                        Text(to)
+                            .font(.caption)
+                            .lineLimit(1)
+                    }
+                    Text("\(remaining) to go")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    ProgressView(value: entry.progress)
+                        .progressViewStyle(.linear)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Pasture", systemImage: "pawprint.fill")
+                        .font(.headline)
+                    Text("Your rams are resting")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .containerBackground(.clear, for: .widget)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(entry.accessibilityDescription)
+    }
+}
+
+/// One line above the clock: "Juniper · 248 km to Edinburgh".
+private struct InlineLockWidgetView: View {
+    let entry: BaranovWidgetEntry
+
+    var body: some View {
+        Group {
+            if let name = entry.ramName, let remaining = entry.remainingDistance {
+                if let to = entry.toCity, !to.isEmpty {
+                    Label("\(name) · \(remaining) to \(to)", systemImage: entry.statusSymbol)
+                } else {
+                    Label("\(name) · \(remaining) to go", systemImage: entry.statusSymbol)
+                }
+            } else {
+                Label("Rams resting", systemImage: "pawprint.fill")
+            }
+        }
+        .containerBackground(.clear, for: .widget)
+        .accessibilityLabel(entry.accessibilityDescription)
+    }
+}
+
+#Preview(as: .accessoryRectangular) {
+    BaranovHomeWidget()
+} timeline: {
+    BaranovWidgetEntry.placeholder
+    BaranovWidgetEntry.empty
 }
 
 #Preview(as: .systemSmall) {

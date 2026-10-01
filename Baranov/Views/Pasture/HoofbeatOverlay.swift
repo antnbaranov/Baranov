@@ -57,47 +57,91 @@ struct HoofbeatOverlay: View {
     var body: some View {
         Group {
             if phase.isActive {
-                HStack(spacing: 10) {
-                    icon
-                        .frame(width: 22, height: 22)
-
-                    Text(message)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-
-                    if showRetry, let onRetry {
-                        Button {
-                            onRetry()
-                        } label: {
-                            Text("Retry")
-                                .font(.caption.weight(.semibold))
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-
-                    if showDismiss, let onDismiss {
-                        Button {
-                            onDismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Dismiss")
-                    }
+                if showRetry {
+                    failedCard
+                } else {
+                    statusPill
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.regularMaterial, in: Capsule(style: .continuous))
-                .padding(.horizontal, 20)
-                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: phase)
         .sensoryFeedback(.success, trigger: successTick)
+    }
+
+    private var statusPill: some View {
+        HStack(spacing: 10) {
+            icon
+                .frame(width: 22, height: 22)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+
+            if showDismiss, let onDismiss {
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.regularMaterial, in: Capsule(style: .continuous))
+        .padding(.horizontal, 20)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    /// A failed handoff: what happened, what to do instead, and a retry as
+    /// big as the Accept button on the request card.
+    private var failedCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                icon
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(message)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("The sender has to send the ram first. Or be the receiver instead: add the sender's ID as a code in the letter sheet.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                if let onDismiss {
+                    Button {
+                        onDismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss")
+                }
+            }
+            if let onRetry {
+                Button(action: onRetry) {
+                    Label("Retry", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 16)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     @ViewBuilder

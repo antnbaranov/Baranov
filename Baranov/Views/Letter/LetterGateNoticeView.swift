@@ -17,39 +17,36 @@ struct LetterGateNoticeView: View {
     let ram: Ram
     var onVerified: () -> Void
 
-    @AppStorage("com.baranov.carrierDisplayName") private var storedDisplayName = ""
     @Environment(LocationService.self) private var locationService
 
     private var recipientName: String { ram.letter?.recipientName ?? "" }
 
-    private var recipientNameMatches: Bool {
-        !storedDisplayName.gateNormalized.isEmpty
-            && recipientName.gateNormalized == storedDisplayName.gateNormalized
+    /// Any of the person's active names (name, nickname, pen name).
+    private var recipientNameMatches: Bool { NameProfile.matches(recipientName) }
+
+    /// Only a letter the sender left at a Precise Geo Drop holds the recipient to a spot.
+    private var isPreciseDrop: Bool { ram.letter?.geofence != nil }
+
+    /// `nil` while there is no location fix yet; always `true` for a standard letter.
+    private var isAtSpot: Bool? {
+        guard isPreciseDrop else { return true }
+        guard let here = locationService.currentCoordinate, let letter = ram.letter else { return nil }
+        return !letter.isOutsideGeofence(of: here)
     }
 
-    private var distanceToGate: CLLocationDistance? {
-        guard let here = locationService.currentCoordinate else { return nil }
-        return ram.distanceToGate(from: here)
-    }
-
-    /// `nil` while there is no location fix yet.
-    private var isAtPickupSpot: Bool? {
-        distanceToGate.map { $0 <= Ram.pickupRadiusMeters }
-    }
-
-    private var isVerified: Bool { recipientNameMatches && isAtPickupSpot == true }
+    private var isVerified: Bool { recipientNameMatches && isAtSpot == true }
 
     private var walkRowText: String {
-        if isAtPickupSpot == true { return String(localized: "You're at the pick-up spot", bundle: .appLanguage, locale: .appLanguage) }
-        if let distance = distanceToGate {
-            return String(localized: "Walk to \(ram.targetCity) — \(DistanceFormatter.string(forMeters: Int(distance))) to go", bundle: .appLanguage, locale: .appLanguage)
+        if isAtSpot == true { return String(localized: "You're at the pick-up spot", bundle: .appLanguage, locale: .appLanguage) }
+        if let remaining = ram.letter?.geofenceDistanceRemaining(from: locationService.currentCoordinate) {
+            return String(localized: "Walk to the spot the sender chose. \(DistanceFormatter.string(forMeters: Int(remaining))) to go.", bundle: .appLanguage, locale: .appLanguage)
         }
-        return String(localized: "Walk to \(ram.targetCity)", bundle: .appLanguage, locale: .appLanguage)
+        return String(localized: "Walk to the spot the sender chose", bundle: .appLanguage, locale: .appLanguage)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if isAtPickupSpot == nil {
+            if isAtSpot == nil {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text("Finding where you are…")
@@ -63,25 +60,38 @@ struct LetterGateNoticeView: View {
 
                 row(recipientNameMatches,
                     recipientNameMatches ? String(localized: "Addressed to you", bundle: .appLanguage, locale: .appLanguage) : String(localized: "Addressed to \(recipientName.isEmpty ? String(localized: "someone else", bundle: .appLanguage, locale: .appLanguage) : recipientName)", bundle: .appLanguage, locale: .appLanguage))
-                row(isAtPickupSpot == true, walkRowText)
+                if isPreciseDrop {
+                    row(isAtSpot == true, walkRowText)
+                }
 
-                Text("The letter was left at the gate. Only the recipient can collect it — by really walking there.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !recipientNameMatches, ram.letter?.requiresNameMatch == true {
+                    Text("The sender made this letter for one name only.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if !recipientNameMatches {
+                    Text("Not one of your names? The ear tag code still opens it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: onVerified) {
+                        Label("I have the code", systemImage: "key.fill")
+                    }
+                    .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+                }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .task {
-            if locationService.currentCoordinate == nil { locationService.resolveCurrentLocation() }
+            if isPreciseDrop, locationService.currentCoordinate == nil { locationService.resolveCurrentLocation() }
             if isVerified { onVerified() }
         }
         .onChange(of: isVerified) { _, verified in
             if verified { onVerified() }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private func row(_ isMatch: Bool, _ label: String) -> some View {

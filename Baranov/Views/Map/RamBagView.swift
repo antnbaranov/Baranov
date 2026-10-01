@@ -56,7 +56,7 @@ struct RamBagView: View {
                     CloseToolbarButton { dismiss() }
                 }
             }
-            if let message = ram?.letterShareMessage {
+            if let message = ram?.senderShareMessage {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: message) {
                         Image(systemName: "square.and.arrow.up")
@@ -126,7 +126,16 @@ struct RamBagView: View {
             if !ram.passengerLetters.isEmpty {
                 Section("Also in the Bag") {
                     ForEach(ram.passengerLetters, id: \.id) { passenger in
-                        LabeledContent("For \(passenger.recipientName)", value: passenger.senderName)
+                        HStack {
+                            LabeledContent("For \(passenger.recipientName)", value: passenger.senderName)
+                            if let message = ram.senderShareMessage(for: passenger) {
+                                ShareLink(item: message) {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
+                                .buttonStyle(.borderless)
+                                .accessibilityLabel("Share for \(passenger.recipientName)")
+                            }
+                        }
                     }
                 }
             }

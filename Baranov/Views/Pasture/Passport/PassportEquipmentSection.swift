@@ -246,6 +246,8 @@ struct PassportEquipmentSection: View {
             funFact
             weatherFunFact
             deck
+            // Apple Weather mark and legal link, as WeatherKit requires.
+            WeatherAttributionView()
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -256,10 +258,15 @@ struct PassportEquipmentSection: View {
             RamReelSheet(base: reelData)
         }
         .sheet(isPresented: $isWritingGoal) {
-            PassportGoalSheet(ramName: ramName) { title, kilometers in
+            PassportGoalSheet(ramName: ramName, weather: latestWeather) { title, kilometers in
                 goalStore.add(title: title, kilometers: kilometers, ramID: ramID, currentMeters: totalMeters)
             }
         }
+    }
+
+    /// The sky on the newest stamp that recorded one.
+    private var latestWeather: StampWeather? {
+        stamps.sorted { $0.timestamp < $1.timestamp }.compactMap(\.weather).last
     }
 
     // MARK: Reel
@@ -447,7 +454,7 @@ struct PassportEquipmentSection: View {
                         isFlipped: flippedId == key,
                         shareImage: goalShareImages[goal.id],
                         onDone: {
-                            goalStore.markDone(goal)
+                            goalStore.markDone(goal, weather: latestWeather)
                             goalTick += 1
                             renderShareImage(for: goal)
                         },
@@ -495,7 +502,7 @@ struct PassportEquipmentSection: View {
             }
             .padding(.vertical, 8)
         }
-        .contentMargins(.horizontal, 18, for: .scrollContent)
+        .contentMargins(.horizontal, 26, for: .scrollContent)
         .scrollIndicators(.hidden)
         .padding(.horizontal, -18)
     }

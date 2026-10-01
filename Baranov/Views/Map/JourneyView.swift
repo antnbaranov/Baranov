@@ -94,6 +94,8 @@ struct JourneyView: View {
     /// dispatched ram could otherwise be credited with steps walked
     /// before it existed and appear partway down its route.
     @State private var trackingRamId: UUID?
+    /// Which of the sender's own rams the map and panel follow; nil = the default pick.
+    @State private var selectedRamId: UUID?
 
     /// Rams this view has already flown the dispatch camera over — once
     /// per ram per view lifetime, so re-tracking (a tab away and back, a
@@ -202,13 +204,13 @@ struct JourneyView: View {
     // Starts on the shortest of the sheet's real detents (the tiny peek
     // size, with the page title above one row) — a stale 152 matched none of them, which
     // made the sheet look short while the code treated it as open.
-    @State private var panelDetent: PresentationDetent = .height(JourneyView.tinyPanelHeight)
+    @State private var panelDetent: PresentationDetent = CommandLine.arguments.contains("-screenshotMap") ? .height(JourneyView.tinyPanelHeight) : (CommandLine.arguments.contains("-screenshotCompose") ? .large : .height(JourneyView.tinyPanelHeight))
 
     /// Whether the floating "You are here"/"Ram is away" pill is
     /// currently shown — auto-dismissed a few seconds after it appears
     /// (see `revealReturnToMePill`) so it doesn't sit indefinitely over
     /// the progress step cards.
-    @State private var isReturnToMePillVisible = true
+    @State private var isReturnToMePillVisible = !CommandLine.arguments.contains("-demoMode")
     @State private var returnToMePillDismissTask: Task<Void, Never>?
 
     /// The docked panel has exactly two pages: writing a letter (always the
@@ -219,15 +221,19 @@ struct JourneyView: View {
         case mailbag
     }
 
-    @State private var panelPage: PanelPage = CommandLine.arguments.contains("-demoMode") ? .mailbag : .compose
+    @State private var panelPage: PanelPage = CommandLine.arguments.contains("-screenshotCompose") ? .compose : (CommandLine.arguments.contains("-demoMode") ? .mailbag : .compose)
     @State private var codeDraft = ""
     @State private var mailbagSection: MailbagSection = CommandLine.arguments.contains("-demoMode") ? .outgoing : .incoming
     /// What is pushed inside the mailbag page (a ram's bag, a letter). Held
     /// here rather than in the page so it survives the page being recycled
     /// by the horizontal pager.
     @State private var mailbagPath: [MailbagRoute] = []
+    @State private var collapseTask: Task<Void, Never>?
     @State private var archiveQuery = ""
     @State private var codeFocusTick = 0
+    /// The ear tag field has the cursor: the bottom strip rides on the keyboard,
+    /// so it must not carry the home-indicator offset then.
+    @State private var codeFieldFocused = false
 
     // Following / programmatic-vs-manual camera bookkeeping moved into
     // `JourneyCameraController` (`camera.isFollowingRam`,
@@ -364,10 +370,29 @@ struct JourneyView: View {
     /// The ram this tab is currently tracking real-world steps for: the one
     /// actively walking, or — if none is — the most recently dispatched ram
     /// still waiting to set out.
+    /// The sender's own rams that are out with a letter.
+    private var sentRams: [Ram] {
+        flockViewModel.ownRams.filter {
+            $0.status == .walking || $0.status == .grazing
+                || $0.status == .waitingForHandoff || $0.status == .atSea
+        }
+    }
+
+    /// Switches to the next of the sender's own rams and looks at it.
+    private func showNextSentRam() {
+        let rams = sentRams
+        guard rams.count > 1 else { return }
+        let index = rams.firstIndex(where: { $0.id == trackedRam?.id }) ?? -1
+        let next = rams[(index + 1) % rams.count]
+        selectedRamId = next.id
+        camera.resumeFollowing(ramCoordinate: next.currentCoordinate ?? next.originCoordinate, animated: true)
+    }
+
     private var trackedRam: Ram? {
         let own: [Ram] = flockViewModel.ownRams
         let active: [Ram] = flockViewModel.activeRams
 
+        if let id = selectedRamId, let ram = sentRams.first(where: { $0.id == id }) { return ram }
         // The person's own ram first: guests ride along on its steps.
         if let ram = own.first(where: { $0.status == .walking }) { return ram }
         if let ram = own.first(where: { $0.status == .grazing }) { return ram }
@@ -583,6 +608,11 @@ struct JourneyView: View {
                     )
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .firstLetterDispatched)) { _ in
+                // A letter this person just sent belongs under Outgoing,
+                // not Incoming, where the mailbag opens by default.
+                mailbagSection = .outgoing
+            }
             .onChange(of: flockViewModel.activeRams.count) { oldCount, newCount in
                 // A second ram dispatched from the compose page while
                 // the first is still walking doesn't change `trackedRam`
@@ -639,7 +669,11 @@ struct JourneyView: View {
                 // once the sheet is dragged back down to a short size there
                 // is no room for it, so it folds away to the list.
                 if detent != .dockMedium && detent != .large, !mailbagPath.isEmpty {
-                    mailbagPath.removeAll()
+                    // Next turn of the run loop, never inside the sheet's own
+                    // resize pass.
+                    Task { @MainActor in
+                        if panelDetent != .dockMedium && panelDetent != .large { mailbagPath.removeAll() }
+                    }
                 }
             }
             .onChange(of: collapsedPanelHeight) { old, new in
@@ -655,6 +689,17 @@ struct JourneyView: View {
                 withAnimation { panelDetent = .dockMedium }
             }
             .onChange(of: trackedRam?.id) { _, newValue in
+                #if DEBUG
+                if CommandLine.arguments.contains("-screenshotCompose") {
+                    panelPage = .compose
+                    panelDetent = .large
+                    return
+                } else if CommandLine.arguments.contains("-screenshotMap") {
+                    panelPage = .mailbag
+                    panelDetent = .height(Self.tinyPanelHeight)
+                    return
+                }
+                #endif
                 withAnimation {
                     // A ram setting out lands the panel on the mailbag,
                     // where its card now is (the journey page is one swipe
@@ -663,7 +708,7 @@ struct JourneyView: View {
                     // real stop, so there's nothing taller-but-short to
                     // rest on instead.
                     panelPage = newValue != nil ? .mailbag : .compose
-                    panelDetent = newValue != nil ? .dockMedium : .height(Self.tinyPanelHeight)
+                    panelDetent = .height(Self.tinyPanelHeight)
                 }
             }
             .task {
@@ -677,7 +722,13 @@ struct JourneyView: View {
             }
             .onAppear {
                 #if DEBUG
-                if CommandLine.arguments.contains("-demoMode") {
+                if CommandLine.arguments.contains("-screenshotCompose") {
+                    panelPage = .compose
+                    panelDetent = .large
+                } else if CommandLine.arguments.contains("-screenshotMap") {
+                    panelPage = .mailbag
+                    panelDetent = .height(Self.tinyPanelHeight)
+                } else if CommandLine.arguments.contains("-demoMode") {
                     panelPage = .mailbag
                     panelDetent = .dockMedium
                     mailbagSection = .outgoing
@@ -692,9 +743,10 @@ struct JourneyView: View {
                 locationService.startLiveTracking()
             }
             .onChange(of: flockViewModel.activeRams.contains { $0.status == .walking }, initial: true) { _, walking in
-                // Background location only while a ram is walking; otherwise
-                // it stops when the app leaves the screen.
-                locationService.setWalkKeepAlive(walking)
+                // HealthKit step wakes only while a ram is walking, so an
+                // idle pasture never wakes the phone. (No background
+                // location: steps keep counting without the app running.)
+                BackgroundStepSync.shared.setWalking(walking)
             }
             .onChange(of: hasCompletedOnboarding) { _, completed in
                 if completed {
@@ -852,7 +904,14 @@ struct JourneyView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // The page dots are always there, collapsed or not, so the
             // other page is one tap away at every size.
-            HStack(alignment: .bottom, spacing: 8) {
+            // Long sheet: the ear tag field gets its own full-width row right
+            // above the page slider. Standard sheet: it shares the row with
+            // the slider, as before. `AnyLayout` keeps the field's identity
+            // across the switch, so it never loses the cursor mid-focus.
+            let stripLayout = panelDetent == .large
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(alignment: .bottom, spacing: 8))
+            stripLayout {
                 // Receiving belongs to the mailbag; on the compose page the
                 // sheet is about where the letter is going, so the code
                 // field stays out of the way there. The compact sheet is
@@ -872,16 +931,22 @@ struct JourneyView: View {
                         focusRequest: codeFocusTick,
                         onOpen: { ram, code in onOpenByCode(ram, code) },
                         onNeedsRoom: {
-                            if isPanelCollapsed {
-                                withAnimation { panelDetent = .dockMedium }
+                            // The keyboard needs the long sheet: at the
+                            // standard height it covered the field.
+                            if panelDetent != .large {
+                                withAnimation { panelDetent = .large }
                             }
-                        }
+                        },
+                        onFocusChange: { codeFieldFocused = $0 }
                     )
                     .onAppear {
                         proximity.setEntryListening(true)
                         prefillCodeFromNearby()
                     }
-                    .onDisappear { proximity.setEntryListening(false) }
+                    .onDisappear {
+                        proximity.setEntryListening(false)
+                        codeFieldFocused = false
+                    }
                     .onChange(of: proximity.state) { prefillCodeFromNearby() }
                 } else if isPanelCollapsed, panelPage == .compose || isPanelTiny {
                     // On the dots' own line, so it never steals height from
@@ -898,17 +963,23 @@ struct JourneyView: View {
                     .buttonStyle(.plain)
                     .accessibilityHint("Opens the full letter form")
                 } else {
-                    Spacer(minLength: 0)
+                    // Pushes the dots to the trailing edge in the one-row
+                    // strip; takes no room in the stacked long-sheet strip.
+                    Color.clear
+                        .frame(maxWidth: panelDetent == .large ? 0 : .infinity, maxHeight: 0)
                 }
                 PanelPageControl(items: panelPageItems, selection: $panelPage)
                     .frame(height: 40)
+                    .frame(maxWidth: panelDetent == .large ? .infinity : nil, alignment: .trailing)
             }
             // The whole strip — Expand or the code field, and the dots —
             // sits lower, closer to the bottom edge, so the ram's progress
             // above it has the room.
             // On iPad the sheet has no home-indicator inset to hide in, so the
             // same offset pushed Expand and the dots out of the sheet.
-            .offset(y: isPad ? 0 : 20)
+            // Not while typing: the strip then sits on the keyboard, and the
+            // offset would slide the field underneath it.
+            .offset(y: isPad || codeFieldFocused ? 0 : 20)
             .padding(.horizontal, 16)
             .padding(.bottom, isPad ? 10 : 0)
             .padding(.top, 4)
@@ -977,10 +1048,18 @@ struct JourneyView: View {
         UIApplication.shared.sendAction(
             #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
         )
-        var swap = Transaction()
-        swap.disablesAnimations = true
-        withTransaction(swap) { mailbagPath.removeAll() }
-        withAnimation(.smooth(duration: 0.35)) { panelDetent = .height(Self.tinyPanelHeight) }
+        // Pop the pushed screens first and let that finish before the sheet
+        // shrinks. Emptying the navigation path and swapping the list for
+        // the one-row layout in the same frame, while the sheet is sliding
+        // down, is what could take the app down.
+        collapseTask?.cancel()
+        let hasPushedScreens = !mailbagPath.isEmpty
+        if hasPushedScreens { mailbagPath.removeAll() }
+        collapseTask = Task { @MainActor in
+            if hasPushedScreens { try? await Task.sleep(for: .milliseconds(380)) }
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth(duration: 0.35)) { panelDetent = .height(Self.tinyPanelHeight) }
+        }
     }
 
     /// "Enter a code" from elsewhere in the app (the nearby-sender marker):
@@ -1000,8 +1079,10 @@ struct JourneyView: View {
     private var composePage: some View {
         ComposeLetterView(
             onDestinationSelected: {
-                withAnimation {
-                    panelDetent = .dockMedium
+                if !CommandLine.arguments.contains("-screenshotCompose") {
+                    withAnimation {
+                        panelDetent = .dockMedium
+                    }
                 }
             },
             onCancel: {
@@ -1019,6 +1100,19 @@ struct JourneyView: View {
                 // canceling anywhere else, not settling on a mid-height
                 // sheet that looks like it's still half-open.
                 panelDetent = .height(Self.tinyPanelHeight)
+            },
+            onRodeAlong: { ram in
+                mailbagSection = .outgoing
+                var swap = Transaction()
+                swap.disablesAnimations = true
+                withTransaction(swap) { panelPage = .mailbag }
+                panelDetent = .height(Self.tinyPanelHeight)
+                guard let origin = ram.currentCoordinate ?? ram.originCoordinate else { return }
+                camera.flyover(
+                    route: ram.routeCoordinates.map(\.clLocationCoordinate),
+                    origin: origin,
+                    reduceMotion: reduceMotion
+                )
             },
             relay: relay,
             shepherdIDRequest: $sendToShepherdID,
@@ -1067,6 +1161,11 @@ struct JourneyView: View {
 
     /// Switches between standard 3D realistic relief up close and hybrid globe view from orbit.
     private var currentMapStyle: MapStyle {
+        #if DEBUG
+        if CommandLine.arguments.contains("-screenshotMap") || CommandLine.arguments.contains("-screenshotCompose") {
+            return .standard(elevation: .realistic)
+        }
+        #endif
         let distance = camera.currentDistance
         if distance > globeViewDistanceThresholdMeters {
             return .hybrid(elevation: .realistic, showsTraffic: false)
@@ -1274,7 +1373,8 @@ struct JourneyView: View {
                             } else {
                                 ramMarker(
                                     bearingDegrees: ram.currentBearingDegrees ?? ram.originBearingDegrees ?? 0,
-                                    motionState: motionState(for: ram)
+                                    motionState: motionState(for: ram),
+                                    color: RamColorStore.shared.color(for: ram.name)
                                 )
                             }
                         }
@@ -1402,13 +1502,9 @@ struct JourneyView: View {
                         stepsTodayBadge
                     }
 
-                    if flockPulse.hasPulse {
-                        flockPulseBadge
-                    }
                 }
                 .padding(.top, 8)
                 .padding(.trailing, 12)
-                .animation(.snappy, value: flockPulse.hasPulse)
                 .animation(LookAroundLayoutMetrics.transitionSpring, value: lookAround.layout)
             }
         }
@@ -1659,7 +1755,7 @@ struct JourneyView: View {
     /// apex sits exactly on the marker with no offset bookkeeping; the
     /// cone is compensated for the map's own rotation so it stays true
     /// to north however the person has turned the map.
-    private func ramMarker(bearingDegrees: Double, motionState: RamMotionState) -> some View {
+    private func ramMarker(bearingDegrees: Double, motionState: RamMotionState, color: RamColor = .white) -> some View {
         ZStack {
             if lookAround.layout.isExpanded {
                 LookAroundHeadingCone(
@@ -1673,7 +1769,8 @@ struct JourneyView: View {
             RamSpriteMarkerView(
                 bearingDegrees: bearingDegrees,
                 motionState: motionState,
-                markerSize: 52
+                markerSize: 52,
+                color: color
             )
         }
         .animation(LookAroundLayoutMetrics.transitionSpring, value: lookAround.layout.isExpanded)
@@ -1724,6 +1821,14 @@ struct JourneyView: View {
                     accessibilityLabel: String(localized: "Find Ram", bundle: .appLanguage, locale: .appLanguage),
                     tint: camera.isFollowingRam ? Color.primary : Color.accentColor,
                     action: { returnToRam() }
+                )
+            }
+
+            if sentRams.count > 1 {
+                mapControlButton(
+                    systemImage: "arrow.triangle.2.circlepath",
+                    accessibilityLabel: String(localized: "Next ram", bundle: .appLanguage, locale: .appLanguage),
+                    action: { showNextSentRam() }
                 )
             }
 
@@ -2123,8 +2228,11 @@ struct JourneyView: View {
 
         stepTracker.stopTracking()
         trackingRamId = ram.id
-        lastAppliedStepCount = 0
-        stepTracker.startTracking(from: Date()) { _ in }
+        // Right after launch, pick up from the last saved baseline so steps
+        // walked while iOS had terminated the app still reach the ram.
+        let resume = BackgroundStepSync.shared.consumeLaunchResumePoint(for: ram)
+        lastAppliedStepCount = resume?.alreadyApplied ?? 0
+        stepTracker.startTracking(from: resume?.since ?? Date()) { _ in }
     }
 
     private func applyStepDelta(_ cumulativeSteps: Int) {
@@ -2273,6 +2381,12 @@ struct JourneyView: View {
     /// this again so the tooltip comes back rather than staying dismissed
     /// forever.
     private func revealReturnToMePill() {
+        #if DEBUG
+        if CommandLine.arguments.contains("-demoMode") {
+            isReturnToMePillVisible = false
+            return
+        }
+        #endif
         withAnimation(.easeOut(duration: 0.2)) {
             isReturnToMePillVisible = true
         }

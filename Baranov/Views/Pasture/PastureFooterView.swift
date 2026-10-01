@@ -18,8 +18,8 @@ enum AppLinks {
     /// the App Store app.
     static let appStore = URL(string: "https://apps.apple.com/us/app/baranov-slow-mail-penpal/id6813932060")!
     static let writeReview = URL(string: "https://apps.apple.com/us/app/baranov-slow-mail-penpal/id6813932060?action=write-review")!
-    static let instagram = URL(string: "https://instagram.com/pitchcoach.club")!
-    static let tiktok = URL(string: "https://tiktok.com/@pitch.coach")!
+    static let instagram = URL(string: "https://instagram.com/slowrampost")!
+    static let tiktok = URL(string: "https://tiktok.com/@slowrampost")!
     /// Apple's standard license agreement, linked from the end of our own terms.
     static let terms = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
 }
@@ -243,8 +243,9 @@ queued stats are then deleted.
 
 **Course telemetry.** This app is part of the BCIT ACIT3855 distributed
 systems coursework. Builds pointed at the course receiver post anonymous hop
-and flock-metric events (a per-install ID, a ram ID, step counts, timestamps,
-the ram's rounded position). No names, no letter contents.
+and flock-metric events (a per-install ID, a ram ID, step counts, active rams,
+letters delivered, timestamps). No names, no positions, no letter contents.
+The same "Share anonymous usage stats" switch turns these off.
 
 **Apple services.** Maps, routing, Look Around, weather, dictation and Game
 Center are Apple services, covered by Apple's privacy policy.

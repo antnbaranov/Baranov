@@ -101,7 +101,7 @@ struct RamReelScene: View {
     private var theme: ReelTheme { ReelTheme.all[data.variant % ReelTheme.all.count] }
 
     private var frameName: String {
-        let frames = RamSpriteFrameSets.gallopRunningStride
+        let frames = RamSpriteFrameSets.runningFrames(for: RamColorStore.shared.color(for: data.ramName))
         let index = Int(t / 0.07) % max(frames.count, 1)
         return frames[index]
     }

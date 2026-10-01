@@ -46,7 +46,11 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>NSBonjourServices</key>
 	<array>
@@ -63,6 +67,8 @@
 	<string>Baranov looks at your upcoming events to suggest AirDrop destinations for letters you are carrying.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>Baranov suggests people from your contacts when you address a letter to someone.</string>
+	<key>NSGKFriendListUsageDescription</key>
+	<string>Baranov shows your Game Center friends so you can hand a ram to one of them and compare tables with them.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Baranov reads your step count, including steps recorded by your Apple Watch, to walk your carrier rams toward their destinations.</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -90,14 +96,13 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>location</string>
 		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>

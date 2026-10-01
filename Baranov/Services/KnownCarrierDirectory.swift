@@ -93,7 +93,7 @@ final class KnownCarrierDirectory {
     }
 }
 
-#if DEBUG
+// Preview fixtures: intentionally not #if DEBUG so #Preview blocks compile in Release/Archive builds.
 extension KnownCarrierDirectory {
     /// A couple of illustrative carriers for SwiftUI canvas previews —
     /// never seeded into the real running app.
@@ -106,4 +106,3 @@ extension KnownCarrierDirectory {
         return directory
     }
 }
-#endif

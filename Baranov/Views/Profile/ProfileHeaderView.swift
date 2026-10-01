@@ -11,8 +11,7 @@ struct ProfileHeaderView: View {
 
     @Environment(\.locale) private var locale
     @State private var showPicker = false
-    @State private var editingName = false
-    @State private var nameDraft = ""
+    @State private var showsNames = false
     @State private var tapTick = 0
     @AppStorage("com.baranov.quoteOffset") private var quoteOffset = 0
     /// Today's Foundation Models saying (empty until generated / when unavailable).
@@ -53,13 +52,10 @@ struct ProfileHeaderView: View {
             ShepherdPickerSheet(selection: $avatarSelection, customFileName: $avatarFile, motto: $motto)
                 .preferredColorScheme((AppAppearance(rawValue: appearanceRawValue) ?? .system).colorScheme)
         }
-        .alert("Your name", isPresented: $editingName) {
-            TextField("Name", text: $nameDraft)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty { name = trimmed }
-            }
+        .sheet(isPresented: $showsNames) {
+            NamesEditorView()
+                .presentationDetents([.medium, .large])
+                .preferredColorScheme((AppAppearance(rawValue: appearanceRawValue) ?? .system).colorScheme)
         }
         .task {
             // One fresh on-device saying per day; offline / unsupported devices keep the classic ones.
@@ -79,8 +75,7 @@ struct ProfileHeaderView: View {
                 .foregroundStyle(.primary)
                 .lineLimit(2)
             Button {
-                nameDraft = name
-                editingName = true
+                showsNames = true
             } label: {
                 Image(systemName: "pencil")
                     .font(.footnote.weight(.semibold))

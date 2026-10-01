@@ -190,6 +190,8 @@ private struct WornMask: View {
     var body: some View {
         Canvas { context, size in
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.black))
+            // Canvas can draw once at zero size; `random(in: 0..<0)` traps.
+            guard size.width > 0, size.height > 0 else { return }
             context.blendMode = .destinationOut
             var generator = SeededGenerator(seed: seed)
             for _ in 0..<26 {

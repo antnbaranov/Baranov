@@ -24,6 +24,7 @@ struct TravelNote: Identifiable, Hashable {
     let place: String
     let metersIn: Int
     let text: String
+    let weather: StampWeather?
 }
 
 enum TravelNoteWriter {
@@ -37,7 +38,8 @@ enum TravelNoteWriter {
                 kind: stamp.kind,
                 place: stamp.shortPlaceName,
                 metersIn: stamp.stepsAtStamp,
-                text: line(for: stamp.kind, place: stamp.shortPlaceName, variant: variant)
+                text: line(for: stamp.kind, place: stamp.shortPlaceName, variant: variant),
+                weather: stamp.weather
             )
         }
     }
@@ -118,6 +120,11 @@ struct PassportNotesSection: View {
                     guard newValue != nil else { return }
                     UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                 }
+
+                if notes.contains(where: { $0.weather != nil }) {
+                    WeatherAttributionView()
+                        .padding(.horizontal, 34)
+                }
             }
         }
         .padding(.vertical, 18)
@@ -158,6 +165,14 @@ struct PassportNotesSection: View {
 
             Spacer(minLength: 0)
 
+            if let weather = note.weather {
+                Label(weather.summaryLine, systemImage: weather.symbolName)
+                    .symbolRenderingMode(.multicolor)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
             HStack {
                 Label("\(DistanceFormatter.string(forMeters: note.metersIn)) in", systemImage: "figure.walk")
                     .font(.caption)
@@ -166,7 +181,7 @@ struct PassportNotesSection: View {
                 ShareLink(item: String(localized: "\u{201C}\(note.text)\u{201D} \u{2014} \(ramName), on the road with Baranov", bundle: .appLanguage, locale: .appLanguage)) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.black)
                         .frame(width: 32, height: 32)
                         .background(Color(uiColor: .systemGray6), in: Circle())
                 }

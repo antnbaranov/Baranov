@@ -40,7 +40,7 @@ final class EntitlementService: NSObject {
     private(set) var hasPastureExpansion: Bool = false
 
     /// Whether this carrier owns an adopted ram — a permanent second slot.
-    private(set) var hasAdoptedRam: Bool = false
+    private(set) var hasSecondRam: Bool = false
 
     /// Whether the SDK is actually talking to RevenueCat, as opposed to
     /// the local mock store. The paywall uses this to decide whether
@@ -50,7 +50,7 @@ final class EntitlementService: NSObject {
     /// How many rams this carrier may have in the pasture at once.
     var allowedRamSlots: Int {
         if hasPastureExpansion { return FlockViewModel.pastureCapacity }
-        if hasAdoptedRam { return 2 }
+        if hasSecondRam { return 2 }
         return 1
     }
 
@@ -89,7 +89,7 @@ final class EntitlementService: NSObject {
     func refresh() async {
         guard Purchases.isConfigured else {
             hasPastureExpansion = MockEntitlementStore.hasPastureExpansion
-            hasAdoptedRam = MockEntitlementStore.hasAdoptedRam
+            hasSecondRam = MockEntitlementStore.hasSecondRam
             return
         }
 
@@ -141,15 +141,27 @@ final class EntitlementService: NSObject {
         // identifier (or none at all, e.g. a Test Store product). Being subscribed
         // is what matters, so an active subscription unlocks the pasture even if
         // its entitlement isn't literally named `pasture_expansion`.
-        let namedExpansion = active[RevenueCatConfiguration.Entitlement.pastureExpansion] != nil
-        let otherEntitlement = active.keys.contains { $0 != RevenueCatConfiguration.Entitlement.adoptedRam }
+        // The one-time ram must NEVER count as the subscription, whichever
+        // entitlement the dashboard attached it to (even `pasture_expansion`
+        // itself). Otherwise buying the ram flips the whole paywall into its
+        // "already subscribed" state and the subscriptions can't be bought.
+        // So the expansion is decided by what backs the entitlement, not by
+        // its name.
+        let subscriptionBacked = active.values.contains {
+            $0.productIdentifier != RevenueCatConfiguration.ProductID.adoptRam
+                && $0.identifier != RevenueCatConfiguration.Entitlement.adoptedRam
+        }
         let anySubscription = !customerInfo.activeSubscriptions.isEmpty
-        hasPastureExpansion = namedExpansion || otherEntitlement || anySubscription
-        hasAdoptedRam = active[RevenueCatConfiguration.Entitlement.adoptedRam] != nil
+        hasPastureExpansion = subscriptionBacked || anySubscription
+        // Non-consumable: once bought it stays in CustomerInfo forever, and
+        // `restorePurchases()` brings it back on a new device.
+        hasSecondRam = active[RevenueCatConfiguration.Entitlement.adoptedRam] != nil
+            || active.values.contains { $0.productIdentifier == RevenueCatConfiguration.ProductID.adoptRam }
+            || customerInfo.nonSubscriptions.contains { $0.productIdentifier == RevenueCatConfiguration.ProductID.adoptRam }
             || !customerInfo.nonSubscriptions.isEmpty
 
         #if DEBUG
-        print("[Entitlements] active entitlements: \(active.keys.sorted()), activeSubscriptions: \(customerInfo.activeSubscriptions.sorted()), nonSubscriptions: \(customerInfo.nonSubscriptions.map(\.productIdentifier)) → expansion=\(hasPastureExpansion) adopted=\(hasAdoptedRam)")
+        print("[Entitlements] active entitlements: \(active.keys.sorted()), activeSubscriptions: \(customerInfo.activeSubscriptions.sorted()), nonSubscriptions: \(customerInfo.nonSubscriptions.map(\.productIdentifier)) → expansion=\(hasPastureExpansion) adopted=\(hasSecondRam)")
         #endif
     }
 }
@@ -183,7 +195,7 @@ enum MockEntitlementStore {
         set { UserDefaults.standard.set(newValue, forKey: expansionKey) }
     }
 
-    static var hasAdoptedRam: Bool {
+    static var hasSecondRam: Bool {
         get { UserDefaults.standard.bool(forKey: adoptedKey) }
         set { UserDefaults.standard.set(newValue, forKey: adoptedKey) }
     }

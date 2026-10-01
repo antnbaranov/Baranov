@@ -13,13 +13,14 @@ import SwiftUI
 
 struct PassportGoalSheet: View {
     let ramName: String
+    var weather: StampWeather?
     let onAdd: (_ title: String, _ kilometers: Int?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var usesDistance = false
     @State private var kilometers = 5
-    @State private var suggestions: [RamGoalSuggestion] = Array(RamGoalSuggestion.all.shuffled().prefix(4))
+    @State private var suggestions: [RamGoalSuggestion] = []
     @State private var tapTick = 0
     @FocusState private var isFocused: Bool
 
@@ -37,7 +38,7 @@ struct PassportGoalSheet: View {
                             .lineLimit(3...6)
                             .focused($isFocused)
                             .padding(16)
-                            .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .onChange(of: title) { _, newValue in
                                 if newValue.count > 90 { title = String(newValue.prefix(90)) }
                             }
@@ -53,7 +54,7 @@ struct PassportGoalSheet: View {
                             Spacer()
                             Button {
                                 withAnimation(.snappy) {
-                                    suggestions = Array(RamGoalSuggestion.all.shuffled().prefix(4))
+                                    suggestions = RamGoalSuggestion.ordered(for: weather)
                                 }
                             } label: {
                                 Label("Shuffle", systemImage: "dice.fill")
@@ -62,33 +63,41 @@ struct PassportGoalSheet: View {
                             .buttonStyle(.plain)
                             .foregroundStyle(Color.accentColor)
                         }
-                        ForEach(suggestions) { suggestion in
-                            Button {
-                                tapTick += 1
-                                title = suggestion.title
-                                if let km = suggestion.kilometers {
-                                    usesDistance = true
-                                    kilometers = km
-                                } else {
-                                    usesDistance = false
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(suggestions) { suggestion in
+                                    Button {
+                                        tapTick += 1
+                                        title = suggestion.title
+                                        if let km = suggestion.kilometers {
+                                            usesDistance = true
+                                            kilometers = km
+                                        } else {
+                                            usesDistance = false
+                                        }
+                                    } label: {
+                                        HStack(alignment: .top, spacing: 10) {
+                                            Text(suggestion.title)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.primary)
+                                                .multilineTextAlignment(.leading)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            Image(systemName: "plus")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                        }
+                                        .padding(14)
+                                        .frame(width: 240, alignment: .topLeading)
+                                        .frame(maxHeight: .infinity, alignment: .top)
+                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "sparkle")
-                                        .foregroundStyle(Color.accentColor)
-                                    Text(suggestion.title)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.primary)
-                                        .multilineTextAlignment(.leading)
-                                    Spacer(minLength: 0)
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundStyle(Color.accentColor)
-                                }
-                                .padding(12)
-                                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
-                            .buttonStyle(.plain)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 20)
                         }
+                        .padding(.horizontal, -20)
                     }
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -112,6 +121,10 @@ struct PassportGoalSheet: View {
                 .padding(20)
             }
             .scrollDismissesKeyboard(.interactively)
+            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+            .onAppear {
+                if suggestions.isEmpty { suggestions = RamGoalSuggestion.ordered(for: weather) }
+            }
             .navigationTitle("New milestone")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -173,6 +173,10 @@ struct PostcardView: View {
     /// 0…1 while the sender holds the wax: a pool of wax gathers on the
     /// postcard where the seal will land, so the hold shows what it does.
     var sealPreview: Double = 0
+    /// Shows the foil strip the recipient will scratch clear.
+    var hasScratchSecret: Bool = false
+    /// The line under the foil; the real scratch layer, as the recipient gets it.
+    var scratchSecret: String = ""
 
     private var style: PaperStyle { PaperStyle(paper: paper, customHex: customHex) }
 
@@ -194,6 +198,18 @@ struct PostcardView: View {
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .strokeBorder(style.ink.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
                         .frame(width: 26, height: 32)
+                }
+                if hasScratchSecret {
+                    // Where it sits on the real letter: the actual foil,
+                    // scratchable right here on the postcard.
+                    let line = scratchSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+                    ScratchOffRevealView(
+                        secretText: line.isEmpty
+                            ? String(localized: "Your secret line", bundle: .appLanguage, locale: .appLanguage)
+                            : line,
+                        isCompact: true
+                    )
+                    .id(line)
                 }
                 Spacer(minLength: 0)
                 Text(addressee)

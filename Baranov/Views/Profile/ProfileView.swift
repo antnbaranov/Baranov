@@ -50,6 +50,8 @@ struct ProfileView: View {
     private let onSendLetter: ((NearbyCourier) -> Void)?
     @AppStorage("com.baranov.openToCarry") private var openToCarry = false
     @State private var copiedTick = 0
+    @AppStorage(NearbyCourierService.introSeenKey) private var nearbyIntroSeen = false
+    @State private var isShowingNearbyIntro = false
 
     init(onHandOver: ((NearbyCourier) -> Void)? = nil, onSendLetter: ((NearbyCourier) -> Void)? = nil) {
         self.onHandOver = onHandOver
@@ -148,6 +150,17 @@ struct ProfileView: View {
             .onChange(of: nearby.couriers) { _, couriers in
                 if let selected = selectedCourier, !couriers.contains(selected) {
                     withAnimation(.snappy) { selectedCourier = nil }
+                }
+            }
+            .task {
+                if !nearbyIntroSeen { isShowingNearbyIntro = true }
+            }
+            .sheet(isPresented: $isShowingNearbyIntro) {
+                NearbyIntroSheet {
+                    nearbyIntroSeen = true
+                    nearby.start(announce: nil)
+                } onSkip: {
+                    nearbyIntroSeen = true
                 }
             }
             .onDisappear {
@@ -632,6 +645,49 @@ struct ProfileView: View {
         .contextMenu {
             Button("Remove trip", systemImage: "trash", role: .destructive, action: onRemove)
         }
+    }
+}
+
+/// Shown once, the first time Profile opens, before iOS asks for Local Network access.
+private struct NearbyIntroSheet: View {
+    let onContinue: () -> Void
+    let onSkip: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 0)
+            Image(systemName: "wave.3.forward")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+            Text("Find shepherds nearby")
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+            Text("Baranov looks for other shepherds close to you over Wi‑Fi and Bluetooth, so a ram or a code can reach you without the internet. iOS will ask next to let Baranov find devices on your local network.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Spacer(minLength: 0)
+            VStack(spacing: 12) {
+                Button {
+                    onContinue()
+                    dismiss()
+                } label: {
+                    Text("Continue").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(tint: .accentColor, expands: true))
+                Button {
+                    onSkip()
+                    dismiss()
+                } label: {
+                    Text("Not now").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+            }
+        }
+        .padding(24)
+        .presentationDetents([.medium])
+        .interactiveDismissDisabled()
     }
 }
 

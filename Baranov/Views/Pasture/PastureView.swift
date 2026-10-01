@@ -104,7 +104,7 @@ struct PastureView: View {
             .listRowBackground(Color.clear)
 
             Section {
-                if entitlementService.hasPastureExpansion || entitlementService.hasAdoptedRam {
+                if entitlementService.hasPastureExpansion || entitlementService.hasSecondRam {
                     Button {
                         // Same page as "Expand the Pasture" in a letter;
                         // its own Manage Subscription button opens the
@@ -296,6 +296,7 @@ struct PastureView: View {
         guard oldName != newName else { return }
         flockViewModel.activeRams[index].name = newName
         ramLedger.rename(from: oldName, to: newName)
+        RamColorStore.shared.rename(from: oldName, to: newName)
     }
 
     /// Standard sheet dismiss control: the system close button on iOS 26,

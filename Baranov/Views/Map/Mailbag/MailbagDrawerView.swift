@@ -21,6 +21,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Where the mailbag's own navigation can go. Pushed inside the sheet, so
 /// a ram's letters are followed without a second sheet opening over it.
@@ -57,6 +58,8 @@ struct MailbagDrawerView: View {
     let onCancelJourney: (Ram) -> Void
 
     @AppStorage("com.baranov.carrierDisplayName") private var carrierName = ""
+    /// The file picker for a letter that came by AirDrop or Files.
+    @State private var isImportingFile = false
     /// Letters the person was told are coming (a shared link), until the
     /// ram itself lands here.
     private let expectedStore = ExpectedLetterStore.shared
@@ -127,8 +130,8 @@ struct MailbagDrawerView: View {
         }
     }
 
-    /// Search lives under Incoming and Archive only; Outgoing is never filtered.
-    private var showsSearch: Bool { section != .outgoing }
+    /// Search lives under Archive only; Incoming and Outgoing are never filtered.
+    private var showsSearch: Bool { section == .archive }
 
     private var activeQuery: String {
         showsSearch ? searchText.trimmingCharacters(in: .whitespacesAndNewlines) : ""
@@ -193,6 +196,20 @@ struct MailbagDrawerView: View {
                 .containerBackground(.clear, for: .navigation)
             }
         }
+        .fileImporter(isPresented: $isImportingFile, allowedContentTypes: [.baranovPackage, .data]) { result in
+            if case .success(let url) = result {
+                NotificationCenter.default.post(name: .importTransitFile, object: url)
+            }
+        }
+    }
+
+    /// Adds a `.ram` file (AirDropped, or saved to Files) to the mailbag.
+    private var importFileButton: some View {
+        Button { isImportingFile = true } label: {
+            Label("Import a file", systemImage: "square.and.arrow.down")
+        }
+        .buttonStyle(ShareCodeGlassButtonStyle(expands: true))
+        .accessibilityHint("Adds a letter file you received by AirDrop")
     }
 
     /// Opens a ram's bag right here in the sheet, growing it if needed.
@@ -348,6 +365,10 @@ struct MailbagDrawerView: View {
                 ScrollView {
                   VStack(spacing: 12) {
                     emptyState
+                    if section == .incoming {
+                        importFileButton
+                            .padding(.horizontal, 16)
+                    }
                     // Only the courier that belongs to this tab; never
                     // an outgoing ram under Incoming or vice versa.
                     if section == .outgoing, onTheRoad == nil {
@@ -378,13 +399,10 @@ struct MailbagDrawerView: View {
                         }
                     }
 
-                    // Search is offered
-                    // under Incoming and Archive, not Outgoing.
+                    // Search is offered under Archive only.
                     Section {
                         if showsSearch {
-                            HStack(spacing: 8) {
-                                Image(systemName: "magnifyingglass")
-                                    .foregroundStyle(.secondary)
+                            NativeFieldRow(symbol: "magnifyingglass") {
                                 TextField("Search Letters", text: $searchText)
                                     .submitLabel(.search)
                                 if isSearching {
@@ -396,9 +414,19 @@ struct MailbagDrawerView: View {
                                     .accessibilityLabel("Clear")
                                 }
                             }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .listRowBackground(Color.clear)
                         }
                         if rams.isEmpty, isSearching {
                             ContentUnavailableView.search(text: searchText)
+                        }
+                    }
+
+                    if section == .incoming {
+                        Section {
+                            importFileButton
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowBackground(Color.clear)
                         }
                     }
 
@@ -439,6 +467,9 @@ struct MailbagDrawerView: View {
                 }
                 .listStyle(.insetGrouped)
                 .scrollContentBackground(.hidden)
+                // Clear of the page dots along the bottom (they sit low on
+                // small phones and overlapped the last rows).
+                .contentMargins(.bottom, 32, for: .scrollContent)
             }
         }
         .animation(.snappy, value: section)
@@ -461,4 +492,9 @@ struct MailbagDrawerView: View {
             }
         }
     }
+}
+
+extension Notification.Name {
+    /// A `.ram` file the person picked in the mailbag; `object` is its URL.
+    static let importTransitFile = Notification.Name("com.baranov.importTransitFile")
 }

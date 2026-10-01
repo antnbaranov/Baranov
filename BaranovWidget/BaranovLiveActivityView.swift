@@ -14,6 +14,14 @@
 //  transition between updates, and a walking clock that ticks by itself
 //  with no update at all (`Text(_:style: .timer)`).
 //
+//  The app has no background mode, so between updates the card runs on its
+//  own: the bar (`ProgressView(timerInterval:)`) and the ETA countdown
+//  (`Text(timerInterval:)`) slide toward the estimated arrival at the pace
+//  the person was walking. That projection is only trusted until the card's
+//  `staleDate`; after that the card freezes on the last real numbers, the
+//  ram stands still, and it says when it was last updated. A HealthKit
+//  background wake or opening the app brings the real numbers back.
+//
 //  Standard system type styles and semantic foreground styles only, so
 //  Dynamic Type, Always-On and dark/light all work.
 //
@@ -31,7 +39,7 @@ struct BaranovLiveActivityView: Widget {
             DynamicIsland {
                 // Expanded: sprite left, hero distance right, name centred, track below.
                 DynamicIslandExpandedRegion(.leading) {
-                    LiveRam(state: context.state, height: 48)
+                    LiveRam(state: context.state, height: 48, isStale: context.isStale)
                         .padding(.leading, 4)
                         .accessibilityHidden(true)
                 }
@@ -47,7 +55,7 @@ struct BaranovLiveActivityView: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        StatusRow(state: context.state)
+                        StatusRow(state: context.state, isStale: context.isStale)
                         LiveTrack(state: context.state, isStale: context.isStale, height: 8)
                         RouteRow(from: context.attributes.fromCity,
                                  to: context.attributes.toCity,
@@ -58,7 +66,7 @@ struct BaranovLiveActivityView: Widget {
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                LiveRam(state: context.state, height: 22)
+                LiveRam(state: context.state, height: 22, isStale: context.isStale)
                     .padding(.leading, 2)
                     .accessibilityHidden(true)
             } compactTrailing: {
@@ -107,14 +115,14 @@ struct LockScreenLiveActivityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
-                LiveRam(state: state, height: 46)
+                LiveRam(state: state, height: 46, isStale: isStale)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(attributes.ramName)
                         .font(.headline)
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    StatusRow(state: state)
+                    StatusRow(state: state, isStale: isStale)
                     Text(routeDescription(from: attributes.fromCity, to: attributes.toCity))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
@@ -127,7 +135,7 @@ struct LockScreenLiveActivityView: View {
             }
 
             LiveTrack(state: state, isStale: isStale, height: 8)
-            StatsRow(state: state)
+            StatsRow(state: state, isStale: isStale)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -179,8 +187,11 @@ struct LiveRam: View {
     let state: RamActivityAttributes.ContentState
     let height: CGFloat
     var showsExtras: Bool = true
+    /// A stale card no longer knows whether the person is walking, so the
+    /// ram stands still rather than trotting on a guess.
+    var isStale: Bool = false
 
-    private var pose: RamActivityPose { state.pose }
+    private var pose: RamActivityPose { state.livePose(isStale: isStale) }
     private var stride: Int { state.strideFrame }
     private var isEvenStep: Bool { stride.isMultiple(of: 2) }
 
@@ -254,13 +265,14 @@ struct JourneyTrack: View {
 /// own. The clock is the one element that moves between updates.
 struct StatusRow: View {
     let state: RamActivityAttributes.ContentState
+    var isStale: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
             Label {
-                Text(state.displayLabel)
+                Text(state.displayLabel(isStale: isStale))
             } icon: {
-                Image(systemName: state.displaySymbol)
+                Image(systemName: state.displaySymbol(isStale: isStale))
                     .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.bounce, value: state.strideFrame)
             }
@@ -268,7 +280,7 @@ struct StatusRow: View {
             .foregroundStyle(.secondary)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            if state.isWalking, state.isMovingNow, let since = state.walkingSince {
+            if !isStale, state.isWalking, state.isMovingNow, let since = state.walkingSince {
                 Text(since, style: .timer)
                     .font(.subheadline)
                     .monospacedDigit()
@@ -378,7 +390,7 @@ private struct MinimalProgressRing: View {
                     .stroke(.tint, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
-            LiveRam(state: state, height: 12, showsExtras: false)
+            LiveRam(state: state, height: 12, showsExtras: false, isStale: isStale)
         }
         .padding(2)
         .accessibilityLabel("Journey \(Int((progress * 100).rounded())) percent complete")
@@ -416,6 +428,7 @@ struct LiveTrack: View {
 /// Steps walked and cadence, so the card shows more than one distance.
 struct StatsRow: View {
     let state: RamActivityAttributes.ContentState
+    var isStale: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -427,12 +440,28 @@ struct StatsRow: View {
                     Image(systemName: "shoeprints.fill")
                 }
             }
-            if state.isWalking, state.isMovingNow, let spm = state.stepsPerMinute, spm > 0 {
+            if let range = state.liveRange(isStale: isStale) {
+                // Counts down to the estimated arrival by itself, no update needed.
+                Label {
+                    Text(timerInterval: range, countsDown: true)
+                        .frame(maxWidth: 72, alignment: .leading)
+                } icon: {
+                    Image(systemName: "flag.checkered")
+                }
+                .accessibilityLabel("Estimated time to arrival")
+            } else if !isStale, state.isWalking, state.isMovingNow, let spm = state.stepsPerMinute, spm > 0 {
                 Label {
                     Text("\(spm)/min")
                         .contentTransition(.numericText())
                 } icon: {
                     Image(systemName: "speedometer")
+                }
+            }
+            if isStale, state.isWalking, let updatedAt = state.updatedAt {
+                Label {
+                    Text("Updated \(updatedAt, style: .relative) ago")
+                } icon: {
+                    Image(systemName: "clock.arrow.circlepath")
                 }
             }
             Spacer(minLength: 0)
@@ -461,7 +490,7 @@ struct CompactTrailing: View {
                 }
                 .progressViewStyle(.circular)
                 .tint(.accentColor)
-                Image(systemName: state.displaySymbol)
+                Image(systemName: state.displaySymbol(isStale: isStale))
                     .font(.system(size: 9, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
                     .symbolEffect(.bounce, value: state.strideFrame)
@@ -470,7 +499,7 @@ struct CompactTrailing: View {
             .accessibilityLabel("\(state.remainingDistance) to go")
         } else {
             HStack(spacing: 3) {
-                Image(systemName: state.displaySymbol)
+                Image(systemName: state.displaySymbol(isStale: isStale))
                     .font(.system(.footnote, weight: .semibold))
                     .contentTransition(.symbolEffect(.replace))
                 Text(state.remainingDistance)
@@ -531,11 +560,11 @@ enum RamActivityPose {
 }
 
 extension RamActivityAttributes.ContentState {
-    var pose: RamActivityPose {
+    func livePose(isStale: Bool) -> RamActivityPose {
         switch statusSymbol {
         case "figure.walk":
-            // Paused: the shepherd stopped, so the ram stands still.
-            if !isMovingNow { return .idle }
+            // Paused, or a stale card that no longer knows: the ram stands still.
+            if isStale || !isMovingNow { return .idle }
             // Seven steps, then a happy leap, so the ram is never just a loop.
             let beat = ((strideFrame % RamActivityPose.walkCycleLength) + RamActivityPose.walkCycleLength) % RamActivityPose.walkCycleLength
             return beat == RamActivityPose.walkCycleLength - 1 ? .leap : .run
@@ -552,12 +581,15 @@ extension RamActivityAttributes.ContentState {
     /// What the card says and shows. A walking ram whose shepherd has stopped
     /// reads "Paused" with a pause glyph, so a still ram is never mistaken for
     /// a frozen card.
-    var displayLabel: String {
-        isWalking && !isMovingNow ? String(localized: "Paused") : statusLabel
+    ///
+    /// A stale card never says "Paused": the person may well be walking with
+    /// the phone locked. It shows the plain status and when it was updated.
+    func displayLabel(isStale: Bool) -> String {
+        !isStale && isWalking && !isMovingNow ? String(localized: "Paused") : statusLabel
     }
 
-    var displaySymbol: String {
-        isWalking && !isMovingNow ? "pause.circle.fill" : statusSymbol
+    func displaySymbol(isStale: Bool) -> String {
+        !isStale && isWalking && !isMovingNow ? "pause.circle.fill" : statusSymbol
     }
 
     var stepsWalked: Int? {

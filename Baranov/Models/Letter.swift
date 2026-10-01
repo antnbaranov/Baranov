@@ -93,6 +93,11 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     /// hash matches this. `nil` on letters from older builds — those
     /// simply can't be recalled once handed on.
     var recallTokenHash: String?
+    /// Sender's choice under "Who is this for?": the recipient's name has to
+    /// match one of their names, and the ear tag alone does not open it.
+    /// `false` (the default, and every older letter) leaves the code as the
+    /// master key.
+    var requiresNameMatch = false
     /// The letter's place at the post office (see `LetterTracker`): the
     /// relay lookup id and the progress token that lets whichever phone is
     /// carrying the ram report how far it has come, and hand the letter to
@@ -358,7 +363,7 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case id, senderName, recipientName, sealedBody, revealedBody, isSealed, createdAt, sealColor, attachment, revealedAttachment, paper, paperCustomHex
         case unlockAt, geofence, sealedScratchSecret, revealedScratchSecret
-        case recallTokenHash
+        case recallTokenHash, requiresNameMatch
         case relayTicket, recipientKeys
         // Legacy keys from builds before letters were actually encrypted.
         case messageBody, receivingCode
@@ -385,6 +390,7 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         unlockAt = try container.decodeIfPresent(Date.self, forKey: .unlockAt)
         geofence = try container.decodeIfPresent(LetterGeofence.self, forKey: .geofence)
         recallTokenHash = try container.decodeIfPresent(String.self, forKey: .recallTokenHash)
+        requiresNameMatch = try container.decodeIfPresent(Bool.self, forKey: .requiresNameMatch) ?? false
         relayTicket = try? container.decodeIfPresent(RelayTicket.self, forKey: .relayTicket)
         recipientKeys = try? container.decodeIfPresent([RecipientKey].self, forKey: .recipientKeys)
         sealedScratchSecret = try container.decodeIfPresent(Data.self, forKey: .sealedScratchSecret)
@@ -422,6 +428,7 @@ struct Letter: Identifiable, Codable, Sendable, Hashable {
         try container.encodeIfPresent(sealedScratchSecret, forKey: .sealedScratchSecret)
         try container.encodeIfPresent(revealedScratchSecret, forKey: .revealedScratchSecret)
         try container.encodeIfPresent(recallTokenHash, forKey: .recallTokenHash)
+        if requiresNameMatch { try container.encode(true, forKey: .requiresNameMatch) }
         try container.encodeIfPresent(relayTicket, forKey: .relayTicket)
         try container.encodeIfPresent(recipientKeys, forKey: .recipientKeys)
     }

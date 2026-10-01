@@ -34,10 +34,17 @@ struct RamActivityAttributes: ActivityAttributes {
         /// Recent cadence, steps per minute.
         var stepsPerMinute: Int? = nil
         /// A virtual start/end pair at the current pace. The system animates
-        /// `ProgressView(timerInterval:)` on its own, so the bar keeps sliding
-        /// between updates. Only set while the person is actually walking.
+        /// `ProgressView(timerInterval:)` and `Text(timerInterval:)` on its own,
+        /// so the bar and the ETA keep moving with the phone locked and the
+        /// app suspended. `barEnd` is the estimated arrival. Only set while
+        /// the person is actually walking; the card's `staleDate` caps how
+        /// long the projection is trusted.
         var barStart: Date? = nil
         var barEnd: Date? = nil
+        /// When the step numbers in this state were last real. The app does
+        /// not run in the background, so once the card goes stale the widget
+        /// stops projecting and says "Updated 12 min ago" instead of guessing.
+        var updatedAt: Date? = nil
     }
     var ramName: String
     var fromCity: String

@@ -19,10 +19,9 @@
 //
 //    Entitlement            Unlocks                          Granted by
 //    ─────────────────────  ───────────────────────────────  ─────────────────────────────
-//    pasture_expansion      5 rams at once + every wax       com.baranov.sub.monthly   ($2.99)
-//                           colour                           com.baranov.sub.quarterly ($5.99 / 3 months)
-//                                                            com.baranov.sub.annual    ($19.99, 7-day trial)
-//    adopted_ram            a permanent 2nd ram slot         com.baranov.iap.ram.merino ($2.99, one-time)
+//    pasture_expansion      5 rams at once + every wax       monthly                 (subscription)
+//                           colour                           baranov.pasture.annual  (subscription, 7-day trial)
+//    adopted_ram            a permanent 2nd ram slot         baranov.ram.adopt       (one-time)
 //
 //  Pricing rationale (a starting point, not data — watch the numbers):
 //  the expansion is worth about a coffee a month to someone who writes to
@@ -38,7 +37,13 @@ import Foundation
 
 enum RevenueCatConfiguration {
     /// Public SDK key from Project Settings → API Keys.
-    static let apiKey = "test_JZRPZKzpSBlSCvjemKwkupccdcJ"
+    /// Public Apple SDK key. Used in every build, debug included, so the paywall
+    /// reads the same offering (`monthly`, `baranov.pasture.annual`,
+    /// `baranov.ram.adopt`) that ships. A Test Store key (`test_…`) is a separate
+    /// RevenueCat app with its own product catalogue: against the dashboard's
+    /// App Store packages it returns an empty offering, so the paywall showed
+    /// "Pricing unavailable". Debug runs buy through Xcode's StoreKit file or sandbox.
+    static let apiKey = "appl_ghrRKeJOvhHTFeYYXaTtWUqRcXg"
 
     static var hasRealAPIKey: Bool {
         !apiKey.isEmpty && apiKey != "REVENUECAT_API_KEY_PLACEHOLDER"
@@ -52,10 +57,13 @@ enum RevenueCatConfiguration {
     }
 
     enum ProductID {
-        static let pastureMonthly = "com.baranov.sub.monthly"
-        static let pastureQuarterly = "com.baranov.sub.quarterly"
-        static let pastureAnnual = "com.baranov.sub.annual"
-        static let adoptRam = "com.baranov.iap.ram.merino"
+        // The real App Store Connect / RevenueCat product IDs. Do not rename.
+        static let pastureMonthly = "monthly"
+        static let pastureAnnual = "baranov.pasture.annual"
+        static let adoptRam = "baranov.ram.adopt"
+
+        /// Everything the paywall is allowed to sell.
+        static let all: Set<String> = [pastureMonthly, pastureAnnual, adoptRam]
     }
 
     /// Custom subscriber attributes synced to RevenueCat so the dashboard

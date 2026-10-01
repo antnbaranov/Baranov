@@ -222,7 +222,9 @@ private struct GeoLockScene: View {
             )
             let pixelDistance = hypot(dot.x - center.x, dot.y - center.y)
             let isInside = pixelDistance <= radius && phase < 0.94
-            let meters = Int((pixelDistance / radius * 100).rounded())
+            // GeometryReader can hand over a zero size on its first pass; 0 / 0
+            // is NaN and `Int(NaN)` traps.
+            let meters = radius > 0 ? Int((pixelDistance / radius * 100).rounded()) : 0
 
             ZStack {
                 Color(uiColor: .systemGroupedBackground)

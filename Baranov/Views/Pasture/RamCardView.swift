@@ -380,11 +380,10 @@ struct RamCardView: View {
             .font(.caption)
             .foregroundStyle(.tertiary)
 
-            // Only this ram's own letter — not a passenger it picked up
-            // along the way, which isn't this sender's to hand a code
-            // out for.
-            if !isPassenger, let shareMessage = ram.letterShareMessage {
-                shareCodeButton(shareMessage)
+            // Every letter this phone sent gets its own button, grouped
+            // or not; a guest's letter never does (`senderShareMessage`).
+            if let shareMessage = ram.senderShareMessage(for: letter) {
+                shareCodeButton(shareMessage, recipient: ram.passengerLetters.isEmpty ? nil : letter.recipientName)
             }
         }
     }
@@ -395,9 +394,13 @@ struct RamCardView: View {
     /// know how to open it. `ShareLink` opens the system share sheet
     /// (Messages included), matching the AirDrop hand-off above rather
     /// than introducing a separate, bespoke "compose an iMessage" screen.
-    private func shareCodeButton(_ shareMessage: String) -> some View {
+    private func shareCodeButton(_ shareMessage: String, recipient: String? = nil) -> some View {
         ShareLink(item: shareMessage) {
-            Label("Share Ear Tag", systemImage: "square.and.arrow.up")
+            if let recipient, !recipient.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Label("Share for \(recipient)", systemImage: "square.and.arrow.up")
+            } else {
+                Label("Share Ear Tag", systemImage: "square.and.arrow.up")
+            }
         }
         .buttonStyle(ShareCodeGlassButtonStyle(tint: PastureTheme.green, expands: true))
         .simultaneousGesture(TapGesture().onEnded { impact(.light) })

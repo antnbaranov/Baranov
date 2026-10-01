@@ -94,6 +94,9 @@ final class LetterTracker {
     private var reportedDeliveries: Set<String> = []
     @ObservationIgnored private var held: [UUID: HeldLetter] = [:]
     @ObservationIgnored private var isTicking = false
+    @ObservationIgnored private var rerunRequested = false
+    @ObservationIgnored private var arrivalReportFailed = false
+    @ObservationIgnored private var arrivalRetryTask: Task<Void, Never>?
 
     private let recordsKey = "com.baranov.trackedLetters"
     private let deliveriesKey = "com.baranov.reportedDeliveries"
@@ -219,13 +222,52 @@ final class LetterTracker {
     /// Publish what's waiting, set out what learned its gate, report what
     /// moved, and check on what arrived.
     func tick() async {
-        guard let relay, let flock, !isTicking else { return }
+        guard let relay, let flock else { return }
+        // A request that lands mid-tick (a ram reaching its gate while the
+        // minute tick is running) used to be dropped until the next minute.
+        // It now runs once more right after this one.
+        guard !isTicking else { rerunRequested = true; return }
         isTicking = true
         defer { isTicking = false }
-        await publishPending(relay: relay, flock: flock)
-        await setOutHeld(relay: relay, flock: flock)
-        await reportProgress(relay: relay, flock: flock)
-        await pollDelivered(relay: relay)
+        repeat {
+            rerunRequested = false
+            arrivalReportFailed = false
+            await publishPending(relay: relay, flock: flock)
+            await setOutHeld(relay: relay, flock: flock)
+            await reportProgress(relay: relay, flock: flock)
+            await pollDelivered(relay: relay)
+        } while rerunRequested
+        // The delivery itself failed to reach the post office (offline, or
+        // the letter isn't there yet): don't wait a whole minute to retry,
+        // the recipient is waiting for the push.
+        if arrivalReportFailed { scheduleArrivalRetry() }
+    }
+
+    /// Call whenever the flock changes: a ram that just reached the
+    /// recipient's gate is reported to the post office right away, which is
+    /// what makes the relay push both phones and hand the letter over.
+    func flockChanged() {
+        guard relay != nil, let flock else { return }
+        let waiting = flock.activeRams.contains { ram in
+            guard Self.isCustodian(of: ram),
+                  ram.status == .arrivedAtGate || ram.wasDeliveredInPerson else { return false }
+            return ([ram.letter].compactMap { $0 } + ram.passengerLetters).contains { letter in
+                guard let ticket = letter.relayTicket else { return false }
+                return !reportedDeliveries.contains(ticket.lookupID)
+            }
+        }
+        guard waiting else { return }
+        Task { await tick() }
+    }
+
+    private func scheduleArrivalRetry() {
+        guard arrivalRetryTask == nil else { return }
+        arrivalRetryTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(15))
+            guard let self, !Task.isCancelled else { return }
+            self.arrivalRetryTask = nil
+            await self.tick()
+        }
     }
 
     private func publishPending(relay: LetterRelayService, flock: FlockViewModel) async {
@@ -384,6 +426,7 @@ final class LetterTracker {
                     saveDeliveries()
                 } catch {
                     // Not published yet (a courier ahead of the sender), or offline.
+                    if arrived { arrivalReportFailed = true }
                     continue
                 }
             }

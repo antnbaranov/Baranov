@@ -5,7 +5,8 @@ import FoundationModels
 
 /// A short, wise saying for the profile, written on-device by Apple's Foundation Models.
 /// Returns nil whenever the model is unavailable (older iOS, no Apple Intelligence, unsupported
-/// language, model still downloading) so the caller can fall back to `CourierQuotes`.
+/// language, model still downloading) or the reply fails the checks in
+/// `AppLanguage.acceptModelText`, so the caller can fall back to the translated `CourierQuotes`.
 enum ShepherdQuoteService {
     static func generate(languageCode: String) async -> String? {
         #if canImport(FoundationModels)
@@ -23,37 +24,37 @@ enum ShepherdQuoteService {
         // No reply at all beats a reply in the wrong language: the caller
         // then shows the translated classic sayings.
         guard case .available = model.availability,
-              model.supportsLocale(Locale(identifier: languageCode)) else { return nil }
+              AppLanguage.modelSupports(code: languageCode) else { return nil }
 
-        let language = Locale(identifier: "en").localizedString(forIdentifier: languageCode) ?? Locale(identifier: "en").localizedString(forLanguageCode: languageCode) ?? "English"
         let session = LanguageModelSession(
             model: model,
-            instructions: """
-            You are a wise old shepherd who carries letters on foot together with a ram. \
-            Reply with exactly one short aphorism, at most 90 characters, written in \(language). \
-            Themes: slow travel, patience, steps, distance, letters, home. \
-            No quotation marks, no explanation, no emoji, no names. \
-            Every word of the aphorism must be in \(language), even though these instructions are in English.
-            """
+            instructions: AppLanguage.modelInstructions("""
+                You are an old shepherd who has walked letters across mountains and seas with a ram for fifty years.
+                Write exactly ONE short, original saying of at most 12 words, as a single sentence.
+                It should sound like folk wisdom a grandparent would say: calm, warm and a little dry, never preachy or grand.
+                Build it around the image of the day you are given, and connect it to walking, patience, distance, letters or home.
+                Do not start with "Remember" or "Always", do not address anyone by name, and do not use quotation marks.
+                """, code: languageCode)
         )
-        let images = ["dawn", "fog", "the road", "a night's rest", "wind", "mountains", "rain", "the sea"]
+        let images = [
+            "dawn", "fog", "the road", "a night's rest", "wind", "mountains", "rain", "the sea",
+            "a bridge", "snow", "a lamp in a window", "a well-worn boot", "a crossroads", "the first frost",
+        ]
         let seed = images.randomElement() ?? "the road"
         do {
             let response = try await session.respond(
-                to: "Write a new saying for the shepherd. Image of the day: \(seed).",
-                options: GenerationOptions(temperature: 1.0)
+                to: "Image of the day: \(seed). Write the saying.",
+                options: GenerationOptions(temperature: 0.9, maximumResponseTokens: 48)
             )
-            return clean(response.content)
+            guard let text = AppLanguage.acceptModelText(response.content, maxCharacters: 110, code: languageCode) else {
+                return nil
+            }
+            // One sentence only; a second one is the model explaining itself.
+            let sentenceEnds = text.filter { ".!?。！？".contains($0) }.count
+            return sentenceEnds <= 1 ? text : nil
         } catch {
             return nil
         }
     }
     #endif
-
-    private static func clean(_ raw: String) -> String? {
-        let quotes = CharacterSet(charactersIn: "\"«»“”„'").union(.whitespacesAndNewlines)
-        let text = raw.trimmingCharacters(in: quotes)
-        guard !text.isEmpty, AppLanguage.isInAppLanguage(text) else { return nil }
-        return String(text.prefix(140))
-    }
 }
