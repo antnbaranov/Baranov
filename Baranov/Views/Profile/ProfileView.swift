@@ -235,7 +235,8 @@ struct ProfileView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
                 ShareLink(item: String(localized: "Send me a letter on Baranov. My Shepherd ID: \(code)", bundle: .appLanguage, locale: .appLanguage)) {

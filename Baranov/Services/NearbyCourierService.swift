@@ -117,15 +117,19 @@ final class NearbyCourierService: NSObject {
 
     /// Shows a suggestion unless the same one was shown in the last day —
     /// a courier who lingers in range must not be announced every minute.
-    func suggest(_ suggestion: CourierSuggestion) {
-        guard self.suggestion == nil, incomingRequest == nil else { return }
+    /// Returns whether it was shown, so the caller can move on to the next courier when this one was
+    /// already dismissed or announced today.
+    @discardableResult
+    func suggest(_ suggestion: CourierSuggestion) -> Bool {
+        guard self.suggestion == nil, incomingRequest == nil else { return false }
         var shown = UserDefaults.standard.dictionary(forKey: Self.shownSuggestionsKey) as? [String: Date] ?? [:]
         let now = Date()
         shown = shown.filter { now.timeIntervalSince($0.value) < 86_400 }
-        guard shown[suggestion.id] == nil else { return }
+        guard shown[suggestion.id] == nil else { return false }
         shown[suggestion.id] = now
         UserDefaults.standard.set(shown, forKey: Self.shownSuggestionsKey)
         self.suggestion = suggestion
+        return true
     }
 
     func dismissSuggestion() {

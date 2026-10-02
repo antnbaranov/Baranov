@@ -300,6 +300,10 @@ struct RootView: View {
             .onChange(of: nearbyCouriers.couriers) { _, couriers in
                 suggestCourierMoments(couriers)
             }
+            .onChange(of: nearbyCouriers.suggestion) { _, current in
+                // A card was swiped away (or answered): offer the next courier worth a tap, if there is one.
+                if current == nil { suggestCourierMoments(nearbyCouriers.couriers) }
+            }
             .onChange(of: openToCarry) { syncNearby() }
             .onChange(of: scenePhase) { old, phase in
                 syncNearbyRadar()
@@ -822,11 +826,10 @@ struct RootView: View {
                         .caseInsensitiveCompare(name) == .orderedSame
                     && !(ram.letter.map(FlockViewModel.isAddressedToMe) ?? false)
             }) {
-                nearbyCouriers.suggest(CourierSuggestion(
+                if nearbyCouriers.suggest(CourierSuggestion(
                     kind: .deliver, courier: courier, ramID: atGate.id,
                     ramName: atGate.name, place: atGate.targetCity
-                ))
-                return
+                )) { return }
             }
         }
 
@@ -836,12 +839,11 @@ struct RootView: View {
                     && ram.letter != nil
                     && courier.isGoingSameWay(as: ram)
             }) {
-                nearbyCouriers.suggest(CourierSuggestion(
+                if nearbyCouriers.suggest(CourierSuggestion(
                     kind: .goingYourWay, courier: courier, ramID: going.id,
                     ramName: going.name,
                     place: courier.tripCity.isEmpty ? going.targetCity : courier.tripCity
-                ))
-                return
+                )) { return }
             }
         }
     }

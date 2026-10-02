@@ -593,6 +593,7 @@ struct ComposeLetterView: View {
             // a letter in progress is kept across that, not lost. A
             // dispatched or abandoned letter has already been cleared,
             // so this saves nothing then.
+            muse.cancelPrefetch()
             autosaveDraftIfNeeded()
         }
         .task {
@@ -975,8 +976,10 @@ struct ComposeLetterView: View {
             // The idea stays visible while writing — the model's line when
             // there is one, otherwise the next static prompt — so the
             // "Idea" button always has something to visibly change.
-            nudgeBadge(museNudge ?? writingPrompts[promptIndex % writingPrompts.count])
-                .id(museNudge ?? "static-\(promptIndex)")
+            if showNudge {
+                nudgeBadge(museNudge ?? staticPrompt)
+                    .id(museNudge ?? "static-\(promptIndex)")
+            }
 
             ZStack(alignment: .topLeading) {
                 TextField("", text: $messageBody, axis: .vertical)
@@ -999,6 +1002,7 @@ struct ComposeLetterView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: promptIndex)
+            .animation(.easeInOut(duration: 0.25), value: showNudge)
             .animation(.easeInOut(duration: 0.2), value: isMessageFocused)
             .animation(.easeInOut(duration: 0.2), value: messageBody.isEmpty)
 
@@ -1020,7 +1024,7 @@ struct ComposeLetterView: View {
                 .accessibilityLabel(attachedPhoto == nil ? "Draw a picture" : "Edit drawing")
 
                 Button {
-                    withAnimation { promptIndex += 1 }
+                    withAnimation { promptIndex += 1; ideaRequested = true }
                     promptTick += 1
                     Task { await refreshMuseNudge(force: true) }
                 } label: {
@@ -1034,6 +1038,21 @@ struct ComposeLetterView: View {
                     .frame(minHeight: 24)
                 }
                 .accessibilityLabel("Show another writing idea")
+
+                if LetterMuseService.isSupported {
+                    Menu {
+                        Picker("Who it's to", selection: $relationship) {
+                            Text("Not specified").tag(LetterMuseService.Relationship?.none)
+                            ForEach(LetterMuseService.Relationship.allCases, id: \.self) { kind in
+                                Text(kind.displayName).tag(Optional(kind))
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "person.2")
+                            .frame(minHeight: 24)
+                    }
+                    .accessibilityLabel("Who it's to")
+                }
 
                 dictationButton
 
@@ -1067,6 +1086,14 @@ struct ComposeLetterView: View {
         .sensoryFeedback(.selection, trigger: promptTick)
         .task(id: museContextKey) {
             await refreshMuseNudge(force: false)
+        }
+        .onChange(of: relationship) { _, _ in
+            Task { await refreshMuseNudge(force: true) }
+        }
+        .onChange(of: messageWordCount) { _, words in
+            // Once the letter is underway the idea steps aside (a tap on
+            // "Idea" brings it back); nothing is written ahead for it.
+            if words < Self.ideaWordLimit { ideaRequested = false } else { muse.cancelPrefetch() }
         }
         .onChange(of: messageDictationService.transcript) { _, newValue in
             guard !newValue.isEmpty else { return }
@@ -1195,8 +1222,15 @@ struct ComposeLetterView: View {
 
     @FocusState private var isMessageFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var promptIndex = Int.random(in: 0..<8)
+    @State private var promptIndex = 0
+    @State private var promptDeck = ComposeLetterView.makePromptDeck()
     @State private var promptTick = 0
+    @State private var relationship: LetterMuseService.Relationship?
+    @State private var ideaRequested = false
+    private static let ideaWordLimit = 25
+
+    /// The idea card shows on an empty or just-begun page, or when asked for.
+    private var showNudge: Bool { messageWordCount < Self.ideaWordLimit || ideaRequested }
 
     /// The on-device model's one-sentence nudge for *this* letter, when
     /// the device can make one (iOS 26 + Apple Intelligence). `nil` means
@@ -1207,7 +1241,7 @@ struct ComposeLetterView: View {
     /// Re-asks for a nudge when who or where changes — not on every
     /// keystroke, and never with the letter's text.
     private var museContextKey: String {
-        "\(recipientName.trimmed)|\(targetCity.trimmed)|\(currentCity.trimmed)"
+        "\(recipientName.trimmed)|\(targetCity.trimmed)|\(currentCity.trimmed)|\(relationship?.rawValue ?? "")"
     }
 
     private func refreshMuseNudge(force: Bool) async {
@@ -1227,7 +1261,8 @@ struct ComposeLetterView: View {
             destinationCity: targetCity.trimmed,
             originCity: currentCity.trimmed,
             distanceMeters: distance,
-            needsHandoff: needsHandoffCity
+            needsHandoff: needsHandoffCity,
+            relationship: relationship
         )
         if let nudge = await muse.nudge(for: context) {
             withAnimation { museNudge = nudge }
@@ -1235,17 +1270,58 @@ struct ComposeLetterView: View {
     }
 
     /// Prompts for the blank page — a nudge toward the kind of thing a
-    /// slow letter is for, never a template to fill in.
+    /// slow letter is for, never a template to fill in. Four groups of
+    /// five (reflective, warmth, distance, sensory/weather), so the weather
+    /// is only a quarter of what can show.
+    private static let promptGroupSize = 5
+
     private var writingPrompts: [String] { [
-        String(localized: "Tell them what the light is like where you are right now.", bundle: .appLanguage, locale: .appLanguage),
         String(localized: "Something you'd never say in a text, because it needs a whole page.", bundle: .appLanguage, locale: .appLanguage),
-        String(localized: "What you were doing an hour ago, in enough detail that they can see it.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What you'd want them to know if the ram took a year to arrive.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What is something you've been carrying quietly this week?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What feels subtly different this year compared to last?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "Something you haven't said out loud to anyone yet, but could say on paper.", bundle: .appLanguage, locale: .appLanguage),
         String(localized: "A thing they said once that you still think about.", bundle: .appLanguage, locale: .appLanguage),
-        String(localized: "By the time this reaches you, the weather will have changed. Describe today's.", bundle: .appLanguage, locale: .appLanguage),
         String(localized: "The smallest good thing that happened this week.", bundle: .appLanguage, locale: .appLanguage),
         String(localized: "Ask them one real question and leave room for the answer.", bundle: .appLanguage, locale: .appLanguage),
-        String(localized: "What you'd want them to know if the ram took a year to arrive.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "A moment you shared that still makes you smile when you think of it.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What small thing happened today that you wish you could tell them right now?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What you were doing an hour ago, in enough detail that they can see it.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "Describe one detail of where you're sitting right now that they haven't seen.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What sounds are outside your window tonight?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "Something near you that you keep wanting to show them.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What do you do differently now that you're so far apart?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "Tell them what the light is like where you are right now.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "By the time this reaches you, the weather will have changed. Describe today's.", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What does the street sound like when you step outside today?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "How does the air feel when you open your door this morning?", bundle: .appLanguage, locale: .appLanguage),
+        String(localized: "What are people wearing on your street this time of year?", bundle: .appLanguage, locale: .appLanguage),
     ] }
+
+    /// A shuffled deck of indices into `writingPrompts`: every prompt shows
+    /// once before any repeats, and neighbours always come from different
+    /// groups (round-robin across the four, in a random group order).
+    private static func makePromptDeck() -> [Int] {
+        let groups = (0..<4).shuffled().map { g in
+            (0..<promptGroupSize).map { g * promptGroupSize + $0 }.shuffled()
+        }
+        return (0..<promptGroupSize).flatMap { i in groups.map { $0[i] } }
+    }
+
+    /// The next prompt from the shuffled deck. When the model just failed to
+    /// write an idea of some kind, the next one from that same group.
+    private var staticPrompt: String {
+        let prompts = writingPrompts
+        let deck = promptDeck
+        var pick = deck[promptIndex % deck.count]
+        if let group = muse.failedGroup {
+            for step in 0..<deck.count {
+                let candidate = deck[(promptIndex + step) % deck.count]
+                if candidate / Self.promptGroupSize == group { pick = candidate; break }
+            }
+        }
+        return prompts[pick % prompts.count]
+    }
 
     private var messageWordCount: Int {
         messageBody.split { $0.isWhitespace || $0.isNewline }.count

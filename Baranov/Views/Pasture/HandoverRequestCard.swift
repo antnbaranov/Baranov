@@ -85,6 +85,7 @@ struct HandoverRequestCard: View {
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.horizontal, 16)
+        .swipeToDismiss(onDismiss: onDecline)
         .sensoryFeedback(.impact(weight: .medium), trigger: appeared)
         .onAppear { appeared = true }
         .transition(.move(edge: .top).combined(with: .opacity))

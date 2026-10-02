@@ -18,7 +18,6 @@ struct CourierSuggestionCard: View {
     let onDismiss: () -> Void
 
     @State private var appeared = false
-
     private var title: String {
         switch suggestion.kind {
         case .goingYourWay:
@@ -86,6 +85,7 @@ struct CourierSuggestionCard: View {
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.horizontal, 16)
+        .swipeToDismiss(onDismiss: onDismiss)
         .sensoryFeedback(.impact(weight: .light), trigger: appeared)
         .onAppear { appeared = true }
         .transition(.move(edge: .top).combined(with: .opacity))

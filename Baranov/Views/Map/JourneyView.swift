@@ -69,6 +69,8 @@ struct JourneyView: View {
     @Environment(SavedCourierStore.self) private var savedCouriers
     /// The courier whose card is open on the map (see `NearbyCourierCard`).
     @State private var selectedNearbyCourier: NearbyCourier?
+    /// Couriers the "in range" badge was swiped away for. A courier who arrives later brings it back.
+    @State private var dismissedBadgeCourierIDs: Set<String> = []
     @Environment(EntitlementService.self) private var entitlementService
     @AppStorage("com.baranov.hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(AppLanguagePickerView.storageKey) private var selectedLanguageCode = Locale.current.language.languageCode?.identifier ?? "en"
@@ -1474,10 +1476,13 @@ struct JourneyView: View {
                     isConnecting: nearbyCouriers.handoverCourierID == courier.id
                 )
                 .padding(.top, 8)
-            } else if let closest = nearbyCouriers.couriers.first {
-                NearbyRangeBadge(count: nearbyCouriers.couriers.count) {
+            } else if let closest = nearbyCouriers.couriers.first,
+                      nearbyCouriers.couriers.contains(where: { !dismissedBadgeCourierIDs.contains($0.id) }) {
+                NearbyRangeBadge(count: nearbyCouriers.couriers.count, onTap: {
                     withAnimation(.snappy) { selectedNearbyCourier = closest }
-                }
+                }, onDismiss: {
+                    dismissedBadgeCourierIDs.formUnion(nearbyCouriers.couriers.map(\.id))
+                })
                 .padding(.top, 8)
             }
         }
@@ -1486,6 +1491,8 @@ struct JourneyView: View {
             withAnimation(.snappy) { selectedNearbyCourier = nil }
         }
         .onChange(of: nearbyCouriers.couriers) { _, couriers in
+            // Someone who left range and comes back counts as new again.
+            dismissedBadgeCourierIDs.formIntersection(couriers.map(\.id))
             if let selected = selectedNearbyCourier, !couriers.contains(selected) {
                 withAnimation(.snappy) { selectedNearbyCourier = nil }
             }
@@ -2397,6 +2404,7 @@ struct JourneyView: View {
                 .background(.regularMaterial, in: Capsule())
             }
             .buttonStyle(.plain)
+            .swipeToDismiss(isEnabled: isReturnToMePillVisible) { hideReturnToMePill() }
             .opacity(isReturnToMePillVisible ? 1 : 0)
             .allowsHitTesting(isReturnToMePillVisible)
             .transition(.move(edge: .top).combined(with: .opacity))
@@ -2408,6 +2416,15 @@ struct JourneyView: View {
             .onAppear { revealReturnToMePill() }
             .onChange(of: isViewingUser) { _, _ in revealReturnToMePill() }
             .onChange(of: offset) { _, _ in revealReturnToMePill() }
+        }
+    }
+
+    /// Swiped away: hides the pill now. It comes back by itself on the next real change (who is being
+    /// viewed, or the distance), like when its timer runs out.
+    private func hideReturnToMePill() {
+        returnToMePillDismissTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) {
+            isReturnToMePillVisible = false
         }
     }
 

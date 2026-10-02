@@ -81,6 +81,8 @@ struct HoofbeatOverlay: View {
                 }
             }
         }
+        // Swipe cancels, exactly like the X / Cancel — except mid-transfer, when cancelling would corrupt it.
+        .swipeToDismiss(isEnabled: showDismiss && onDismiss != nil) { onDismiss?() }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: phase)
         .sensoryFeedback(.success, trigger: successTick)
     }

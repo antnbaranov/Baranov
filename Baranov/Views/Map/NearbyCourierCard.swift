@@ -121,6 +121,7 @@ struct NearbyCourierCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, 16)
+        .swipeToDismiss(isEnabled: !isConnecting, onDismiss: onClose)
         .sensoryFeedback(.selection, trigger: saveTick)
         .sensoryFeedback(.impact(weight: .light), trigger: isConnecting) { _, now in now }
         .transition(.move(edge: .top).combined(with: .opacity))
@@ -186,6 +187,7 @@ struct NearbyDiscoveryPrompt: View {
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .padding(.horizontal, 16)
+        .swipeToDismiss(onDismiss: onNotNow)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
@@ -195,6 +197,8 @@ struct NearbyDiscoveryPrompt: View {
 struct NearbyRangeBadge: View {
     let count: Int
     let onTap: () -> Void
+    /// Swiped away; it stays away until a courier it hasn't counted yet comes into range.
+    let onDismiss: () -> Void
 
     var body: some View {
         Button(action: onTap) {
@@ -211,6 +215,7 @@ struct NearbyRangeBadge: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
+        .swipeToDismiss(onDismiss: onDismiss)
         .accessibilityHint("Shows the closest courier")
         .transition(.move(edge: .top).combined(with: .opacity))
     }
